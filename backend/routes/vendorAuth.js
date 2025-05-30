@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const Vendor = require('../models/Vendor');
+const auth = require('../middleware/auth');
 
 // Test route
 router.get('/test', (req, res) => {
@@ -145,16 +146,113 @@ router.post('/login', async (req, res) => {
 });
 
 // Get vendor profile
-router.get('/profile', async (req, res) => {
+router.get('/profile', auth, async (req, res) => {
   try {
+    console.log('Fetching profile for vendor:', req.vendor._id);
     const vendor = await Vendor.findById(req.vendor._id);
     if (!vendor) {
       return res.status(404).json({ message: 'Vendor not found' });
     }
-    res.json(vendor.getPublicProfile());
+
+    const profile = vendor.getPublicProfile();
+    // Transform businessHours to openingHours for frontend compatibility
+    if (profile.businessHours) {
+      profile.openingHours = profile.businessHours;
+      delete profile.businessHours;
+    }
+    res.json(profile);
   } catch (error) {
     console.error('Profile error:', error);
     res.status(500).json({ message: 'Error fetching profile' });
+  }
+});
+
+// Update vendor profile
+router.put('/profile', auth, async (req, res) => {
+  try {
+    console.log('Updating profile for vendor:', req.vendor._id);
+    const updates = req.body;
+    const vendor = await Vendor.findById(req.vendor._id);
+    
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    // Transform openingHours to businessHours for backend compatibility
+    if (updates.openingHours) {
+      updates.businessHours = updates.openingHours;
+      delete updates.openingHours;
+    }
+
+    // Update fields
+    Object.keys(updates).forEach(key => {
+      if (key !== 'password' && key !== 'email' && key !== 'role' && key !== 'status') {
+        vendor[key] = updates[key];
+      }
+    });
+
+    await vendor.save();
+    const profile = vendor.getPublicProfile();
+    // Transform businessHours to openingHours for frontend compatibility
+    if (profile.businessHours) {
+      profile.openingHours = profile.businessHours;
+      delete profile.businessHours;
+    }
+    res.json(profile);
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ message: 'Error updating profile' });
+  }
+});
+
+// Update opening hours
+router.patch('/opening-hours', auth, async (req, res) => {
+  try {
+    console.log('Updating opening hours for vendor:', req.vendor._id);
+    const { openingHours } = req.body;
+    const vendor = await Vendor.findById(req.vendor._id);
+    
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    vendor.businessHours = openingHours;
+    await vendor.save();
+    const profile = vendor.getPublicProfile();
+    // Transform businessHours to openingHours for frontend compatibility
+    if (profile.businessHours) {
+      profile.openingHours = profile.businessHours;
+      delete profile.businessHours;
+    }
+    res.json(profile);
+  } catch (error) {
+    console.error('Update opening hours error:', error);
+    res.status(500).json({ message: 'Error updating opening hours' });
+  }
+});
+
+// Toggle open status
+router.patch('/toggle-status', auth, async (req, res) => {
+  try {
+    console.log('Toggling status for vendor:', req.vendor._id);
+    const vendor = await Vendor.findById(req.vendor._id);
+    
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    vendor.isOpen = !vendor.isOpen;
+    await vendor.save();
+    const profile = vendor.getPublicProfile();
+    // Transform businessHours to openingHours for frontend compatibility
+    if (profile.businessHours) {
+      profile.openingHours = profile.businessHours;
+      delete profile.businessHours;
+    }
+    res.json(profile);
+  } catch (error) {
+    console.error('Toggle status error:', error);
+    res.status(500).json({ message: 'Error toggling status' });
   }
 });
 

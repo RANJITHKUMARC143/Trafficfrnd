@@ -3,9 +3,12 @@ import { authService } from '../services/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
+  setIsAuthenticated: (value: boolean) => void;
   vendor: any | null;
+  setVendor: (vendor: any | null) => void;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  checkAuthStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -13,10 +16,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [vendor, setVendor] = useState<any | null>(null);
-
-  useEffect(() => {
-    checkAuthStatus();
-  }, []);
 
   const checkAuthStatus = async () => {
     try {
@@ -29,6 +28,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthenticated(false);
     }
   };
+
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
 
   const login = async (email: string, password: string) => {
     try {
@@ -53,7 +56,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, vendor, login, logout }}>
+    <AuthContext.Provider 
+      value={{ 
+        isAuthenticated, 
+        setIsAuthenticated,
+        vendor,
+        setVendor,
+        login, 
+        logout,
+        checkAuthStatus
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

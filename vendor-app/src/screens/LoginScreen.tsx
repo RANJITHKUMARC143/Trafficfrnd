@@ -15,7 +15,7 @@ import { Button } from '../components/Button';
 import { theme } from '../theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { authService } from '../services/api';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');

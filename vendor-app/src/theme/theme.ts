@@ -24,6 +24,15 @@ export const spacing = {
   xxl: 48,
 };
 
+export const borderRadius = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  round: 9999,
+};
+
 export const typography = {
   fontFamily: {
     regular: 'System',
@@ -89,6 +98,7 @@ export const navigationTheme = {
 export const theme = {
   colors,
   spacing,
+  borderRadius,
   typography,
   shadows,
   navigationTheme,

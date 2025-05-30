@@ -42,6 +42,10 @@ const vendorSchema = new mongoose.Schema({
     enum: ['active', 'inactive', 'suspended'],
     default: 'active'
   },
+  isOpen: {
+    type: Boolean,
+    default: false
+  },
   location: {
     type: {
       type: String,

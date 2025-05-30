@@ -1,113 +1,207 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
-import { Card } from '../components/Card';
-import { Button } from '../components/Button';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, StyleSheet, StatusBar, TouchableOpacity } from 'react-native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MenuSection } from '../components/MenuSection';
 import { theme } from '../theme/theme';
+import { Text } from '../components/Text';
+import { menuService, MenuItem } from '../services/menuService';
+import { authService } from '../services/api';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../contexts/AuthContext';
 
-interface MenuItemProps {
-  name: string;
-  price: string;
-  description: string;
-  category: string;
-  isAvailable: boolean;
-}
+type MenuStackParamList = {
+  MenuList: undefined;
+  MenuItemDetail: { item: MenuItem };
+  MenuItemForm: { mode: 'add' | 'edit'; initialData?: MenuItem };
+};
 
-const MenuItem: React.FC<MenuItemProps> = ({
-  name,
-  price,
-  description,
-  category,
-  isAvailable,
-}) => (
-  <Card style={styles.menuItem}>
-    <View style={styles.menuItemContent}>
-      <View style={styles.menuItemImage}>
-        <Ionicons name="fast-food" size={40} color={theme.colors.primary} />
-      </View>
-      <View style={styles.menuItemDetails}>
-        <Text style={styles.menuItemName}>{name}</Text>
-        <Text style={styles.menuItemDescription}>{description}</Text>
-        <Text style={styles.menuItemPrice}>{price}</Text>
-      </View>
-      <View style={styles.menuItemActions}>
-        <TouchableOpacity style={styles.editButton}>
-          <Ionicons name="pencil" size={20} color={theme.colors.primary} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.deleteButton}>
-          <Ionicons name="trash" size={20} color={theme.colors.error} />
-        </TouchableOpacity>
-      </View>
-    </View>
-    <View style={styles.menuItemFooter}>
-      <Text style={styles.menuItemCategory}>{category}</Text>
-      <View style={styles.availabilityContainer}>
-        <Text style={styles.availabilityText}>
-          {isAvailable ? 'Available' : 'Not Available'}
-        </Text>
-        <View
-          style={[
-            styles.availabilityIndicator,
-            {
-              backgroundColor: isAvailable
-                ? theme.colors.success
-                : theme.colors.error,
-            },
-          ]}
-        />
-      </View>
-    </View>
-  </Card>
-);
+type MenuScreenNavigationProp = NativeStackNavigationProp<MenuStackParamList>;
 
 export const MenuScreen = () => {
-  const menuItems: MenuItemProps[] = [
-    {
-      name: 'Margherita Pizza',
-      price: '₹299',
-      description: 'Classic tomato sauce, mozzarella, and basil',
-      category: 'Pizza',
-      isAvailable: true,
-    },
-    {
-      name: 'Chicken Burger',
-      price: '₹199',
-      description: 'Grilled chicken patty with fresh vegetables',
-      category: 'Burger',
-      isAvailable: true,
-    },
-    {
-      name: 'Pasta Alfredo',
-      price: '₹249',
-      description: 'Creamy white sauce pasta with parmesan',
-      category: 'Pasta',
-      isAvailable: false,
-    },
-  ];
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated } = useAuth();
+  const navigation = useNavigation<MenuScreenNavigationProp>();
+  const route = useRoute();
+
+  // Check authentication status
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const vendor = await authService.getCurrentVendor();
+        if (!vendor) {
+          navigation.navigate('Login');
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        navigation.navigate('Login');
+      }
+    };
+
+    checkAuth();
+  }, [navigation]);
+
+  // Initialize menu service and set up real-time listeners
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const setupMenuService = async () => {
+      try {
+        await menuService.initialize();
+        
+        // Set up real-time listeners
+        menuService.onMenuUpdate((items) => {
+          setMenuItems(items);
+        });
+
+        menuService.onItemAvailabilityChange((item) => {
+          setMenuItems(prevItems => 
+            prevItems.map(prevItem => 
+              prevItem._id === item._id ? item : prevItem
+            )
+          );
+        });
+      } catch (error) {
+        console.error('Error setting up menu service:', error);
+        setError('Failed to initialize menu service');
+        navigation.navigate('Login');
+      }
+    };
+
+    setupMenuService();
+
+    // Cleanup
+    return () => {
+      menuService.disconnect();
+    };
+  }, [isAuthenticated, navigation]);
+
+  // Fetch menu items when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (!isAuthenticated) return;
+
+      const fetchMenuItems = async () => {
+        try {
+          setLoading(true);
+          const items = await menuService.getMenuItems();
+          setMenuItems(items);
+          setError(null);
+        } catch (error) {
+          console.error('Error fetching menu items:', error);
+          if (error instanceof Error && error.message === 'No authentication token found') {
+            navigation.navigate('Login');
+          } else {
+            setError('Failed to fetch menu items');
+          }
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchMenuItems();
+    }, [isAuthenticated, navigation])
+  );
+
+  // Handle form submission from MenuItemForm
+  useFocusEffect(
+    useCallback(() => {
+      const params = route.params as { formData?: any; mode?: 'add' | 'edit'; itemId?: string } | undefined;
+      
+      if (params?.formData) {
+        const handleFormSubmission = async () => {
+          try {
+            setLoading(true);
+            if (params.mode === 'add') {
+              const response = await menuService.addMenuItem(params.formData);
+              console.log('Menu item added successfully:', response);
+            } else if (params.mode === 'edit' && params.itemId) {
+              const response = await menuService.updateMenuItem(params.itemId, params.formData);
+              console.log('Menu item updated successfully:', response);
+            }
+            // Clear the params after handling
+            navigation.setParams({ formData: undefined, mode: undefined, itemId: undefined });
+          } catch (error: any) {
+            console.error('Error handling form submission:', error);
+            setError(error.response?.data?.message || 'Failed to save menu item');
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        handleFormSubmission();
+      }
+    }, [route.params])
+  );
+
+  const handleItemPress = useCallback((item: MenuItem) => {
+    navigation.navigate('MenuItemDetail', { 
+      item,
+      onDelete: async () => {
+        try {
+          await menuService.deleteMenuItem(item._id);
+          // Real-time update will handle the UI update
+        } catch (error) {
+          console.error('Error deleting menu item:', error);
+          setError('Failed to delete menu item');
+        }
+      },
+      onEdit: async (updatedItem: MenuItem) => {
+        try {
+          await menuService.updateMenuItem(item._id, updatedItem);
+          // Real-time update will handle the UI update
+        } catch (error) {
+          console.error('Error updating menu item:', error);
+          setError('Failed to update menu item');
+        }
+      }
+    });
+  }, [navigation]);
+
+  const handleAddItem = useCallback(() => {
+    navigation.navigate('MenuItemForm', {
+      mode: 'add'
+    });
+  }, [navigation]);
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+      navigation.navigate('Login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      setError('Failed to log out');
+    }
+  };
+
+  if (!isAuthenticated) {
+    return null; // Will be redirected to Login screen
+  }
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={theme.colors.background} />
       <View style={styles.header}>
-        <Text style={styles.title}>Menu Items</Text>
-        <Button
-          title="Add New Item"
-          onPress={() => {}}
-          icon="add"
-          style={styles.addButton}
-        />
+        <View style={styles.headerContent}>
+          <Text variant="h2" style={styles.title}>Menu Management</Text>
+          <Text variant="caption" style={styles.subtitle}>Manage your restaurant's menu items</Text>
+        </View>
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+          <Ionicons name="log-out-outline" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
       </View>
-
-      <ScrollView style={styles.menuList}>
-        {menuItems.map((item, index) => (
-          <MenuItem key={index} {...item} />
-        ))}
-      </ScrollView>
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text variant="caption" style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+      <MenuSection
+        items={menuItems}
+        onItemPress={handleItemPress}
+        loading={loading}
+      />
     </View>
   );
 };
@@ -118,98 +212,36 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   header: {
+    padding: 16,
+    paddingTop: 24,
+    backgroundColor: theme.colors.background,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
+  },
+  headerContent: {
+    flex: 1,
   },
   title: {
-    fontSize: theme.typography.fontSize.xl,
-    fontFamily: theme.typography.fontFamily.bold,
+    fontSize: 24,
+    fontWeight: 'bold',
     color: theme.colors.text,
+    marginBottom: 4,
   },
-  addButton: {
-    width: 'auto',
+  subtitle: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
   },
-  menuList: {
-    flex: 1,
-    padding: theme.spacing.md,
-  },
-  menuItem: {
-    marginBottom: theme.spacing.md,
-  },
-  menuItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  menuItemImage: {
-    width: 80,
-    height: 80,
+  errorContainer: {
+    padding: 16,
+    backgroundColor: theme.colors.error + '20',
+    marginHorizontal: 16,
     borderRadius: 8,
-    backgroundColor: theme.colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: theme.spacing.md,
   },
-  menuItemDetails: {
-    flex: 1,
+  errorText: {
+    color: theme.colors.error,
   },
-  menuItemName: {
-    fontSize: theme.typography.fontSize.lg,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  menuItemDescription: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.xs,
-  },
-  menuItemPrice: {
-    fontSize: theme.typography.fontSize.md,
-    fontFamily: theme.typography.fontFamily.medium,
-    color: theme.colors.primary,
-  },
-  menuItemActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  editButton: {
-    padding: theme.spacing.sm,
-    marginLeft: theme.spacing.sm,
-  },
-  deleteButton: {
-    padding: theme.spacing.sm,
-    marginLeft: theme.spacing.sm,
-  },
-  menuItemFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: theme.spacing.md,
-    paddingTop: theme.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  menuItemCategory: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textSecondary,
-  },
-  availabilityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  availabilityText: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textSecondary,
-    marginRight: theme.spacing.xs,
-  },
-  availabilityIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  logoutButton: {
+    padding: 8,
   },
 }); 

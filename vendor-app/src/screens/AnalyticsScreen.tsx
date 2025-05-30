@@ -1,160 +1,181 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
-  Dimensions,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
-import { Card } from '../components/Card';
 import { theme } from '../theme/theme';
+import { Card } from '../components/Card';
+import { analyticsService, AnalyticsData } from '../services/analyticsService';
+import { useAuth } from '../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
-const screenWidth = Dimensions.get('window').width;
-
-interface MetricCardProps {
-  title: string;
-  value: string;
-  change: string;
-  isPositive: boolean;
-  icon: string;
-}
-
-const MetricCard: React.FC<MetricCardProps> = ({
-  title,
-  value,
-  change,
-  isPositive,
-  icon,
-}) => (
-  <Card style={styles.metricCard}>
-    <View style={styles.metricHeader}>
-      <Ionicons name={icon as any} size={24} color={theme.colors.primary} />
-      <Text style={styles.metricTitle}>{title}</Text>
-    </View>
-    <Text style={styles.metricValue}>{value}</Text>
-    <View style={styles.changeContainer}>
-      <Ionicons
-        name={isPositive ? 'arrow-up' : 'arrow-down'}
-        size={16}
-        color={isPositive ? theme.colors.success : theme.colors.error}
-      />
-      <Text
-        style={[
-          styles.changeText,
-          { color: isPositive ? theme.colors.success : theme.colors.error },
-        ]}
-      >
-        {change}
-      </Text>
-    </View>
-  </Card>
-);
-
-const SimpleBarChart: React.FC<{ data: number[]; labels: string[] }> = ({ data, labels }) => {
-  const maxValue = Math.max(...data);
-  
-  return (
-    <View style={styles.chartContainer}>
-      {data.map((value, index) => (
-        <View key={index} style={styles.barContainer}>
-          <View style={styles.barWrapper}>
-            <View
-              style={[
-                styles.bar,
-                {
-                  height: `${(value / maxValue) * 100}%`,
-                  backgroundColor: theme.colors.primary,
-                },
-              ]}
-            />
-          </View>
-          <Text style={styles.barLabel}>{labels[index]}</Text>
-        </View>
-      ))}
-    </View>
-  );
-};
-
 export const AnalyticsScreen = () => {
-  const revenueData = [2000, 4500, 2800, 8000, 9900, 4300, 5000];
-  const ordersData = [20, 45, 28, 80, 99, 43, 50];
-  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated } = useAuth();
+
+  const fetchAnalytics = async () => {
+    try {
+      const data = await analyticsService.getAnalytics();
+      setAnalytics(data);
+      setError(null);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      setError('Failed to fetch analytics data');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchAnalytics();
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const setupAnalytics = async () => {
+      try {
+        await analyticsService.initialize();
+        
+        // Set up real-time listeners
+        analyticsService.onAnalyticsUpdate((updatedAnalytics) => {
+          console.log('Received analytics update:', updatedAnalytics);
+          setAnalytics(updatedAnalytics);
+        });
+
+        analyticsService.onNewOrder(() => {
+          fetchAnalytics(); // Refresh analytics when new order arrives
+        });
+
+        analyticsService.onOrderStatusUpdate(() => {
+          fetchAnalytics(); // Refresh analytics when order status changes
+        });
+
+        analyticsService.onOrderCancelled(() => {
+          fetchAnalytics(); // Refresh analytics when order is cancelled
+        });
+
+        // Initial fetch
+        await fetchAnalytics();
+      } catch (error) {
+        console.error('Error setting up analytics:', error);
+        setError('Failed to initialize analytics');
+      }
+    };
+
+    setupAnalytics();
+
+    // Cleanup
+    return () => {
+      analyticsService.disconnect();
+    };
+  }, [isAuthenticated]);
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Time Period Selector */}
-      <View style={styles.periodSelector}>
-        <TouchableOpacity style={[styles.periodButton, styles.activePeriod]}>
-          <Text style={styles.activePeriodText}>Week</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.periodButton}>
-          <Text style={styles.periodText}>Month</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.periodButton}>
-          <Text style={styles.periodText}>Year</Text>
-        </TouchableOpacity>
-      </View>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
 
-      {/* Key Metrics */}
-      <View style={styles.metricsContainer}>
-        <MetricCard
-          title="Total Revenue"
-          value="₹45,250"
-          change="+12.5%"
-          isPositive={true}
-          icon="cash-outline"
-        />
-        <MetricCard
-          title="Total Orders"
-          value="156"
-          change="+8.2%"
-          isPositive={true}
-          icon="receipt-outline"
-        />
-        <MetricCard
-          title="Average Order"
-          value="₹290"
-          change="-2.1%"
-          isPositive={false}
-          icon="cart-outline"
-        />
-        <MetricCard
-          title="Customer Rating"
-          value="4.8"
-          change="+0.2"
-          isPositive={true}
-          icon="star-outline"
-        />
-      </View>
-
-      {/* Revenue Chart */}
-      <Card style={styles.chartCard}>
-        <Text style={styles.chartTitle}>Revenue Trend</Text>
-        <SimpleBarChart data={revenueData} labels={labels} />
+      {/* Today's Overview */}
+      <Card style={styles.section}>
+        <Text style={styles.sectionTitle}>Today's Overview</Text>
+        <View style={styles.metricsContainer}>
+          <View style={styles.metricItem}>
+            <Ionicons name="cash-outline" size={24} color={theme.colors.primary} />
+            <Text style={styles.metricValue}>₹{analytics?.metrics.today.revenue.toFixed(2) || '0.00'}</Text>
+            <Text style={styles.metricLabel}>Revenue</Text>
+          </View>
+          <View style={styles.metricItem}>
+            <Ionicons name="receipt-outline" size={24} color={theme.colors.secondary} />
+            <Text style={styles.metricValue}>{analytics?.metrics.today.orders || 0}</Text>
+            <Text style={styles.metricLabel}>Orders</Text>
+          </View>
+          <View style={styles.metricItem}>
+            <Ionicons name="trending-up-outline" size={24} color={theme.colors.accent} />
+            <Text style={styles.metricValue}>₹{analytics?.metrics.today.averageOrderValue.toFixed(2) || '0.00'}</Text>
+            <Text style={styles.metricLabel}>Avg. Order</Text>
+          </View>
+        </View>
       </Card>
 
-      {/* Orders Chart */}
-      <Card style={styles.chartCard}>
-        <Text style={styles.chartTitle}>Orders Trend</Text>
-        <SimpleBarChart data={ordersData} labels={labels} />
+      {/* Comparison with Yesterday */}
+      <Card style={styles.section}>
+        <Text style={styles.sectionTitle}>vs Yesterday</Text>
+        <View style={styles.comparisonContainer}>
+          <View style={styles.comparisonItem}>
+            <Text style={styles.comparisonLabel}>Revenue</Text>
+            <Text style={styles.comparisonValue}>
+              ₹{analytics?.metrics.yesterday.revenue.toFixed(2) || '0.00'}
+            </Text>
+          </View>
+          <View style={styles.comparisonItem}>
+            <Text style={styles.comparisonLabel}>Orders</Text>
+            <Text style={styles.comparisonValue}>
+              {analytics?.metrics.yesterday.orders || 0}
+            </Text>
+          </View>
+          <View style={styles.comparisonItem}>
+            <Text style={styles.comparisonLabel}>Avg. Order</Text>
+            <Text style={styles.comparisonValue}>
+              ₹{analytics?.metrics.yesterday.averageOrderValue.toFixed(2) || '0.00'}
+            </Text>
+          </View>
+        </View>
       </Card>
 
-      {/* Top Items */}
-      <Card style={styles.topItemsCard}>
+      {/* Top Selling Items */}
+      <Card style={styles.section}>
         <Text style={styles.sectionTitle}>Top Selling Items</Text>
-        <View style={styles.topItem}>
-          <Text style={styles.itemName}>Margherita Pizza</Text>
-          <Text style={styles.itemSales}>45 orders</Text>
-        </View>
-        <View style={styles.topItem}>
-          <Text style={styles.itemName}>Chicken Burger</Text>
-          <Text style={styles.itemSales}>38 orders</Text>
-        </View>
-        <View style={styles.topItem}>
-          <Text style={styles.itemName}>Pasta Alfredo</Text>
-          <Text style={styles.itemSales}>32 orders</Text>
+        {analytics?.topSellingItems.map((item, index) => (
+          <View key={index} style={styles.itemRow}>
+            <Text style={styles.itemName}>{item.name}</Text>
+            <View style={styles.itemDetails}>
+              <Text style={styles.itemQuantity}>x{item.quantity}</Text>
+              <Text style={styles.itemRevenue}>₹{item.revenue.toFixed(2)}</Text>
+            </View>
+          </View>
+        ))}
+      </Card>
+
+      {/* Order Status Distribution */}
+      <Card style={styles.section}>
+        <Text style={styles.sectionTitle}>Order Status</Text>
+        <View style={styles.statusContainer}>
+          {Object.entries(analytics?.statusDistribution || {}).map(([status, count]) => (
+            <View key={status} style={styles.statusItem}>
+              <Text style={styles.statusLabel}>{status}</Text>
+              <Text style={styles.statusValue}>{count}</Text>
+            </View>
+          ))}
         </View>
       </Card>
     </ScrollView>
@@ -165,101 +186,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
-  },
-  periodSelector: {
-    flexDirection: 'row',
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  periodButton: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    marginRight: theme.spacing.sm,
-    borderRadius: 20,
-  },
-  activePeriod: {
-    backgroundColor: theme.colors.primary,
-  },
-  periodText: {
-    color: theme.colors.text,
-    fontSize: theme.typography.fontSize.sm,
-  },
-  activePeriodText: {
-    color: theme.colors.surface,
-    fontSize: theme.typography.fontSize.sm,
-    fontFamily: theme.typography.fontFamily.medium,
-  },
-  metricsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     padding: theme.spacing.md,
   },
-  metricCard: {
-    width: '48%',
-    marginBottom: theme.spacing.md,
-    marginHorizontal: '1%',
-  },
-  metricHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  metricTitle: {
-    fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textSecondary,
-    marginLeft: theme.spacing.xs,
-  },
-  metricValue: {
-    fontSize: theme.typography.fontSize.xl,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  changeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  changeText: {
-    fontSize: theme.typography.fontSize.sm,
-    marginLeft: theme.spacing.xs,
-  },
-  chartCard: {
-    margin: theme.spacing.md,
-  },
-  chartTitle: {
-    fontSize: theme.typography.fontSize.lg,
-    fontFamily: theme.typography.fontFamily.bold,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
-  },
-  chartContainer: {
-    flexDirection: 'row',
-    height: 200,
-    alignItems: 'flex-end',
-    paddingHorizontal: theme.spacing.sm,
-  },
-  barContainer: {
+  centered: {
     flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  barWrapper: {
-    height: '100%',
-    width: 20,
-    justifyContent: 'flex-end',
+  errorContainer: {
+    backgroundColor: theme.colors.error + '20',
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    marginBottom: theme.spacing.md,
   },
-  bar: {
-    width: '100%',
-    borderRadius: 4,
-  },
-  barLabel: {
-    marginTop: theme.spacing.xs,
+  errorText: {
+    color: theme.colors.error,
     fontSize: theme.typography.fontSize.sm,
-    color: theme.colors.textSecondary,
   },
-  topItemsCard: {
-    margin: theme.spacing.md,
+  section: {
+    marginBottom: theme.spacing.md,
   },
   sectionTitle: {
     fontSize: theme.typography.fontSize.lg,
@@ -267,7 +212,44 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
   },
-  topItem: {
+  metricsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  metricItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  metricValue: {
+    fontSize: theme.typography.fontSize.xl,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.text,
+    marginTop: theme.spacing.xs,
+  },
+  metricLabel: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+  },
+  comparisonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  comparisonItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  comparisonLabel: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textSecondary,
+  },
+  comparisonValue: {
+    fontSize: theme.typography.fontSize.md,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.text,
+    marginTop: theme.spacing.xs,
+  },
+  itemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -278,9 +260,43 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: theme.typography.fontSize.md,
     color: theme.colors.text,
+    flex: 1,
   },
-  itemSales: {
+  itemDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  itemQuantity: {
     fontSize: theme.typography.fontSize.sm,
     color: theme.colors.textSecondary,
+    marginRight: theme.spacing.sm,
+  },
+  itemRevenue: {
+    fontSize: theme.typography.fontSize.md,
+    fontFamily: theme.typography.fontFamily.medium,
+    color: theme.colors.primary,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  statusItem: {
+    width: '48%',
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.sm,
+    marginBottom: theme.spacing.sm,
+  },
+  statusLabel: {
+    fontSize: theme.typography.fontSize.sm,
+    color: theme.colors.textSecondary,
+    textTransform: 'capitalize',
+  },
+  statusValue: {
+    fontSize: theme.typography.fontSize.lg,
+    fontFamily: theme.typography.fontFamily.bold,
+    color: theme.colors.text,
+    marginTop: theme.spacing.xs,
   },
 }); 

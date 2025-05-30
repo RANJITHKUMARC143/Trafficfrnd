@@ -1,21 +1,50 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../theme/theme';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
+import { View, ActivityIndicator } from 'react-native';
 
 // Screens
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { OrdersScreen } from '../screens/OrdersScreen';
 import { MenuScreen } from '../screens/MenuScreen';
+import { MenuItemDetailScreen } from '../screens/MenuItemDetailScreen';
+import { MenuItemFormScreen } from '../screens/MenuItemFormScreen';
 import { AnalyticsScreen } from '../screens/AnalyticsScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { OrderDetailsScreen } from '../screens/OrderDetailsScreen';
 import { AuthNavigator } from './AuthNavigator';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+const MenuStack = createNativeStackNavigator();
+const OrdersStack = createNativeStackNavigator();
+
+const MenuStackNavigator = () => (
+  <MenuStack.Navigator
+    screenOptions={{
+      headerShown: false,
+    }}
+  >
+    <MenuStack.Screen name="MenuList" component={MenuScreen} />
+    <MenuStack.Screen name="MenuItemDetail" component={MenuItemDetailScreen} />
+    <MenuStack.Screen name="MenuItemForm" component={MenuItemFormScreen} />
+  </MenuStack.Navigator>
+);
+
+const OrdersStackNavigator = () => (
+  <OrdersStack.Navigator
+    screenOptions={{
+      headerShown: false,
+    }}
+  >
+    <OrdersStack.Screen name="OrdersList" component={OrdersScreen} />
+    <OrdersStack.Screen name="OrderDetails" component={OrderDetailsScreen} />
+  </OrdersStack.Navigator>
+);
 
 const TabNavigator = () => (
   <Tab.Navigator
@@ -49,15 +78,44 @@ const TabNavigator = () => (
     })}
   >
     <Tab.Screen name="Dashboard" component={DashboardScreen} />
-    <Tab.Screen name="Orders" component={OrdersScreen} />
-    <Tab.Screen name="Menu" component={MenuScreen} />
+    <Tab.Screen name="Orders" component={OrdersStackNavigator} />
+    <Tab.Screen 
+      name="Menu" 
+      component={MenuStackNavigator}
+      options={{
+        headerShown: false,
+      }}
+    />
     <Tab.Screen name="Analytics" component={AnalyticsScreen} />
     <Tab.Screen name="Profile" component={ProfileScreen} />
   </Tab.Navigator>
 );
 
 export const AppNavigator = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, checkAuthStatus } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const initialize = async () => {
+      try {
+        await checkAuthStatus();
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initialize();
+  }, [checkAuthStatus]);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer>

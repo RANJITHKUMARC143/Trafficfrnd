@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   ViewStyle,
   TextStyle,
+  View,
 } from 'react-native';
 import { theme } from '../theme/theme';
 
@@ -80,22 +81,24 @@ export const Button: React.FC<ButtonProps> = ({
         style,
       ]}
     >
-      {loading ? (
-        <ActivityIndicator color={getTextColor()} />
-      ) : (
-        <Text
-          style={[
-            styles.text,
-            {
-              color: getTextColor(),
-              fontSize: size === 'small' ? theme.typography.fontSize.sm : theme.typography.fontSize.md,
-            },
-            textStyle,
-          ]}
-        >
-          {title}
-        </Text>
-      )}
+      <View style={styles.content}>
+        {loading ? (
+          <ActivityIndicator color={getTextColor()} />
+        ) : (
+          <Text
+            style={[
+              styles.text,
+              {
+                color: getTextColor(),
+                fontSize: size === 'small' ? theme.typography.fontSize.sm : theme.typography.fontSize.md,
+              },
+              textStyle,
+            ]}
+          >
+            {title}
+          </Text>
+        )}
+      </View>
     </TouchableOpacity>
   );
 };
@@ -106,6 +109,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...theme.shadows.small,
+  },
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   text: {
     fontFamily: theme.typography.fontFamily.medium,

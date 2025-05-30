@@ -40,7 +40,9 @@ export const Card: React.FC<CardProps> = ({
 
   return (
     <View style={[styles.card, getCardStyle(), style]}>
-      {children}
+      <View style={styles.content}>
+        {children}
+      </View>
     </View>
   );
 };
@@ -48,7 +50,9 @@ export const Card: React.FC<CardProps> = ({
 const styles = StyleSheet.create({
   card: {
     borderRadius: 12,
-    padding: theme.spacing.md,
     marginVertical: theme.spacing.sm,
+  },
+  content: {
+    padding: theme.spacing.md,
   },
 }); 
