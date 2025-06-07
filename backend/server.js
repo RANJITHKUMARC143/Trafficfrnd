@@ -10,6 +10,9 @@ const menuRoutes = require('./routes/menuRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const deliveryBoyRoutes = require('./routes/deliveryBoyRoutes');
+const userAuthRoutes = require('./routes/userAuth');
+const rateLimit = require('express-rate-limit');
 
 // Load environment variables
 dotenv.config();
@@ -31,6 +34,10 @@ const io = socketIo(server, {
     allowedHeaders: ['Content-Type', 'Authorization']
   }
 });
+
+// Add timeout settings
+server.timeout = 30000; // 30 seconds timeout
+server.keepAliveTimeout = 30000; // 30 seconds keep-alive timeout
 
 // Socket.io authentication middleware
 io.use((socket, next) => {
@@ -54,7 +61,7 @@ app.set('io', io);
 
 // CORS configuration
 const corsOptions = {
-  origin: '*', // Allow all origins in development
+  origin: true, // Allow all origins in development
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   credentials: true,
@@ -68,6 +75,8 @@ app.use(express.json());
 // Log all requests
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  console.log('Request headers:', req.headers);
+  console.log('Request body:', req.body);
   next();
 });
 
@@ -77,6 +86,8 @@ app.use('/api/vendors/menu', menuRoutes);
 app.use('/api/vendors/orders', orderRoutes);
 app.use('/api/vendors/dashboard', dashboardRoutes);
 app.use('/api/vendors/analytics', analyticsRoutes);
+app.use('/api/delivery', deliveryBoyRoutes);
+app.use('/api/users', userAuthRoutes);
 
 // Test route
 app.get('/api/test', (req, res) => {
@@ -85,32 +96,64 @@ app.get('/api/test', (req, res) => {
 
 // WebSocket connection handling
 io.on('connection', (socket) => {
-  console.log('New client connected');
+  console.log('New client connected:', socket.id);
 
-  // Join vendor room
-  socket.on('joinVendorRoom', (vendorId) => {
-    if (socket.vendorId === vendorId) {
-      socket.join(vendorId);
-      console.log(`Client joined vendor room: ${vendorId}`);
-    } else {
-      console.error('Unauthorized room join attempt');
+  // Handle delivery boy location updates
+  socket.on('updateLocation', async (data) => {
+    try {
+      const { deliveryBoyId, location } = data;
+      // Update location in database
+      await DeliveryBoy.findByIdAndUpdate(deliveryBoyId, {
+        location: location
+      });
+      // Broadcast to all clients
+      io.emit('locationUpdated', { deliveryBoyId, location });
+    } catch (error) {
+      console.error('Error updating location:', error);
     }
   });
 
-  // Leave vendor room
-  socket.on('leaveVendorRoom', (vendorId) => {
-    if (socket.vendorId === vendorId) {
-      socket.leave(vendorId);
-      console.log(`Client left vendor room: ${vendorId}`);
+  // Handle order status updates
+  socket.on('updateOrderStatus', async (data) => {
+    try {
+      const { orderId, status } = data;
+      // Update order status in database
+      await Order.findByIdAndUpdate(orderId, { status });
+      // Broadcast to all clients
+      io.emit('orderStatusUpdated', { orderId, status });
+    } catch (error) {
+      console.error('Error updating order status:', error);
     }
+  });
+
+  // Handle new orders
+  socket.on('newOrder', (order) => {
+    io.emit('orderCreated', order);
+  });
+
+  // Handle delivery boy status updates
+  socket.on('updateDeliveryStatus', async (data) => {
+    try {
+      const { deliveryBoyId, status } = data;
+      await DeliveryBoy.findByIdAndUpdate(deliveryBoyId, { status });
+      io.emit('deliveryStatusUpdated', { deliveryBoyId, status });
+    } catch (error) {
+      console.error('Error updating delivery status:', error);
+    }
+  });
+
+  // Handle room joining for specific orders
+  socket.on('joinOrderRoom', (orderId) => {
+    socket.join(`order_${orderId}`);
+  });
+
+  // Handle room leaving
+  socket.on('leaveOrderRoom', (orderId) => {
+    socket.leave(`order_${orderId}`);
   });
 
   socket.on('disconnect', () => {
-    console.log('Client disconnected');
-  });
-
-  socket.on('error', (error) => {
-    console.error('Socket error:', error);
+    console.log('Client disconnected:', socket.id);
   });
 });
 
@@ -133,10 +176,22 @@ mongoose.connect('mongodb://localhost:27017/Trafficfrnd', {
   
   // Start server after successful database connection
   const PORT = process.env.PORT || 3000;
-  server.listen(PORT, '0.0.0.0', () => {
+  const HOST = '0.0.0.0';  // Bind to all network interfaces
+  
+  server.listen(PORT, HOST, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Local URL: http://localhost:${PORT}`);
-    console.log(`Network URL: http://0.0.0.0:${PORT}`);
+    console.log(`Network URL: http://${HOST}:${PORT}`);
+    console.log('Available network interfaces:');
+    const { networkInterfaces } = require('os');
+    const nets = networkInterfaces();
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name]) {
+        if (net.family === 'IPv4' && !net.internal) {
+          console.log(`- http://${net.address}:${PORT}`);
+        }
+      }
+    }
   });
 
   // Handle server errors

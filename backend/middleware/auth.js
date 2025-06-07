@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const Vendor = require('../models/Vendor');
+const DeliveryBoy = require('../models/DeliveryBoy');
 
 const auth = async (req, res, next) => {
   try {
@@ -15,35 +16,36 @@ const auth = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_key_here');
     console.log('Auth middleware - Token decoded:', decoded);
 
-    if (!decoded.vendorId) {
-      console.log('Auth middleware - No vendorId in token');
-      return res.status(401).json({ message: 'Invalid token format' });
+    let user = null;
+    if (decoded.vendorId) {
+      console.log('Auth middleware - Finding vendor:', decoded.vendorId);
+      user = await Vendor.findById(decoded.vendorId);
+    } else if (decoded.id) {
+      console.log('Auth middleware - Finding delivery boy:', decoded.id);
+      user = await DeliveryBoy.findById(decoded.id);
+      if (user && user.status && user.status !== 'active' && user.status !== 'approved') {
+        console.log('Auth middleware - Delivery boy not active/approved:', user.status);
+        return res.status(403).json({ message: 'Account is not active or approved' });
+      }
     }
 
-    console.log('Auth middleware - Finding vendor:', decoded.vendorId);
-    const vendor = await Vendor.findById(decoded.vendorId);
-
-    if (!vendor) {
-      console.log('Auth middleware - Vendor not found');
-      return res.status(401).json({ message: 'Vendor not found' });
+    if (!user) {
+      console.log('Auth middleware - User (Vendor or Delivery Boy) not found');
+      return res.status(401).json({ message: 'Invalid token or user not found' });
     }
 
-    if (vendor.status !== 'active') {
-      console.log('Auth middleware - Vendor not active:', vendor.status);
-      return res.status(403).json({ message: 'Account is not active' });
-    }
-
-    console.log('Auth middleware - Authentication successful');
+    console.log('Auth middleware - Authentication successful for user ID:', user._id);
     req.token = token;
-    req.vendor = vendor;
+    req.user = user;
     next();
   } catch (error) {
     console.error('Auth middleware - Error:', error);
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ message: 'Invalid token' });
-    }
-    if (error.name === 'TokenExpiredError') {
+    } else if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ message: 'Token expired' });
+    } else if (error.message === 'Account is not active or approved') {
+      return res.status(403).json({ message: error.message });
     }
     res.status(500).json({ message: 'Authentication error', error: error.message });
   }
