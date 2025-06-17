@@ -1,76 +1,175 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, Image, Dimensions, Alert } from 'react-native';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import React, { useEffect, useState } from 'react';
+import {
+  StyleSheet,
+  View,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  Dimensions,
+  Alert,
+  ActivityIndicator,
+  Animated,
+  Share,
+  Platform,
+} from 'react-native';
+import { ThemedText, ThemedView } from '@/components';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MenuItem } from '@/types/menu';
+import { LinearGradient } from 'expo-linear-gradient';
 
-type ItemSize = 'Small' | 'Regular' | 'Large';
-type ItemWeight = '250g' | '500g' | '1kg' | '2kg' | '5kg';
+const { width, height } = Dimensions.get('window');
+const HEADER_HEIGHT = Platform.OS === 'ios' ? 90 : 70;
+const IMAGE_HEIGHT = height * 0.4;
+
+const SkeletonLoader = () => {
+  return (
+    <ThemedView style={styles.container}>
+      <View style={styles.header}>
+        <LinearGradient
+          colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.8)']}
+          style={styles.headerGradient}
+        >
+          <View style={[styles.backButton, { backgroundColor: '#f0f0f0' }]} />
+          <View style={[styles.shareButton, { backgroundColor: '#f0f0f0' }]} />
+        </LinearGradient>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.imageContainer}>
+          <View style={[styles.image, { backgroundColor: '#f0f0f0' }]} />
+        </View>
+
+        <View style={styles.detailsContainer}>
+          <View style={styles.titleContainer}>
+            <View style={[styles.skeletonTitle, { backgroundColor: '#f0f0f0' }]} />
+            <View style={[styles.skeletonFavorite, { backgroundColor: '#f0f0f0' }]} />
+          </View>
+
+          <View style={styles.priceContainer}>
+            <View style={[styles.skeletonPrice, { backgroundColor: '#f0f0f0' }]} />
+            <View style={[styles.skeletonPrepTime, { backgroundColor: '#f0f0f0' }]} />
+          </View>
+
+          <View style={styles.categoryContainer}>
+            <View style={[styles.skeletonCategory, { backgroundColor: '#f0f0f0' }]} />
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.sectionTitle} />
+          <View style={[styles.skeletonDescription, { backgroundColor: '#f0f0f0' }]} />
+          <View style={[styles.skeletonDescription, { backgroundColor: '#f0f0f0', width: '80%' }]} />
+
+          <View style={styles.actionButtons}>
+            <View style={[styles.skeletonButton, { backgroundColor: '#f0f0f0' }]} />
+            <View style={[styles.skeletonButton, { backgroundColor: '#f0f0f0' }]} />
+          </View>
+        </View>
+      </ScrollView>
+    </ThemedView>
+  );
+};
 
 const ItemScreen = () => {
   const params = useLocalSearchParams();
-  const { 
-    itemId, 
-    itemName, 
-    itemDescription, 
-    itemPrice, 
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const scrollY = new Animated.Value(0);
+  const imageScale = new Animated.Value(1);
+
+  const {
+    itemId,
+    itemName,
+    itemDescription,
+    itemPrice,
     itemImageUrl,
-    category 
+    category,
+    preparationTime,
   } = params;
 
-  const [selectedSize, setSelectedSize] = useState<ItemSize>('Regular');
-  const [selectedWeight, setSelectedWeight] = useState<ItemWeight>('500g');
-  const [quantity, setQuantity] = useState(1);
+  useEffect(() => {
+    checkFavoriteStatus();
+    // Simulate loading
+    const timer = setTimeout(() => setLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, [itemId]);
 
-  // Get category-specific details
-  const getDrinkSizes = () => {
-    const sizes: { size: ItemSize; price: number }[] = [
-      { size: 'Small', price: parseInt(itemPrice as string) - 10 }, // 250ml
-      { size: 'Regular', price: parseInt(itemPrice as string) },    // 500ml
-      { size: 'Large', price: parseInt(itemPrice as string) + 20 }  // 750ml
-    ];
-    return sizes;
+  const checkFavoriteStatus = async () => {
+    try {
+      const favorites = await AsyncStorage.getItem('favorites');
+      if (favorites) {
+        const favoritesArray = JSON.parse(favorites);
+        setIsFavorite(favoritesArray.includes(itemId));
+      }
+    } catch (error) {
+      console.error('Error checking favorite status:', error);
+    }
   };
 
-  const getSnackSizes = () => {
-    const sizes: { size: ItemWeight; price: number }[] = [
-      { size: '250g', price: parseInt(itemPrice as string) - 10 },
-      { size: '500g', price: parseInt(itemPrice as string) },
-      { size: '1kg', price: parseInt(itemPrice as string) * 1.8 }
-    ];
-    return sizes;
+  const toggleFavorite = async () => {
+    try {
+      const favorites = await AsyncStorage.getItem('favorites');
+      let favoritesArray = favorites ? JSON.parse(favorites) : [];
+
+      if (isFavorite) {
+        favoritesArray = favoritesArray.filter((id: string) => id !== itemId);
+      } else {
+        favoritesArray.push(itemId);
+      }
+
+      await AsyncStorage.setItem('favorites', JSON.stringify(favoritesArray));
+      setIsFavorite(!isFavorite);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Check out ${itemName} on our app! Price: ₹${itemPrice}`,
+        title: itemName as string,
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
   };
 
   const handleAddToCart = async () => {
     try {
-      const item = {
-        id: itemId,
-        name: itemName,
-        price: calculatePrice().toString(),
-        quantity: quantity,
-        size: category === 'Cool Drinks' ? selectedSize : selectedWeight,
-        imageUrl: itemImageUrl,
-      };
-
       // Get existing cart items
-      const existingCart = await AsyncStorage.getItem('cart');
-      let cartItems = existingCart ? JSON.parse(existingCart) : [];
-      
-      // Add new item
-      cartItems.push(item);
-      
+      const cartData = await AsyncStorage.getItem('cart');
+      let cartItems = cartData ? JSON.parse(cartData) : [];
+
+      // Check if item already exists in cart
+      const existingItemIndex = cartItems.findIndex((item: any) => item.id === itemId);
+
+      if (existingItemIndex !== -1) {
+        // Item exists, increment quantity
+        cartItems[existingItemIndex].quantity += 1;
+      } else {
+        // Add new item to cart
+        cartItems.push({
+          id: itemId,
+          name: itemName,
+          price: itemPrice,
+          quantity: 1,
+          imageUrl: itemImageUrl,
+        });
+      }
+
       // Save updated cart
       await AsyncStorage.setItem('cart', JSON.stringify(cartItems));
-      
+
+      // Show success message
       Alert.alert(
         'Success',
         'Item added to cart',
         [
           {
             text: 'Continue Shopping',
-            onPress: () => router.back(),
             style: 'cancel',
           },
           {
@@ -85,147 +184,139 @@ const ItemScreen = () => {
     }
   };
 
-  const adjustQuantity = (increment: boolean) => {
-    setQuantity(prev => increment ? prev + 1 : Math.max(1, prev - 1));
-  };
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, IMAGE_HEIGHT - HEADER_HEIGHT],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
 
-  const calculatePrice = () => {
-    let basePrice = parseInt(itemPrice as string);
-    if (category === 'Cool Drinks') {
-      const sizePrice = getDrinkSizes().find(s => s.size === selectedSize)?.price || basePrice;
-      return sizePrice * quantity;
-    } else if (category === 'Snacks') {
-      const weightPrice = getSnackSizes().find(w => w.size === selectedWeight)?.price || basePrice;
-      return weightPrice * quantity;
-    }
-    return basePrice * quantity;
-  };
+  const imageTranslateY = scrollY.interpolate({
+    inputRange: [-height, 0, height],
+    outputRange: [height / 2, 0, -height / 2],
+    extrapolate: 'clamp',
+  });
+
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    { useNativeDriver: true }
+  );
+
+  if (loading) {
+    return <SkeletonLoader />;
+  }
 
   return (
     <ThemedView style={styles.container}>
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen
+        options={{
+          headerShown: false,
+        }}
+      />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <ThemedText style={styles.headerTitle}>{category}</ThemedText>
-      </View>
+      <Animated.View style={[styles.header, { opacity: headerOpacity }]}>
+        <LinearGradient
+          colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.8)']}
+          style={styles.headerGradient}
+        >
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.shareButton}
+            onPress={handleShare}
+          >
+            <Ionicons name="share-outline" size={24} color="#333" />
+          </TouchableOpacity>
+        </LinearGradient>
+      </Animated.View>
 
-      <ScrollView style={styles.content}>
-        {/* Image */}
-        <Image
-          source={{ uri: itemImageUrl as string }}
-          style={styles.image}
-          defaultSource={{ uri: 'https://via.placeholder.com/400' }}
-        />
+      <Animated.ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
+        <Animated.View style={[
+          styles.imageContainer,
+          {
+            transform: [
+              { translateY: imageTranslateY },
+              { scale: imageScale }
+            ]
+          }
+        ]}>
+          <Image
+            source={{ uri: Array.isArray(itemImageUrl) ? itemImageUrl[0] : itemImageUrl || '' }}
+            style={styles.image}
+            defaultSource={{ uri: 'https://placehold.co/400x300/e2e8f0/64748b?text=No+Image' }}
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.3)']}
+            style={styles.imageGradient}
+          />
+        </Animated.View>
 
-        {/* Item Details */}
         <View style={styles.detailsContainer}>
-          <ThemedText style={styles.name}>{itemName}</ThemedText>
-          <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={20} color="#FFD700" />
-            <ThemedText style={styles.rating}>4.5</ThemedText>
-            <ThemedText style={styles.ratingCount}>(128 ratings)</ThemedText>
+          <View style={styles.titleContainer}>
+            <ThemedText style={styles.title}>{itemName}</ThemedText>
+            <TouchableOpacity
+              style={styles.favoriteButton}
+              onPress={toggleFavorite}
+            >
+              <Ionicons
+                name={isFavorite ? 'heart' : 'heart-outline'}
+                size={28}
+                color={isFavorite ? '#FF3B30' : '#666'}
+              />
+            </TouchableOpacity>
           </View>
+
+          <View style={styles.priceContainer}>
+            <ThemedText style={styles.price}>₹{itemPrice}</ThemedText>
+            {preparationTime && (
+              <View style={styles.prepTimeContainer}>
+                <Ionicons name="time-outline" size={18} color="#666" />
+                <ThemedText style={styles.prepTime}>{preparationTime} mins</ThemedText>
+              </View>
+            )}
+          </View>
+
+          {category && (
+            <View style={styles.categoryContainer}>
+              <Ionicons name="restaurant-outline" size={18} color="#666" />
+              <ThemedText style={styles.category}>{category}</ThemedText>
+            </View>
+          )}
+
+          <View style={styles.divider} />
+
+          <ThemedText style={styles.sectionTitle}>Description</ThemedText>
           <ThemedText style={styles.description}>{itemDescription}</ThemedText>
 
-          {/* Category Specific Options */}
-          {category === 'Cool Drinks' && (
-            <View style={styles.optionsContainer}>
-              <ThemedText style={styles.optionTitle}>Select Size</ThemedText>
-              <View style={styles.optionsGrid}>
-                {getDrinkSizes().map((sizeOption) => (
-                  <TouchableOpacity
-                    key={sizeOption.size}
-                    style={[
-                      styles.optionButton,
-                      selectedSize === sizeOption.size && styles.optionButtonSelected
-                    ]}
-                    onPress={() => setSelectedSize(sizeOption.size)}
-                  >
-                    <ThemedText style={[
-                      styles.optionText,
-                      selectedSize === sizeOption.size && styles.optionTextSelected
-                    ]}>
-                      {sizeOption.size}
-                    </ThemedText>
-                    <ThemedText style={[
-                      styles.optionPrice,
-                      selectedSize === sizeOption.size && styles.optionTextSelected
-                    ]}>
-                      ₹{sizeOption.price}
-                    </ThemedText>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={styles.addToCartButton}
+              onPress={handleAddToCart}
+            >
+              <Ionicons name="cart-outline" size={24} color="#fff" />
+              <ThemedText style={styles.addToCartButtonText}>Add to Cart</ThemedText>
+            </TouchableOpacity>
 
-          {category === 'Snacks' && (
-            <View style={styles.optionsContainer}>
-              <ThemedText style={styles.optionTitle}>Select Pack Size</ThemedText>
-              <View style={styles.optionsGrid}>
-                {getSnackSizes().map((sizeOption) => (
-                  <TouchableOpacity
-                    key={sizeOption.size}
-                    style={[
-                      styles.optionButton,
-                      selectedWeight === sizeOption.size && styles.optionButtonSelected
-                    ]}
-                    onPress={() => setSelectedWeight(sizeOption.size)}
-                  >
-                    <ThemedText style={[
-                      styles.optionText,
-                      selectedWeight === sizeOption.size && styles.optionTextSelected
-                    ]}>
-                      {sizeOption.size}
-                    </ThemedText>
-                    <ThemedText style={[
-                      styles.optionPrice,
-                      selectedWeight === sizeOption.size && styles.optionTextSelected
-                    ]}>
-                      ₹{sizeOption.price}
-                    </ThemedText>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* Quantity Selector */}
-          <View style={styles.quantityContainer}>
-            <ThemedText style={styles.optionTitle}>Quantity</ThemedText>
-            <View style={styles.quantitySelector}>
-              <TouchableOpacity 
-                style={styles.quantityButton}
-                onPress={() => adjustQuantity(false)}
-              >
-                <Ionicons name="remove" size={24} color="#333" />
-              </TouchableOpacity>
-              <ThemedText style={styles.quantity}>{quantity}</ThemedText>
-              <TouchableOpacity 
-                style={styles.quantityButton}
-                onPress={() => adjustQuantity(true)}
-              >
-                <Ionicons name="add" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.buyNowButton}
+              onPress={() => {
+                handleAddToCart();
+                router.push('/cart');
+              }}
+            >
+              <ThemedText style={styles.buyNowButtonText}>Buy Now</ThemedText>
+            </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
-
-      {/* Bottom Bar */}
-      <View style={styles.bottomBar}>
-        <View style={styles.priceContainer}>
-          <ThemedText style={styles.priceLabel}>Total Price</ThemedText>
-          <ThemedText style={styles.price}>₹{calculatePrice()}</ThemedText>
-        </View>
-        <TouchableOpacity style={styles.addButton} onPress={handleAddToCart}>
-          <ThemedText style={styles.addButtonText}>Add to Cart</ThemedText>
-        </TouchableOpacity>
-      </View>
+      </Animated.ScrollView>
     </ThemedView>
   );
 };
@@ -235,188 +326,229 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 15,
-    backgroundColor: 'transparent',
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 10,
+    height: HEADER_HEIGHT,
+    zIndex: 100,
+  },
+  headerGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: Platform.OS === 'ios' ? 40 : 20,
+    paddingHorizontal: 20,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'white',
-    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.9)',
     justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  shareButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   content: {
-    flex: 1,
+    paddingBottom: 100,
+  },
+  imageContainer: {
+    height: IMAGE_HEIGHT,
+    width: width,
   },
   image: {
-    width: Dimensions.get('window').width,
-    height: 300,
+    width: '100%',
+    height: '100%',
     resizeMode: 'cover',
+  },
+  imageGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 100,
   },
   detailsContainer: {
     padding: 20,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    marginTop: -30,
   },
-  name: {
-    fontSize: 24,
+  titleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  title: {
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 10,
+    flex: 1,
+    marginRight: 10,
   },
-  ratingContainer: {
+  favoriteButton: {
+    padding: 8,
+  },
+  priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 15,
   },
-  rating: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginLeft: 5,
+  price: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginRight: 15,
   },
-  ratingCount: {
-    fontSize: 14,
+  prepTimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  prepTime: {
+    marginLeft: 6,
     color: '#666',
-    marginLeft: 5,
+    fontSize: 14,
+  },
+  categoryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  category: {
+    marginLeft: 8,
+    color: '#666',
+    fontSize: 16,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#eee',
+    marginVertical: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
   },
   description: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 20,
     lineHeight: 24,
+    marginBottom: 30,
   },
-  optionsContainer: {
-    marginBottom: 20,
-  },
-  optionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 10,
-  },
-  optionsGrid: {
+  actionButtons: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+    justifyContent: 'space-between',
+    marginTop: 20,
   },
-  optionButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    backgroundColor: '#fff',
-    minWidth: 100,
-    alignItems: 'center',
-  },
-  optionButtonSelected: {
-    borderColor: '#4CAF50',
-    backgroundColor: '#E8F5E9',
-  },
-  optionText: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 4,
-  },
-  optionPrice: {
-    fontSize: 14,
-    color: '#666',
-  },
-  optionTextSelected: {
-    color: '#4CAF50',
-  },
-  quantityContainer: {
-    marginBottom: 20,
-  },
-  quantitySelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    padding: 5,
-  },
-  quantityButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
-    elevation: 2,
-  },
-  quantity: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginHorizontal: 20,
-  },
-  bottomBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    backgroundColor: '#fff',
-  },
-  priceContainer: {
+  addToCartButton: {
     flex: 1,
-  },
-  priceLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  price: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  addButton: {
+    flexDirection: 'row',
     backgroundColor: '#4CAF50',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 25,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    padding: 15,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
     elevation: 5,
   },
-  addButtonText: {
+  addToCartButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+    marginLeft: 8,
   },
-  headerTitle: {
-    fontSize: 20,
+  buyNowButton: {
+    flex: 1,
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  buyNowButtonText: {
+    color: '#4CAF50',
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#fff',
-    marginLeft: 10,
+  },
+  skeletonTitle: {
+    height: 32,
+    width: '80%',
+    borderRadius: 8,
+  },
+  skeletonFavorite: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  skeletonPrice: {
+    height: 28,
+    width: 100,
+    borderRadius: 8,
+  },
+  skeletonPrepTime: {
+    height: 24,
+    width: 80,
+    borderRadius: 12,
+    marginLeft: 15,
+  },
+  skeletonCategory: {
+    height: 20,
+    width: 120,
+    borderRadius: 10,
+  },
+  skeletonDescription: {
+    height: 16,
+    width: '100%',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  skeletonButton: {
+    flex: 1,
+    height: 50,
+    borderRadius: 12,
+    marginRight: 10,
   },
 });
 

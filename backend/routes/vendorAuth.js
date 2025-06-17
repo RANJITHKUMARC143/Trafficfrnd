@@ -256,4 +256,42 @@ router.patch('/toggle-status', auth, async (req, res) => {
   }
 });
 
+// Public route: Get all active vendors
+router.get('/public', async (req, res) => {
+  try {
+    const vendors = await Vendor.find({ status: 'active' });
+    res.json(vendors);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching vendors', error: error.message });
+  }
+});
+
+// Test route to create a sample vendor
+router.post('/test/sample-vendor', async (req, res) => {
+  try {
+    const sampleVendor = new Vendor({
+      businessName: 'Test Restaurant',
+      ownerName: 'Test Owner',
+      email: 'test4@restaurant.com',
+      password: 'test123', // Will be hashed by pre-save hook
+      phone: '1234567890',
+      address: {
+        street: '123 Test Street',
+        city: 'Test City',
+        state: 'Test State',
+        zipCode: '12345',
+        country: 'Test Country'
+      },
+      cuisine: ['Italian', 'American'],
+      isVerified: true
+    });
+
+    const savedVendor = await sampleVendor.save();
+    res.status(201).json(savedVendor);
+  } catch (error) {
+    console.error('Error creating sample vendor:', error);
+    res.status(500).json({ message: 'Error creating sample vendor', error: error.message });
+  }
+});
+
 module.exports = router; 

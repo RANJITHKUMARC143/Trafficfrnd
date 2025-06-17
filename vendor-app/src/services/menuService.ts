@@ -20,7 +20,7 @@ export interface MenuItem {
   }>;
 }
 
-class MenuService {
+export class MenuService {
   async initialize() {
     try {
       await socketService.initialize();
@@ -43,12 +43,24 @@ class MenuService {
 
   async getMenuItemsByCategory(category: string): Promise<MenuItem[]> {
     try {
+      const url = `/api/vendors/menu/category/${category}`;
+      console.log(`MenuService: Fetching menu items for URL: ${url}`);
       const token = await AsyncStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      const response = await api.get(`/api/vendors/menu/category/${category}`, { headers });
-      return response.data;
+      const response = await api.get(url, { headers });
+      console.log(`MenuService: Response status for ${category}:`, response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`MenuService: HTTP error for ${category}: ${response.status} - ${errorText}`);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+      }
+
+      const data = response.data; // Axios automatically parses JSON
+      console.log('MenuService: Raw response data for category:', data);
+      return data;
     } catch (error) {
-      console.error('Error fetching menu items by category:', error);
+      console.error('MenuService: Error fetching menu items by category:', error);
       throw error;
     }
   }
@@ -116,6 +128,4 @@ class MenuService {
   disconnect() {
     socketService.disconnect();
   }
-}
-
-export const menuService = new MenuService(); 
+} 

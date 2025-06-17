@@ -2,8 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-// For Expo Go, use your computer's local IP address
-const API_URL = 'http://192.168.131.176:3000'; // Your computer's IP address for mobile device access
+export const API_URL = 'http://192.168.57.230:3000'; // Your computer's IP address for mobile device access
 
 console.log('Using API URL:', API_URL);
 
@@ -65,6 +64,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       // Handle unauthorized access
       await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('user');
       await AsyncStorage.removeItem('vendor');
     }
     
@@ -82,15 +82,15 @@ export const authService = {
   login: async (email: string, password: string) => {
     try {
       console.log('Attempting login for:', email);
-      const response = await api.post('/vendors/login', { email, password });
-      const { token, vendor } = response.data;
+      const response = await api.post('/api/login', { email, password });
+      const { token, user } = response.data;
       
-      if (!token || !vendor) {
+      if (!token || !user) {
         throw new Error('Invalid response from server');
       }
 
       await AsyncStorage.setItem('token', token);
-      await AsyncStorage.setItem('vendor', JSON.stringify(vendor));
+      await AsyncStorage.setItem('user', JSON.stringify(user));
       return response.data;
     } catch (error: any) {
       console.error('Login Error:', error);
@@ -129,6 +129,7 @@ export const authService = {
   logout: async () => {
     try {
       await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('user');
       await AsyncStorage.removeItem('vendor');
     } catch (error) {
       console.error('Logout error:', error);
@@ -155,8 +156,8 @@ export const authService = {
   isAuthenticated: async () => {
     try {
       const token = await AsyncStorage.getItem('token');
-      const vendor = await AsyncStorage.getItem('vendor');
-      return !!(token && vendor);
+      const user = await AsyncStorage.getItem('user');
+      return !!(token && user);
     } catch (error) {
       console.error('Authentication check error:', error);
       return false;

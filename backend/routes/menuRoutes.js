@@ -3,6 +3,7 @@ const router = express.Router();
 const MenuItem = require('../models/MenuItem');
 const auth = require('../middleware/auth');
 const { validateMenuItem } = require('../middleware/validation');
+const Vendor = require('../models/Vendor');
 
 // Get all menu items for a vendor
 router.get('/', auth, async (req, res) => {
@@ -38,8 +39,9 @@ router.post('/', [auth, validateMenuItem], async (req, res) => {
     });
     await menuItem.save();
     
-    // Emit real-time update
-    req.app.get('io').to(req.vendor._id.toString()).emit('menuItemAdded', menuItem);
+    // Emit real-time update to all clients in the vendor's room
+    const io = req.app.get('io');
+    io.to(req.vendor._id.toString()).emit('menuItemAdded', menuItem);
     
     res.status(201).json(menuItem);
   } catch (error) {
@@ -61,8 +63,9 @@ router.put('/:id', [auth, validateMenuItem], async (req, res) => {
       return res.status(404).json({ message: 'Menu item not found' });
     }
 
-    // Emit real-time update
-    req.app.get('io').to(req.vendor._id.toString()).emit('menuItemUpdated', menuItem);
+    // Emit real-time update to all clients in the vendor's room
+    const io = req.app.get('io');
+    io.to(req.vendor._id.toString()).emit('menuItemUpdated', menuItem);
     
     res.json(menuItem);
   } catch (error) {
@@ -87,9 +90,10 @@ router.patch('/:id/availability', auth, async (req, res) => {
       return res.status(404).json({ message: 'Menu item not found' });
     }
 
-    // Emit real-time update
-    req.app.get('io').to(req.vendor._id.toString()).emit('menuItemAvailabilityChanged', {
-      id: menuItem._id,
+    // Emit real-time update to all clients in the vendor's room
+    const io = req.app.get('io');
+    io.to(req.vendor._id.toString()).emit('menuItemAvailabilityChanged', {
+      itemId: menuItem._id,
       isAvailable: menuItem.isAvailable
     });
     
@@ -112,13 +116,104 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Menu item not found' });
     }
 
-    // Emit real-time update
-    req.app.get('io').to(req.vendor._id.toString()).emit('menuItemDeleted', req.params.id);
+    // Emit real-time update to all clients in the vendor's room
+    const io = req.app.get('io');
+    io.to(req.vendor._id.toString()).emit('menuItemDeleted', req.params.id);
     
     res.json({ message: 'Menu item deleted successfully' });
   } catch (error) {
     console.error('Error deleting menu item:', error);
     res.status(500).json({ message: 'Error deleting menu item', error: error.message });
+  }
+});
+
+// Public route: Get all menu items for a vendor by vendorId (no auth)
+router.get('/public/:vendorId', async (req, res) => {
+  try {
+    const menuItems = await MenuItem.find({ vendorId: req.params.vendorId });
+    res.json(menuItems);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching menu items', error: error.message });
+  }
+});
+
+// Public route: Get all menu items across all vendors for explore page
+router.get('/public/explore/all', async (req, res) => {
+  try {
+    const menuItems = await MenuItem.find({ isAvailable: true })
+      .populate('vendorId', 'businessName') // Populate vendor information
+      .sort({ createdAt: -1 }); // Sort by newest first
+    
+    // Transform the data to include vendor name
+    const transformedItems = menuItems.map(item => ({
+      ...item.toObject(),
+      vendorName: item.vendorId.businessName
+    }));
+    
+    res.json(transformedItems);
+  } catch (error) {
+    console.error('Error fetching all menu items:', error);
+    res.status(500).json({ message: 'Error fetching menu items', error: error.message });
+  }
+});
+
+// Test route to create sample menu items
+router.post('/test/sample-items', async (req, res) => {
+  try {
+    const testVendor = await Vendor.findOne({ email: 'test4@restaurant.com' });
+    if (!testVendor) {
+      return res.status(404).json({ message: 'Test vendor not found' });
+    }
+    const vendorId = testVendor._id;
+
+    const sampleItems = [
+      {
+        name: 'Margherita Pizza',
+        description: 'Classic pizza with tomato sauce and mozzarella',
+        price: 299,
+        image: 'https://placehold.co/400x300/e2e8f0/64748b?text=Pizza',
+        category: 'Fast Food',
+        isAvailable: true,
+        preparationTime: 15,
+        vendorId: vendorId,
+        customizationOptions: [
+          {
+            name: 'Size',
+            options: [
+              { name: 'Small', price: 0 },
+              { name: 'Medium', price: 50 },
+              { name: 'Large', price: 100 }
+            ]
+          }
+        ]
+      },
+      {
+        name: 'Chicken Burger',
+        description: 'Juicy chicken patty with fresh vegetables',
+        price: 199,
+        image: 'https://placehold.co/400x300/e2e8f0/64748b?text=Burger',
+        category: 'Fast Food',
+        isAvailable: true,
+        preparationTime: 10,
+        vendorId: vendorId,
+        customizationOptions: [
+          {
+            name: 'Spice Level',
+            options: [
+              { name: 'Mild', price: 0 },
+              { name: 'Medium', price: 0 },
+              { name: 'Hot', price: 0 }
+            ]
+          }
+        ]
+      }
+    ];
+
+    const createdItems = await MenuItem.insertMany(sampleItems);
+    res.status(201).json(createdItems);
+  } catch (error) {
+    console.error('Error creating sample items:', error);
+    res.status(500).json({ message: 'Error creating sample items', error: error.message });
   }
 });
 

@@ -1,6 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { ThemedText, ThemedView } from '@/components';
 
 export default function AlertsScreen() {
   return (
@@ -19,9 +18,8 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 10,
   },
   description: {
     fontSize: 16,

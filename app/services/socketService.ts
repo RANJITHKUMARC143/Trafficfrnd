@@ -1,15 +1,16 @@
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URL, SOCKET_CONFIG } from '@src/config';
 
 class SocketService {
   private static instance: SocketService;
   private socket: Socket | null = null;
-  private vendorId: string | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 3;
   private reconnectTimeout: NodeJS.Timeout | null = null;
-  private readonly SOCKET_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.57.230:3000';
   private eventListeners: Map<string, Set<Function>> = new Map();
+  private isInitializing = false;
+  private connectionTimeout: NodeJS.Timeout | null = null;
 
   private constructor() {}
 
@@ -21,41 +22,31 @@ class SocketService {
   }
 
   async initialize() {
+    if (this.isInitializing) {
+      console.log('Socket initialization already in progress');
+      return;
+    }
+
+    this.isInitializing = true;
     try {
-      // Get vendor data
-      const vendorStr = await AsyncStorage.getItem('vendor');
-      if (!vendorStr) {
-        console.log('No vendor found in storage');
-        return;
-      }
-
-      const vendor = JSON.parse(vendorStr);
-      if (!vendor._id) {
-        console.log('Invalid vendor data');
-        return;
-      }
-      this.vendorId = vendor._id;
-
       // Get token
       const token = await AsyncStorage.getItem('token');
       if (!token) {
-        console.log('No authentication token found');
+        console.log('No authentication token found, waiting for login...');
+        this.isInitializing = false;
         return;
       }
 
       // Initialize socket
-      await this.connectSocket();
+      await this.connectSocket(token);
     } catch (error) {
       console.error('Error initializing socket service:', error);
+    } finally {
+      this.isInitializing = false;
     }
   }
 
-  private async connectSocket() {
-    if (!this.vendorId) {
-      console.log('Cannot connect socket: No vendor ID');
-      return;
-    }
-
+  private async connectSocket(token: string) {
     try {
       // Disconnect existing socket if any
       if (this.socket) {
@@ -64,42 +55,33 @@ class SocketService {
         this.socket = null;
       }
 
-      const token = await AsyncStorage.getItem('token');
-      if (!token) {
-        console.log('Cannot connect socket: No token');
-        return;
-      }
-
-      console.log('Attempting to connect socket to:', this.SOCKET_URL);
+      console.log('Attempting to connect socket to:', API_URL);
 
       // Initialize socket with proper configuration
-      this.socket = io(this.SOCKET_URL, {
-        transports: ['websocket'],
-        autoConnect: true,
+      this.socket = io(API_URL, {
+        ...SOCKET_CONFIG,
+        auth: { token },
+        timeout: 10000, // 10 second timeout
         reconnection: true,
-        reconnectionAttempts: this.maxReconnectAttempts,
+        reconnectionAttempts: 5,
         reconnectionDelay: 1000,
-        timeout: 10000,
-        auth: {
-          token
-        },
-        path: '/socket.io',
-        forceNew: true,
+        reconnectionDelayMax: 5000
       });
 
       // Set up socket event handlers
       this.socket.on('connect', () => {
         console.log('Socket connected successfully');
         this.reconnectAttempts = 0;
-        if (this.vendorId) {
-          console.log('Joining vendor room:', this.vendorId);
-          this.socket?.emit('joinVendorRoom', this.vendorId);
-        }
       });
 
       this.socket.on('connect_error', (error: Error) => {
         console.error('Socket connection error:', error.message);
-        this.handleReconnect();
+        if (error.message.includes('authentication')) {
+          // Handle authentication error
+          this.handleAuthError();
+        } else {
+          this.handleReconnect();
+        }
       });
 
       this.socket.on('disconnect', (reason: string) => {
@@ -113,18 +95,53 @@ class SocketService {
         console.error('Socket error:', error.message);
       });
 
-      // Set up event listeners
+      // Set up event listeners with error handling
       this.eventListeners.forEach((listeners, event) => {
         console.log(`Setting up listener for event: ${event}`);
         listeners.forEach(callback => {
-          this.socket?.on(event, callback);
+          this.socket?.on(event, (data: any) => {
+            try {
+              // If data is a string, try to parse it as JSON
+              if (typeof data === 'string') {
+                try {
+                  data = JSON.parse(data);
+                } catch (parseError) {
+                  console.error(`Failed to parse JSON for event ${event}:`, parseError);
+                  console.log('Raw data:', data);
+                  return;
+                }
+              }
+              callback(data);
+            } catch (error) {
+              console.error(`Error in event listener for ${event}:`, error);
+            }
+          });
         });
       });
+
+      // Set up connection timeout
+      this.connectionTimeout = setTimeout(() => {
+        if (!this.socket?.connected) {
+          console.warn('Socket connection timeout, attempting to reconnect...');
+          this.handleReconnect();
+        }
+      }, 15000); // 15 second timeout
 
     } catch (error) {
       console.error('Error connecting socket:', error);
       console.warn('Socket connection failed, continuing without socket');
     }
+  }
+
+  private async handleAuthError() {
+    console.log('Handling authentication error...');
+    // Clear token and try to reinitialize
+    await AsyncStorage.removeItem('token');
+    this.reconnectAttempts = 0;
+    // Wait a bit before trying to reconnect
+    setTimeout(() => {
+      this.initialize();
+    }, 2000);
   }
 
   private handleReconnect() {
@@ -137,7 +154,7 @@ class SocketService {
       }
       
       this.reconnectTimeout = setTimeout(() => {
-        this.connectSocket();
+        this.initialize();
       }, 1000 * Math.pow(2, this.reconnectAttempts));
     } else {
       console.warn('Max reconnection attempts reached, continuing without socket');
@@ -154,7 +171,23 @@ class SocketService {
       this.eventListeners.set(event, new Set());
     }
     this.eventListeners.get(event)?.add(callback);
-    this.socket?.on(event, callback);
+    this.socket?.on(event, (data: any) => {
+      try {
+        // If data is a string, try to parse it as JSON
+        if (typeof data === 'string') {
+          try {
+            data = JSON.parse(data);
+          } catch (parseError) {
+            console.error(`Failed to parse JSON for event ${event}:`, parseError);
+            console.log('Raw data:', data);
+            return;
+          }
+        }
+        callback(data);
+      } catch (error) {
+        console.error(`Error in event listener for ${event}:`, error);
+      }
+    });
   }
 
   off(event: string, callback: Function) {
@@ -164,8 +197,20 @@ class SocketService {
   }
 
   emit(event: string, data: any) {
-    console.log(`Emitting event: ${event}`, data);
-    this.socket?.emit(event, data);
+    if (!this.socket?.connected) {
+      console.warn('Socket not connected, cannot emit event:', event);
+      return;
+    }
+    try {
+      // If data is not a string, stringify it
+      if (typeof data !== 'string') {
+        data = JSON.stringify(data);
+      }
+      console.log(`Emitting event: ${event}`, data);
+      this.socket.emit(event, data);
+    } catch (error) {
+      console.error(`Error emitting event ${event}:`, error);
+    }
   }
 
   disconnect() {
@@ -173,6 +218,10 @@ class SocketService {
       this.socket.disconnect();
       this.socket = null;
     }
+  }
+
+  isConnected(): boolean {
+    return this.socket?.connected || false;
   }
 }
 

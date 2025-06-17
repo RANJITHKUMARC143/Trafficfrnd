@@ -1,7 +1,6 @@
 import 'react-native-get-random-values';
 import { StyleSheet, TextInput, ScrollView, TouchableOpacity, View, Image, Alert, Platform, Linking, Dimensions, Animated, KeyboardAvoidingView, Text, Modal } from 'react-native';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { ThemedText, ThemedView } from '@/components';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useRef } from 'react';

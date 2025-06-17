@@ -5,7 +5,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import { API_URL } from '@/src/config';
+import { API_URL } from '@src/config';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 
@@ -139,7 +139,7 @@ export default function ProfileScreen() {
       console.log('Starting login process...');
       console.log('Attempting login with email:', formData.email);
       
-      const response = await fetch(`${API_URL}/api/login`, {
+      const response = await fetch(`${API_URL}/api/users/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -151,7 +151,16 @@ export default function ProfileScreen() {
       });
 
       console.log('Login response status:', response.status);
-      const data = await response.json();
+      // Read response as text first
+      const rawText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(rawText);
+      } catch (jsonError) {
+        console.error('Login response is not valid JSON. Raw response:', rawText);
+        Alert.alert('Raw response', rawText);
+        throw new Error('Server did not return valid JSON. See log for details.');
+      }
       console.log('Login response data:', JSON.stringify(data, null, 2));
 
       if (!response.ok) {

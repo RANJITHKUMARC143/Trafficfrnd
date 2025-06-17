@@ -29,6 +29,9 @@ config.resolver = {
   extraNodeModules: {
     '@': path.resolve(projectRoot),
   },
+  alias: {
+    '@': path.resolve(projectRoot, 'app'),
+  },
 };
 
 // Watch all files within the monorepo

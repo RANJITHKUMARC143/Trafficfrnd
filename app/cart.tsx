@@ -3,7 +3,7 @@ import { StyleSheet, View, TouchableOpacity, FlatList, Alert } from 'react-nativ
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type CartItem = {
@@ -105,16 +105,15 @@ export default function CartScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <ThemedText style={styles.headerTitle}>Your Cart</ThemedText>
-        <View style={styles.placeholder} />
-      </View>
+      <Stack.Screen 
+        options={{
+          title: 'Your Cart',
+          headerTitleStyle: {
+            fontSize: 18,
+            fontWeight: 'bold',
+          },
+        }} 
+      />
 
       {cartItems.length === 0 ? (
         <View style={styles.emptyCart}>
@@ -157,28 +156,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 15,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  placeholder: {
-    width: 40,
   },
   cartList: {
     padding: 20,
