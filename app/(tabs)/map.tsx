@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, TouchableOpacity, TextInput, Platform, KeyboardAvoidingView, Alert, Animated, Modal, ScrollView, Linking } from 'react-native';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { ThemedText, ThemedView } from '@/components';
 import { Ionicons } from '@expo/vector-icons';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -9,8 +8,9 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import MapViewDirections from 'react-native-maps-directions';
-import { StatusBar } from 'expo-status-bar';
-import { API_URL } from '@/src/config';
+import { StatusBar } from 'react-native';
+import { API_URL } from '../../src/config';
+import { useRouter } from 'expo-router';
 
 type RoutePoint = {
   latitude: number;
@@ -90,6 +90,9 @@ export default function MapScreen() {
   const [showOrderButton, setShowOrderButton] = useState(false);
   const [selectableTrafficPoints, setSelectableTrafficPoints] = useState(false);
   const [showTrafficPointsModal, setShowTrafficPointsModal] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const router = useRouter();
 
   useEffect(() => {
     let locationSubscription: Location.LocationSubscription | null = null;
@@ -156,6 +159,53 @@ export default function MapScreen() {
       setShowOrderButton(false);
     }
   }, [destination]);
+
+  // Check authentication status on component mount
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  // Add new useEffect for initial auth check
+  useEffect(() => {
+    const checkInitialAuth = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+          Alert.alert(
+            'Authentication Required',
+            'Please log in to access map features and place orders.',
+            [
+              {
+                text: 'Go to Login',
+                onPress: () => router.push('/(tabs)/profile')
+              },
+              {
+                text: 'Cancel',
+                onPress: () => router.replace('/(tabs)')
+              }
+            ],
+            { cancelable: false }
+          );
+        } else {
+          setIsAuthenticated(true);
+        }
+      } catch (error) {
+        console.error('Error checking initial auth:', error);
+      }
+    };
+
+    checkInitialAuth();
+  }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      setIsAuthenticated(!!token);
+    } catch (error) {
+      console.error('Error checking auth status:', error);
+      setIsAuthenticated(false);
+    }
+  };
 
   const setupLocation = async () => {
     try {
@@ -922,7 +972,25 @@ export default function MapScreen() {
     return points;
   };
 
-  const handleRouteSelect = async (route: RouteOption) => {
+  const handleRouteSelect = async (route: any) => {
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Authentication Required',
+        'Please log in to select a route and manage orders.',
+        [
+          {
+            text: 'Go to Login',
+            onPress: () => router.push('/(tabs)/profile')
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          }
+        ]
+      );
+      return;
+    }
+
     setSelectedRoute(route);
     setShowRouteOptions(false);
     setShowOrderButton(true);
@@ -958,11 +1026,16 @@ export default function MapScreen() {
         return;
       }
 
+      // Decode token to get user ID
+      const tokenParts = token.split('.');
+      const payload = JSON.parse(atob(tokenParts[1]));
+      console.log('Token payload:', payload);
+
       // Generate the same delivery points that will be shown to the user
       const routePoints = route.coordinates;
       const checkpoints = [];
       
-      // Generate 3 points along the route at different intervals (same as in findNearbyLocations)
+      // Generate 3 points along the route at different intervals
       const intervals = [0.3, 0.5, 0.7]; // Generate points at 30%, 50%, and 70% of the route
       const types: Array<'traffic' | 'busstop' | 'signal'> = ['traffic', 'busstop', 'signal'];
       const names = [
@@ -1017,7 +1090,7 @@ export default function MapScreen() {
       console.log('Saving route with data:', JSON.stringify(routeData, null, 2));
 
       // Save the route to backend
-      const response = await fetch(`${API_URL}/api/routes`, {
+      const routeResponse = await fetch(`${API_URL}/api/routes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1027,28 +1100,108 @@ export default function MapScreen() {
         body: JSON.stringify(routeData)
       });
 
-      const responseData = await response.json();
-      console.log('Route save response:', JSON.stringify(responseData, null, 2));
-
-      if (!response.ok) {
-        throw new Error(responseData.message || responseData.error || 'Failed to save route');
+      if (!routeResponse.ok) {
+        const errorText = await routeResponse.text();
+        console.error('Route save error response:', errorText);
+        throw new Error('Failed to save route: ' + errorText);
       }
 
-      if (responseData?.route?._id) {
-        // Store the route ID and checkpoint IDs from the response
-        await AsyncStorage.setItem('currentRouteId', responseData.route._id);
-        await AsyncStorage.setItem('routeCheckpoints', JSON.stringify(responseData.route.checkpoints));
-        console.log('Route saved successfully with ID:', responseData.route._id);
-      } else {
-        console.log('Route saved but no ID returned:', responseData);
-        throw new Error('No route ID in response');
+      const routeResponseData = await routeResponse.json();
+      console.log('Route save response:', JSON.stringify(routeResponseData, null, 2));
+
+      if (!routeResponseData?.route?._id) {
+        throw new Error('Invalid route response: missing route ID');
       }
+
+      // Store the route ID and checkpoint IDs from the response
+      await AsyncStorage.setItem('currentRouteId', routeResponseData.route._id);
+      await AsyncStorage.setItem('routeCheckpoints', JSON.stringify(routeResponseData.route.checkpoints));
+      console.log('Route saved successfully with ID:', routeResponseData.route._id);
+
+      // Save journey data
+      const journeyData = {
+        currentLocation: {
+          latitude: locationCoords?.latitude,
+          longitude: locationCoords?.longitude,
+          address: 'Current Location'
+        },
+        finalDestination: {
+          latitude: destination?.latitude,
+          longitude: destination?.longitude,
+          address: destination?.address || 'Selected Destination'
+        },
+        checkpoints: checkpoints.map(cp => ({
+          latitude: cp.location.latitude,
+          longitude: cp.location.longitude,
+          address: cp.name
+        })),
+        selectedCheckpoint: 0 // Default to first checkpoint
+      };
+
+      console.log('Sending journey data:', journeyData);
+      console.log('Using user ID:', payload.userId || payload.id);
+
+      const journeyResponse = await fetch(`${API_URL}/api/users/journey/${payload.userId || payload.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(journeyData)
+      });
+
+      if (!journeyResponse.ok) {
+        const errorText = await journeyResponse.text();
+        console.error('Journey save error response:', errorText);
+        throw new Error('Failed to save journey: ' + errorText);
+      }
+
+      const journeyResponseData = await journeyResponse.json();
+      console.log('Journey save response:', JSON.stringify(journeyResponseData, null, 2));
+
+      // Create route session
+      const sessionData = {
+        route: routeResponseData.route._id,
+        currentLocation: {
+          latitude: locationCoords?.latitude,
+          longitude: locationCoords?.longitude,
+          updatedAt: new Date()
+        },
+        destination: {
+          latitude: destination?.latitude,
+          longitude: destination?.longitude,
+          address: destination?.address || 'Selected Destination'
+        },
+        selectedCheckpoints: checkpoints.map(cp => cp._id)
+      };
+
+      const sessionResponse = await fetch(`${API_URL}/api/users/route-session/${payload.userId || payload.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(sessionData)
+      });
+
+      if (!sessionResponse.ok) {
+        const errorText = await sessionResponse.text();
+        console.error('Session save error response:', errorText);
+        throw new Error('Failed to save route session: ' + errorText);
+      }
+
+      const sessionResponseData = await sessionResponse.json();
+      console.log('Route session save response:', JSON.stringify(sessionResponseData, null, 2));
 
     } catch (error) {
-      console.error('Error in route save:', error);
-      if (error instanceof Error) {
-        console.error('Error details:', error.message);
-      }
+      console.error('Error saving route data:', error);
+      Alert.alert(
+        'Error',
+        'Failed to save route data. Please try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -1078,16 +1231,52 @@ export default function MapScreen() {
     return minDistance <= 0.1 ? nearestCheckpoint : null;
   };
 
-  const handleLocationSelect = async (selectedLocation: TrafficLocation) => {
+  const handleLocationSelect = async (selectedLocation: any) => {
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Authentication Required',
+        'Please log in to select a destination and explore products.',
+        [
+          {
+            text: 'Go to Login',
+            onPress: () => router.push('/(tabs)/profile')
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          }
+        ]
+      );
+      return;
+    }
+
+    console.log('Handling location select:', selectedLocation);
     setShowLocationSelection(false);
     setSelectedDeliveryPoint(selectedLocation);
 
+    // Create a new destination object
+    const newDestination = {
+      latitude: selectedLocation.location.latitude,
+      longitude: selectedLocation.location.longitude,
+      address: selectedLocation.name
+    };
+
+    // Save destination to AsyncStorage
+    try {
+      console.log('Saving destination to AsyncStorage:', newDestination);
+      await AsyncStorage.setItem('destination', JSON.stringify(newDestination));
+      console.log('Destination saved successfully');
+      setDestination(newDestination);
+    } catch (error) {
+      console.error('Error saving destination:', error);
+    }
+
     // Animate map to show the route and selected point
-    if (mapRef.current && locationCoords && destination) {
+    if (mapRef.current && locationCoords && newDestination) {
       const points = [
         { latitude: locationCoords.latitude, longitude: locationCoords.longitude },
         selectedLocation.location,
-        { latitude: destination.latitude, longitude: destination.longitude }
+        { latitude: newDestination.latitude, longitude: newDestination.longitude }
       ];
       
       const bounds = {
@@ -1207,6 +1396,24 @@ export default function MapScreen() {
   };
 
   const handleOrderNow = async () => {
+    if (!isAuthenticated) {
+      Alert.alert(
+        'Authentication Required',
+        'Please log in to place orders.',
+        [
+          {
+            text: 'Go to Login',
+            onPress: () => router.push('/(tabs)/profile')
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          }
+        ]
+      );
+      return;
+    }
+
     if (!locationCoords || !destination || !selectedRoute) {
       Alert.alert('Route Selection Required', 'Please select a route before proceeding.');
       return;
@@ -1466,7 +1673,7 @@ export default function MapScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar barStyle="dark-content" />
       
       {/* Location Header */}
       <View style={[styles.locationHeader, { zIndex: 9998 }]}>

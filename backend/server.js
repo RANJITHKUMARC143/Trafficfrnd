@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const http = require('http');
 const socketIo = require('socket.io');
 const jwt = require('jsonwebtoken');
+const connectDB = require('./config/db');
 const vendorAuthRoutes = require('./routes/vendorAuth');
 const menuRoutes = require('./routes/menuRoutes');
 const orderRoutes = require('./routes/orderRoutes');
@@ -12,6 +13,9 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const deliveryBoyRoutes = require('./routes/deliveryBoyRoutes');
 const userAuthRoutes = require('./routes/userAuth');
+const routeRoutes = require('./routes/routeRoutes');
+const journeyRoutes = require('./routes/journeyRoutes');
+const routeSessionRoutes = require('./routes/routeSessionRoutes');
 const rateLimit = require('express-rate-limit');
 
 // Load environment variables
@@ -61,9 +65,10 @@ app.set('io', io);
 
 // CORS configuration
 const corsOptions = {
-  origin: true, // Allow all origins in development
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Content-Length', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'X-Requested-With'],
   credentials: true,
   maxAge: 86400 // 24 hours
 };
@@ -80,6 +85,12 @@ app.use((req, res, next) => {
   next();
 });
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({ message: 'Internal server error', error: err.message });
+});
+
 // Routes
 app.use('/api/vendors', vendorAuthRoutes);
 app.use('/api/vendors/menu', menuRoutes);
@@ -87,11 +98,20 @@ app.use('/api/vendors/orders', orderRoutes);
 app.use('/api/vendors/dashboard', dashboardRoutes);
 app.use('/api/vendors/analytics', analyticsRoutes);
 app.use('/api/delivery', deliveryBoyRoutes);
+app.use('/api/routes', routeRoutes);
+app.use('/api/users/journey', journeyRoutes);
+app.use('/api/users/route-session', routeSessionRoutes);
 app.use('/api/users', userAuthRoutes);
 
 // Test route
 app.get('/api/test', (req, res) => {
   res.json({ message: 'API is working!' });
+});
+
+// 404 handler
+app.use((req, res) => {
+  console.log('404 Not Found:', req.method, req.url);
+  res.status(404).json({ message: 'Not Found' });
 });
 
 // WebSocket connection handling
@@ -157,67 +177,56 @@ io.on('connection', (socket) => {
   });
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Server Error:', err);
-  res.status(500).json({
-    message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
-});
-
-// Connect to MongoDB
-mongoose.connect('mongodb://localhost:27017/Trafficfrnd', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => {
-  console.log('Connected to MongoDB');
-  
-  // Start server after successful database connection
-  const PORT = process.env.PORT || 3000;
-  const HOST = '0.0.0.0';  // Bind to all network interfaces
-  
-  server.listen(PORT, HOST, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Local URL: http://localhost:${PORT}`);
-    console.log(`Network URL: http://${HOST}:${PORT}`);
-    console.log('Available network interfaces:');
-    const { networkInterfaces } = require('os');
-    const nets = networkInterfaces();
-    for (const name of Object.keys(nets)) {
-      for (const net of nets[name]) {
-        if (net.family === 'IPv4' && !net.internal) {
-          console.log(`- http://${net.address}:${PORT}`);
+// Connect to MongoDB and start server
+const startServer = async () => {
+  try {
+    await connectDB();
+    const PORT = process.env.PORT || 3000;
+    const HOST = '0.0.0.0';  // Bind to all network interfaces
+    
+    server.listen(PORT, HOST, () => {
+      console.log(`Server running on port ${PORT}`);
+      console.log(`Local URL: http://localhost:${PORT}`);
+      console.log(`Network URL: http://${HOST}:${PORT}`);
+      console.log('Available network interfaces:');
+      const { networkInterfaces } = require('os');
+      const nets = networkInterfaces();
+      for (const name of Object.keys(nets)) {
+        for (const net of nets[name]) {
+          if (net.family === 'IPv4' && !net.internal) {
+            console.log(`- http://${net.address}:${PORT}`);
+          }
         }
       }
-    }
-  });
+    });
 
-  // Handle server errors
-  server.on('error', (error) => {
-    if (error.code === 'EADDRINUSE') {
-      console.error(`Port ${PORT} is already in use. Please try a different port or kill the process using this port.`);
-      process.exit(1);
-    } else {
-      console.error('Server error:', error);
-      process.exit(1);
-    }
-  });
+    // Handle server errors
+    server.on('error', (error) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use. Please try a different port or kill the process using this port.`);
+        process.exit(1);
+      } else {
+        console.error('Server error:', error);
+        process.exit(1);
+      }
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
 
-  // Handle process termination
-  process.on('SIGTERM', () => {
-    console.log('SIGTERM received. Shutting down gracefully...');
-    server.close(() => {
-      console.log('Server closed');
-      mongoose.connection.close(false, () => {
-        console.log('MongoDB connection closed');
-        process.exit(0);
-      });
+// Start the server
+startServer();
+
+// Handle process termination
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received. Shutting down gracefully...');
+  server.close(() => {
+    console.log('Server closed');
+    mongoose.connection.close(false, () => {
+      console.log('MongoDB connection closed');
+      process.exit(0);
     });
   });
-})
-.catch((error) => {
-  console.error('MongoDB connection error:', error);
-  process.exit(1);
 }); 
