@@ -1,9 +1,15 @@
-import { StyleSheet, View, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Image, ActivityIndicator, Modal, Alert, Share, Platform, Dimensions, Animated } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MenuItem } from '@/types/menu';
+import { LinearGradient } from 'expo-linear-gradient';
+import LottieView from 'lottie-react-native';
+
+const { width, height } = Dimensions.get('window');
+const IMAGE_HEIGHT = height * 0.4;
 
 export default function CategoryScreen() {
   const { id, name, locationId, locationType, locationName, allMenuItems } = useLocalSearchParams();
@@ -11,6 +17,11 @@ export default function CategoryScreen() {
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [loadingFavorite, setLoadingFavorite] = useState(false);
+  const [showCarAnimation, setShowCarAnimation] = useState(false);
 
   useEffect(() => {
     if (allMenuItems) {
@@ -30,21 +41,82 @@ export default function CategoryScreen() {
     }
   }, [allMenuItems, categoryName]);
 
-  const handleItemPress = (item: MenuItem) => {
-    router.push({
-      pathname: `/item/${item._id}`,
-      params: {
-        itemId: item._id,
-        itemName: item.name,
-        itemDescription: item.description,
-        itemPrice: item.price.toString(),
-        itemImageUrl: item.image,
-        category: item.category,
-        locationId,
-        locationType,
-        locationName
+  // Favorite logic
+  const checkFavoriteStatus = async (itemId: string) => {
+    setLoadingFavorite(true);
+    try {
+      const favorites = await AsyncStorage.getItem('favorites');
+      if (favorites) {
+        const favoritesArray = JSON.parse(favorites);
+        setIsFavorite(favoritesArray.includes(itemId));
+      } else {
+        setIsFavorite(false);
       }
-    });
+    } catch (error) {
+      setIsFavorite(false);
+    } finally {
+      setLoadingFavorite(false);
+    }
+  };
+
+  const toggleFavorite = async (itemId: string) => {
+    try {
+      const favorites = await AsyncStorage.getItem('favorites');
+      let favoritesArray = favorites ? JSON.parse(favorites) : [];
+      if (isFavorite) {
+        favoritesArray = favoritesArray.filter((id: string) => id !== itemId);
+      } else {
+        favoritesArray.push(itemId);
+      }
+      await AsyncStorage.setItem('favorites', JSON.stringify(favoritesArray));
+      setIsFavorite(!isFavorite);
+    } catch (error) {}
+  };
+
+  const handleShare = async (item: MenuItem) => {
+    try {
+      await Share.share({
+        message: `Check out ${item.name} on our app! Price: ₹${item.price}`,
+        title: item.name,
+      });
+    } catch (error) {}
+  };
+
+  const handleAddToCart = async (item: MenuItem) => {
+    try {
+      const cartData = await AsyncStorage.getItem('cart');
+      let cartItems = cartData ? JSON.parse(cartData) : [];
+      const existingItemIndex = cartItems.findIndex((i: any) => i.id === item._id);
+      if (existingItemIndex !== -1) {
+        cartItems[existingItemIndex].quantity += 1;
+      } else {
+        cartItems.push({
+          id: item._id,
+          name: item.name,
+          price: item.price,
+          quantity: 1,
+          imageUrl: item.image,
+        });
+      }
+      await AsyncStorage.setItem('cart', JSON.stringify(cartItems));
+      setShowCarAnimation(true);
+      setTimeout(() => {
+        setShowCarAnimation(false);
+        Alert.alert('Success', 'Item added to cart', [
+          { text: 'Continue Shopping', style: 'cancel' },
+          { text: 'View Cart', onPress: () => router.push('/cart') },
+        ]);
+      }, 2000);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to add item to cart');
+    }
+  };
+
+  // Open detail modal
+  const openDetailModal = (item: MenuItem) => {
+    setSelectedItem(item);
+    checkFavoriteStatus(item._id);
+    setShowDetailModal(true);
   };
 
   if (loading) {
@@ -94,7 +166,7 @@ export default function CategoryScreen() {
             <TouchableOpacity
               key={item._id}
               style={styles.itemCard}
-              onPress={() => handleItemPress(item)}
+              onPress={() => openDetailModal(item)}
             >
               <Image
                 source={{ uri: item.image || 'https://via.placeholder.com/150' }}
@@ -115,6 +187,91 @@ export default function CategoryScreen() {
           ))
         )}
       </ScrollView>
+      {/* Detail Modal */}
+      <Modal
+        visible={showDetailModal && !!selectedItem}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowDetailModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {selectedItem && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Image
+                  source={{ uri: selectedItem.image || 'https://via.placeholder.com/150' }}
+                  style={styles.detailImage}
+                  defaultSource={{ uri: 'https://via.placeholder.com/150' }}
+                />
+                <View style={styles.detailHeader}>
+                  <ThemedText style={styles.detailTitle}>{selectedItem.name}</ThemedText>
+                  <TouchableOpacity
+                    style={styles.favoriteButton}
+                    onPress={() => toggleFavorite(selectedItem._id)}
+                    disabled={loadingFavorite}
+                  >
+                    <Ionicons
+                      name={isFavorite ? 'heart' : 'heart-outline'}
+                      size={28}
+                      color={isFavorite ? '#FF3B30' : '#666'}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.shareButton}
+                    onPress={() => handleShare(selectedItem)}
+                  >
+                    <Ionicons name="share-outline" size={24} color="#333" />
+                  </TouchableOpacity>
+                </View>
+                <ThemedText style={styles.detailPrice}>₹{selectedItem.price}</ThemedText>
+                <ThemedText style={styles.detailDescription}>{selectedItem.description}</ThemedText>
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity
+                    style={styles.addToCartButton}
+                    onPress={() => handleAddToCart(selectedItem)}
+                  >
+                    <Ionicons name="cart-outline" size={24} color="#fff" />
+                    <ThemedText style={styles.addToCartButtonText}>Add to Cart</ThemedText>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.buyNowButton}
+                    onPress={() => {
+                      handleAddToCart(selectedItem);
+                      setShowDetailModal(false);
+                      router.push('/cart');
+                    }}
+                  >
+                    <ThemedText style={styles.buyNowButtonText}>Buy Now</ThemedText>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => setShowDetailModal(false)}
+                >
+                  <Ionicons name="close" size={28} color="#333" />
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+      {/* Car Delivery Animation Modal */}
+      <Modal
+        visible={showCarAnimation}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCarAnimation(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+          <LottieView
+            source={require('../../assets/animations/car-delivery.json')}
+            autoPlay
+            loop={false}
+            style={{ width: 300, height: 300 }}
+          />
+          <ThemedText style={{ color: '#fff', fontSize: 18, marginTop: 20 }}>Your order is on the way!</ThemedText>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -224,5 +381,86 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 20,
+    width: width * 0.9,
+    height: height * 0.9,
+    overflow: 'hidden',
+  },
+  detailImage: {
+    width: '100%',
+    height: IMAGE_HEIGHT,
+    resizeMode: 'cover',
+  },
+  detailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  detailTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginRight: 16,
+  },
+  favoriteButton: {
+    padding: 8,
+  },
+  shareButton: {
+    padding: 8,
+  },
+  detailPrice: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  detailDescription: {
+    fontSize: 14,
+    color: '#666',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  addToCartButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+  },
+  addToCartButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 8,
+  },
+  buyNowButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+  },
+  buyNowButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  closeButton: {
+    padding: 8,
+    position: 'absolute',
+    top: 16,
+    right: 16,
   },
 }); 

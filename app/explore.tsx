@@ -4,7 +4,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { API_URL } from '../src/config';
+import { API_URL } from '@/src/config';
 
 type Vendor = {
   _id: string;
@@ -184,10 +184,8 @@ export default function ExploreScreen() {
   };
 
   const handleItemPress = (item: MenuItem) => {
-    router.push({
-      pathname: '/item/[id]', // Navigate to a single item detail screen
-      params: { id: item._id, vendorId: item.vendorId }
-    });
+    // Remove or refactor any code that navigates to '/item/[id]'.
+    // If there is a handleItemPress or similar, either remove it or replace it with inline/modal detail logic.
   };
 
   const handleSearch = () => {

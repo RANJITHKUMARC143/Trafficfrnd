@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, TouchableOpacity, TextInput, Platform, KeyboardAvoidingView, Alert, Animated, Modal, ScrollView, Linking } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, TextInput, Platform, KeyboardAvoidingView, Alert, Animated, Modal, ScrollView, Linking, PanResponder, Dimensions, Text } from 'react-native';
 import { ThemedText, ThemedView } from '@/components';
 import { Ionicons } from '@expo/vector-icons';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
@@ -63,6 +63,9 @@ type TrafficPoint = {
   timestamp: number;
 };
 
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const MAX_SHEET_HEIGHT = SCREEN_HEIGHT * 0.6;
+
 export default function MapScreen() {
   const [locationCoords, setLocationCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [destination, setDestination] = useState<RoutePoint | null>(null);
@@ -91,6 +94,9 @@ export default function MapScreen() {
   const [selectableTrafficPoints, setSelectableTrafficPoints] = useState(false);
   const [showTrafficPointsModal, setShowTrafficPointsModal] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [routeSheetY, setRouteSheetY] = useState(new Animated.Value(0));
+  const [isDraggingSheet, setIsDraggingSheet] = useState(false);
+  const [showDimOverlay, setShowDimOverlay] = useState(false);
 
   const router = useRouter();
 
@@ -377,31 +383,30 @@ export default function MapScreen() {
           };
         });
 
-        // If we have fewer than 3 routes, generate additional alternatives
-        while (options.length < 3) {
+        // Only keep the first two routes
+        options = options.slice(0, 2);
+
+        // If we have fewer than 2 routes, generate an alternative
+        while (options.length < 2) {
           const baseRoute = options[0];
           const index = options.length;
-          
           // Create a slightly modified version of the base route
           const offset = 0.002 * (index); // Increase offset for each additional route
           const modifiedCoordinates = baseRoute.coordinates.map(coord => ({
             latitude: coord.latitude + (Math.random() > 0.5 ? offset : -offset),
             longitude: coord.longitude + (Math.random() > 0.5 ? offset : -offset)
           }));
-
           // Calculate new duration and distance based on the modification
           const durationMultiplier = 1 + (0.1 * index); // 10% longer for each additional route
           const distanceMultiplier = 1 + (0.15 * index); // 15% longer for each additional route
-          
           const baseDuration = parseInt(baseRoute.duration.replace(/\D/g, ''));
           const baseDistance = parseFloat(baseRoute.distance.replace(/[^0-9.]/g, ''));
-
           options.push({
             id: `route${index + 1}`,
             name: `Alternative Route ${index}`,
             duration: `${Math.round(baseDuration * durationMultiplier)} mins`,
             distance: `${(baseDistance * distanceMultiplier).toFixed(1)} km`,
-            trafficDensity: index === 1 ? 'medium' : 'high',
+            trafficDensity: 'medium',
             coordinates: modifiedCoordinates
           });
         }
@@ -436,21 +441,6 @@ export default function MapScreen() {
             { 
               latitude: destination.latitude + 0.001, 
               longitude: destination.longitude + 0.001 
-            },
-            { latitude: destination.latitude, longitude: destination.longitude }
-          ]
-        },
-        {
-          id: 'route3',
-          name: 'Alternative Route 2',
-          duration: '35 mins',
-          distance: '4.1 km',
-          trafficDensity: 'high',
-          coordinates: [
-            locationCoords,
-            { 
-              latitude: destination.latitude - 0.001, 
-              longitude: destination.longitude - 0.001 
             },
             { latitude: destination.latitude, longitude: destination.longitude }
           ]
@@ -641,6 +631,7 @@ export default function MapScreen() {
   };
 
   const renderDestinationSearch = () => {
+    // Only show the banner or search prompt, NOT the search input/overlay
     return (
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -683,91 +674,6 @@ export default function MapScreen() {
             </View>
           </TouchableOpacity>
         )}
-
-        {showDestinationInput && (
-          <View style={styles.searchOverlay}>
-            <View style={styles.searchContainer}>
-              <View style={styles.searchHeader}>
-                <TouchableOpacity 
-                  style={styles.backButton}
-                  onPress={() => setShowDestinationInput(false)}
-                >
-                  <Ionicons name="arrow-back" size={24} color="#333" />
-                </TouchableOpacity>
-                <ThemedText style={styles.searchTitle}>Enter Destination</ThemedText>
-              </View>
-              <GooglePlacesAutocomplete
-                placeholder='Search for a location...'
-                onPress={(data, details = null) => {
-                  if (details) {
-                    const { geometry, formatted_address } = details;
-                    const newDestination = {
-                      latitude: geometry.location.lat,
-                      longitude: geometry.location.lng,
-                      address: formatted_address,
-                    };
-                    setDestination(newDestination);
-                    setShowDestinationInput(false);
-                    AsyncStorage.setItem('destination', JSON.stringify(newDestination));
-                    
-                    if (locationCoords) {
-                      // Generate and show high traffic points immediately after destination selection
-                      const highTrafficPoints = generateHighTrafficPoints(locationCoords, {
-                        latitude: geometry.location.lat,
-                        longitude: geometry.location.lng
-                      });
-                      setTrafficPoints(highTrafficPoints);
-                      setShowTrafficPoints(true);
-
-                      // Update map region to show both points
-                      const midLat = (locationCoords.latitude + geometry.location.lat) / 2;
-                      const midLng = (locationCoords.longitude + geometry.location.lng) / 2;
-                      const latDelta = Math.abs(locationCoords.latitude - geometry.location.lat) * 2;
-                      const lngDelta = Math.abs(locationCoords.longitude - geometry.location.lng) * 2;
-
-                      mapRef.current?.animateToRegion({
-                        latitude: midLat,
-                        longitude: midLng,
-                        latitudeDelta: Math.max(latDelta, 0.02),
-                        longitudeDelta: Math.max(lngDelta, 0.02),
-                      }, 1000);
-
-                      generateRouteOptions();
-                    }
-                  }
-                }}
-                fetchDetails={true}
-                query={{
-                  key: 'AIzaSyAJX6Yjwz2DiEHjWE_0HIBvEkiYpS5TXAU',
-                  language: 'en',
-                  components: 'country:in',
-                }}
-                enablePoweredByContainer={false}
-                styles={{
-                  container: styles.googlePlacesContainer,
-                  textInput: styles.googlePlacesInput,
-                  listView: styles.googlePlacesList,
-                  row: styles.googlePlacesRow,
-                  description: styles.googlePlacesDescription,
-                  separator: styles.googlePlacesSeparator,
-                }}
-                renderRow={(rowData) => {
-                  return (
-                    <View style={styles.searchResultRow}>
-                      <View style={styles.searchResultIcon}>
-                        <Ionicons name="location" size={20} color="#666" />
-                      </View>
-                      <View style={styles.searchResultText}>
-                        <ThemedText style={styles.searchResultMainText}>{rowData.structured_formatting.main_text}</ThemedText>
-                        <ThemedText style={styles.searchResultSecondaryText}>{rowData.structured_formatting.secondary_text}</ThemedText>
-                      </View>
-                    </View>
-                  );
-                }}
-              />
-            </View>
-          </View>
-        )}
       </KeyboardAvoidingView>
     );
   };
@@ -775,59 +681,68 @@ export default function MapScreen() {
   const renderRouteOptions = () => {
     if (!showRouteOptions) return null;
     if (!routeOptions || routeOptions.length === 0) return null;
-
     return (
-      <View style={styles.routeOptionsContainer}>
-        <View style={styles.routeOptionsHeader}>
-          <ThemedText style={styles.routeOptionsTitle}>Select Your Route</ThemedText>
-        </View>
-        <View style={styles.routeOptionsList}>
-          {routeOptions.map((route, index) => (
-            <TouchableOpacity
-              key={route.id}
-              style={[
-                styles.routeOption,
-                selectedRoute?.id === route.id && styles.selectedRoute,
-              ]}
-              onPress={() => handleRouteSelect(route)}
-            >
-              <View style={styles.routeNameContainer}>
-                <ThemedText style={styles.routeName}>
-                  {index === 0 ? 'Fastest Route' : `Alternative Route ${index}`}
-                </ThemedText>
-                <View style={[
-                  styles.trafficBadge,
-                  { backgroundColor: route.trafficDensity === 'low' ? '#4CAF50' : route.trafficDensity === 'medium' ? '#FFA000' : '#F44336' }
-                ]}>
-                  <ThemedText style={styles.trafficText}>{route.trafficDensity.toUpperCase()}</ThemedText>
-                </View>
-              </View>
-              <View style={styles.routeDetails}>
-                <View style={styles.routeMetric}>
-                  <Ionicons name="time-outline" size={16} color="#666" />
-                  <ThemedText style={styles.routeMetricText}>{route.duration}</ThemedText>
-                </View>
-                <View style={styles.routeMetric}>
-                  <Ionicons name="map-outline" size={16} color="#666" />
-                  <ThemedText style={styles.routeMetricText}>{route.distance}</ThemedText>
-                </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.selectButton}
-                onPress={() => handleRouteSelect(route)}
-              >
-                <ThemedText style={styles.selectButtonText}>Select</ThemedText>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <TouchableOpacity
-          style={styles.closeButton}
-          onPress={() => setShowRouteOptions(false)}
+      <>
+        {/* Dimmed overlay */}
+        {showDimOverlay && (
+          <TouchableOpacity
+            style={styles.dimOverlay}
+            activeOpacity={1}
+            onPress={() => {
+              setShowRouteOptions(false);
+              setShowDimOverlay(false);
+            }}
+          />
+        )}
+        <Animated.View
+          style={[
+            styles.routeOptionsBottomSheet,
+            { maxHeight: MAX_SHEET_HEIGHT, transform: [{ translateY: routeSheetY }] },
+          ]}
+          {...panResponder.panHandlers}
         >
-          <ThemedText style={styles.closeButtonText}>Close</ThemedText>
-        </TouchableOpacity>
-      </View>
+          {/* Drag handle */}
+          <View style={styles.dragHandleContainer}>
+            <View style={styles.dragHandle} />
+          </View>
+          <Text style={styles.routeOptionsTitle}>Select Your Route</Text>
+          <ScrollView style={styles.routeOptionsList} contentContainerStyle={{ paddingBottom: 24 }}>
+            {routeOptions.map((route, index) => (
+              <View key={route.id} style={styles.routeOptionCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.routeName}>{route.name}</Text>
+                  <View style={{ flexDirection: 'row', marginTop: 8, alignItems: 'center' }}>
+                    <Ionicons name="time-outline" size={18} color="#666" />
+                    <Text style={styles.routeMetricText}>{route.duration}</Text>
+                    <Ionicons name="map-outline" size={18} color="#666" style={{ marginLeft: 16 }} />
+                    <Text style={styles.routeMetricText}>{route.distance}</Text>
+                  </View>
+                </View>
+                <View style={{ alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                  <View style={[styles.trafficBadge, { backgroundColor: route.trafficDensity === 'low' ? '#4CAF50' : route.trafficDensity === 'medium' ? '#FFA000' : '#F44336' }] }>
+                    <Text style={styles.trafficText}>{route.trafficDensity.toUpperCase()}</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.selectButton}
+                    onPress={() => handleRouteSelect(route)}
+                  >
+                    <Text style={styles.selectButtonText}>Select</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => {
+              setShowRouteOptions(false);
+              setShowDimOverlay(false);
+            }}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </>
     );
   };
 
@@ -1671,6 +1586,135 @@ export default function MapScreen() {
     );
   };
 
+  // PanResponder for drag-to-close
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dy) > 10;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          routeSheetY.setValue(gestureState.dy);
+          setIsDraggingSheet(true);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        setIsDraggingSheet(false);
+        if (gestureState.dy > 100) {
+          Animated.spring(routeSheetY, { toValue: MAX_SHEET_HEIGHT, useNativeDriver: true }).start(() => {
+            setShowRouteOptions(false);
+            setShowDimOverlay(false);
+            routeSheetY.setValue(0);
+          });
+        } else {
+          Animated.spring(routeSheetY, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
+
+  useEffect(() => {
+    if (showRouteOptions) {
+      setShowDimOverlay(true);
+      Animated.spring(routeSheetY, { toValue: 0, useNativeDriver: true }).start();
+    } else {
+      setShowDimOverlay(false);
+    }
+  }, [showRouteOptions]);
+
+  // Modal search overlay
+  const renderDestinationSearchModal = () => {
+    if (!showDestinationInput) return null;
+    return (
+      <Modal
+        visible={showDestinationInput}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowDestinationInput(false)}
+      >
+        <View style={styles.searchModalOverlay}>
+          <View style={styles.searchModalContent}>
+            {/* Only the search input, not the banner */}
+            <View style={styles.searchHeader}>
+              <TouchableOpacity 
+                style={styles.backButton}
+                onPress={() => setShowDestinationInput(false)}
+              >
+                <Ionicons name="arrow-back" size={24} color="#333" />
+              </TouchableOpacity>
+              <ThemedText style={styles.searchTitle}>Enter Destination</ThemedText>
+            </View>
+            <GooglePlacesAutocomplete
+              placeholder='Search for a location...'
+              onPress={(data, details = null) => {
+                if (details) {
+                  const { geometry, formatted_address } = details;
+                  const newDestination = {
+                    latitude: geometry.location.lat,
+                    longitude: geometry.location.lng,
+                    address: formatted_address,
+                  };
+                  setDestination(newDestination);
+                  setShowDestinationInput(false);
+                  AsyncStorage.setItem('destination', JSON.stringify(newDestination));
+                  if (locationCoords) {
+                    // Generate and show high traffic points immediately after destination selection
+                    const highTrafficPoints = generateHighTrafficPoints(locationCoords, {
+                      latitude: geometry.location.lat,
+                      longitude: geometry.location.lng
+                    });
+                    setTrafficPoints(highTrafficPoints);
+                    setShowTrafficPoints(true);
+                    // Update map region to show both points
+                    const midLat = (locationCoords.latitude + geometry.location.lat) / 2;
+                    const midLng = (locationCoords.longitude + geometry.location.lng) / 2;
+                    const latDelta = Math.abs(locationCoords.latitude - geometry.location.lat) * 2;
+                    const lngDelta = Math.abs(locationCoords.longitude - geometry.location.lng) * 2;
+                    mapRef.current?.animateToRegion({
+                      latitude: midLat,
+                      longitude: midLng,
+                      latitudeDelta: Math.max(latDelta, 0.02),
+                      longitudeDelta: Math.max(lngDelta, 0.02),
+                    }, 1000);
+                    generateRouteOptions();
+                  }
+                }
+              }}
+              fetchDetails={true}
+              query={{
+                key: 'AIzaSyAJX6Yjwz2DiEHjWE_0HIBvEkiYpS5TXAU',
+                language: 'en',
+                components: 'country:in',
+              }}
+              enablePoweredByContainer={false}
+              styles={{
+                container: styles.googlePlacesContainer,
+                textInput: styles.googlePlacesInput,
+                listView: styles.googlePlacesList,
+                row: styles.googlePlacesRow,
+                description: styles.googlePlacesDescription,
+                separator: styles.googlePlacesSeparator,
+              }}
+              renderRow={(rowData) => {
+                return (
+                  <View style={styles.searchResultRow}>
+                    <View style={styles.searchResultIcon}>
+                      <Ionicons name="location" size={20} color="#666" />
+                    </View>
+                    <View style={styles.searchResultText}>
+                      <ThemedText style={styles.searchResultMainText}>{rowData.structured_formatting.main_text}</ThemedText>
+                      <ThemedText style={styles.searchResultSecondaryText}>{rowData.structured_formatting.secondary_text}</ThemedText>
+                    </View>
+                  </View>
+                );
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   return (
     <ThemedView style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -1688,7 +1732,11 @@ export default function MapScreen() {
         </View>
       </View>
 
+      {/* Always show the destination search bar/banner at the top */}
       {renderDestinationSearch()}
+
+      {/* Modal for destination search input */}
+      {renderDestinationSearchModal()}
 
       {destination && (
         <>
@@ -1707,7 +1755,7 @@ export default function MapScreen() {
             </TouchableOpacity>
           </View>
 
-          {locationCoords && (
+          {locationCoords && typeof locationCoords.latitude === 'number' && typeof locationCoords.longitude === 'number' && (
             <View style={styles.mapContainer}>
               <MapView
                 ref={mapRef}
@@ -1731,35 +1779,37 @@ export default function MapScreen() {
                 </Marker>
 
                 {/* Destination marker */}
-                <Marker
-                  coordinate={{
-                    latitude: destination.latitude,
-                    longitude: destination.longitude,
-                  }}
-                  title="Destination"
-                  description={destination.address}
-                >
-                  <View style={styles.destinationMarker}>
-                    <Ionicons name="location" size={24} color="#D32F2F" />
-                  </View>
-                </Marker>
+                {destination && typeof destination.latitude === 'number' && typeof destination.longitude === 'number' && (
+                  <Marker
+                    coordinate={{
+                      latitude: destination.latitude,
+                      longitude: destination.longitude,
+                    }}
+                    title="Destination"
+                    description={destination.address}
+                  >
+                    <View style={styles.destinationMarker}>
+                      <Ionicons name="location" size={24} color="#D32F2F" />
+                    </View>
+                  </Marker>
+                )}
 
                 {/* Nearby Locations */}
-                {nearbyLocations.map((location) => (
+                {nearbyLocations.filter(loc => loc && loc.location && typeof loc.location.latitude === 'number' && typeof loc.location.longitude === 'number').map((location) => (
                   <Marker
                     key={location.id}
                     coordinate={location.location}
                     title={location.name}
                     description={`${location.distance.toFixed(1)} km away`}
                   >
-                    <View style={[styles.locationMarker, { backgroundColor: getMarkerColor(location.type) }]}>
+                    <View style={[styles.locationMarker, { backgroundColor: getMarkerColor(location.type) }]}> 
                       <Ionicons name={getMarkerIcon(location.type)} size={20} color="#fff" />
                     </View>
                   </Marker>
                 ))}
 
                 {/* Selected Delivery Point Marker */}
-                {selectedDeliveryPoint && (
+                {selectedDeliveryPoint && selectedDeliveryPoint.location && typeof selectedDeliveryPoint.location.latitude === 'number' && typeof selectedDeliveryPoint.location.longitude === 'number' && (
                   <Marker
                     coordinate={selectedDeliveryPoint.location}
                     title={selectedDeliveryPoint.name}
@@ -1770,7 +1820,7 @@ export default function MapScreen() {
                       borderColor: '#4CAF50',
                       borderWidth: 2,
                       transform: [{ scale: 1.2 }]
-                    }]}>
+                    }]}> 
                       <Ionicons name={getMarkerIcon(selectedDeliveryPoint.type)} size={24} color="#fff" />
                     </View>
                   </Marker>
@@ -2369,5 +2419,115 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 16,
     fontWeight: '500',
+  },
+  routeOptionsBottomSheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'white',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 20,
+    zIndex: 2000,
+    paddingBottom: 24,
+    paddingHorizontal: 12,
+  },
+  dragHandleContainer: {
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  dragHandle: {
+    width: 48,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#e0e0e0',
+    alignSelf: 'center',
+    marginVertical: 6,
+  },
+  searchModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    justifyContent: 'flex-start',
+  },
+  searchModalContent: {
+    marginTop: 60,
+    backgroundColor: 'white',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 24,
+    minHeight: '60%',
+  },
+  dimOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    zIndex: 1999,
+  },
+  routeOptionsTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 10,
+    textAlign: 'center',
+    color: '#222',
+  },
+  routeOptionsList: {
+    flexGrow: 0,
+    marginBottom: 8,
+  },
+  routeOptionCard: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  routeName: {
+    fontWeight: 'bold',
+    fontSize: 18,
+    color: '#222',
+  },
+  routeMetricText: {
+    marginLeft: 6,
+    fontSize: 15,
+    color: '#666',
+  },
+  selectButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    alignSelf: 'center',
+    marginTop: 12,
+  },
+  selectButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  cancelButton: {
+    alignSelf: 'center',
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+  },
+  cancelButtonText: {
+    color: '#888',
+    fontSize: 16,
   },
 }); 

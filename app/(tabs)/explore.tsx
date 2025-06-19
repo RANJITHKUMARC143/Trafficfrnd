@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, Image, TextInput, Alert, Modal, ActivityIndicator, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { StyleSheet, View, FlatList, TouchableOpacity, Image, TextInput, Alert, Modal, ActivityIndicator, RefreshControl, ScrollView } from 'react-native';
 import { ThemedText, ThemedView } from '@/components';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
@@ -40,6 +40,26 @@ interface MenuItem {
   vendorId: string;
 }
 
+// Skeleton loader component
+const Skeleton = ({ style }: { style?: any }) => (
+  <View style={[{ backgroundColor: '#e0e0e0', borderRadius: 8 }, style]} />
+);
+
+const VendorItem = React.memo(({ vendor, selectedVendor, onSelect }: any) => (
+  <TouchableOpacity
+    style={styles.vendorItem}
+    onPress={() => onSelect(vendor)}
+  >
+    <Ionicons name="storefront-outline" size={24} color="#4CAF50" />
+    <ThemedText style={styles.vendorName}>{vendor.businessName}</ThemedText>
+    <Ionicons 
+      name={selectedVendor?._id === vendor._id ? "checkmark-circle" : "ellipse-outline"}
+      size={20} 
+      color={selectedVendor?._id === vendor._id ? "#4CAF50" : "#ccc"}
+    />
+  </TouchableOpacity>
+));
+
 export default function ExploreScreen() {
   const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,6 +77,10 @@ export default function ExploreScreen() {
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
+  const [categoryCounts, setCategoryCounts] = useState<{ [cat: string]: number }>({});
+  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [itemsToShow, setItemsToShow] = useState(4); // For infinite scroll
+  const [showSelectDestinationModal, setShowSelectDestinationModal] = useState(false);
 
   // Check authentication status on component mount
   useEffect(() => {
@@ -73,65 +97,21 @@ export default function ExploreScreen() {
     }
   };
 
-  // Check for destination when component mounts
+  // Check for destination when component mounts or after login
   useEffect(() => {
     const checkDestination = async () => {
-      console.log('Checking destination in explore screen...');
       try {
-        if (!isAuthenticated) {
-          Alert.alert(
-            'Authentication Required',
-            'Please log in to explore products and place orders.',
-            [
-              {
-                text: 'Go to Login',
-                onPress: () => router.push('/(tabs)/profile')
-              },
-              {
-                text: 'Cancel',
-                onPress: () => router.replace('/(tabs)')
-              }
-            ],
-            { cancelable: false }
-          );
-          return;
-        }
-
+        if (!isAuthenticated) return;
         const savedDestination = await AsyncStorage.getItem('destination');
-        console.log('Saved destination in explore:', savedDestination);
-        
         if (!savedDestination) {
-          console.log('No destination found, showing alert');
-          Alert.alert(
-            'Select Destination',
-            'Please select a destination on the map to explore items.',
-            [
-              {
-                text: 'Go to Map',
-                onPress: () => {
-                  console.log('Navigating to map');
-                  router.replace('/(tabs)/map');
-                }
-              },
-              {
-                text: 'Cancel',
-                onPress: () => {
-                  console.log('Cancelling navigation');
-                  router.replace('/(tabs)');
-                },
-                style: 'cancel'
-              }
-            ],
-            { cancelable: false }
-          );
+          setShowSelectDestinationModal(true);
         } else {
-          console.log('Destination found:', JSON.parse(savedDestination));
+          setShowSelectDestinationModal(false);
         }
       } catch (error) {
-        console.error('Error checking destination:', error);
+        setShowSelectDestinationModal(false);
       }
     };
-
     checkDestination();
   }, [isAuthenticated]);
 
@@ -185,31 +165,31 @@ export default function ExploreScreen() {
   const fetchAndCombineAllMenuItems = async (currentVendors: Vendor[]) => {
     setLoadingMenu(true);
     try {
-      console.log('fetchAndCombineAllMenuItems: Starting to fetch all menu items...');
       const response = await fetch(`${API_URL}/api/vendors/menu/public/explore/all`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      console.log(`fetchAndCombineAllMenuItems: Fetched ${data.length} menu items`);
-      
       // Update vendors state to only include those with menu items
       const vendorsWithMenuItems = currentVendors.filter(vendor => 
         data.some((item: MenuItem) => item.vendorId === vendor._id)
       );
       setVendors(vendorsWithMenuItems);
       setMenuItems(data);
-
+      // Precompute category counts
+      const counts: { [cat: string]: number } = {};
+      data.forEach(item => {
+        counts[item.category] = (counts[item.category] || 0) + 1;
+      });
+      setCategoryCounts(counts);
       // Extract unique categories from menu items
       const uniqueCategories = Array.from(new Set(data.map((item: MenuItem) => item.category)));
       setCategories(uniqueCategories);
-      
       setLastUpdateTime(new Date());
     } catch (error) {
-      console.error('fetchAndCombineAllMenuItems: Error fetching menu items:', error);
-      Alert.alert('Error', 'Failed to fetch menu items. Please try again.');
       setMenuItems([]);
       setCategories([]);
+      setCategoryCounts({});
     } finally {
       setLoadingMenu(false);
     }
@@ -256,40 +236,59 @@ export default function ExploreScreen() {
 
   // --- Periodic Refresh ---
   useEffect(() => {
-    console.log('useEffect[periodic]: Setting up periodic refresh.');
     const intervalId = setInterval(() => {
-      console.log('useEffect[periodic]: Periodic refresh triggered.');
       refreshData();
-    }, 30000); // Refresh every 30 seconds
-
+    }, 120000); // 2 minutes
     return () => {
-      console.log('useEffect[periodic]: Cleaning up periodic refresh.');
       clearInterval(intervalId);
     };
-  }, [refreshData]); // Dependency on refreshData
+  }, [refreshData]);
 
-  // --- Handlers ---
-  const handleCategoryPress = (categoryName: string) => {
+  // Debounced search input
+  const handleSearchChange = useCallback((text: string) => {
+    setSearchQuery(text);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => {
+      if (text.trim()) {
+        handleSearch();
+      }
+    }, 400);
+  }, [handleSearch]);
+
+  // Memoized handlers
+  const memoizedHandleCategoryPress = useCallback((categoryName: string) => {
     router.push({
       pathname: '/category/[id]',
       params: { 
-        id: categoryName, // Use category name as ID for URL consistency
-        name: categoryName, // Pass category name for display
-        allMenuItems: JSON.stringify(menuItems), // Pass all menu items as a string
+        id: categoryName,
+        name: categoryName,
+        allMenuItems: JSON.stringify(menuItems),
         locationId,
         locationType,
         locationName
       }
     });
-  };
+  }, [menuItems, locationId, locationType, locationName, router]);
 
-  const handleItemPress = (item: MenuItem) => {
-    router.push({
-      pathname: '/item/[id]', // Navigate to a single item detail screen
-      params: { id: item._id, vendorId: item.vendorId }
-    });
-  };
+  const memoizedHandleItemPress = useCallback((item: MenuItem) => {
+    // Remove or refactor any code that navigates to '/item/[id]'.
+    // If there is a handleItemPress or similar, either remove it or replace it with inline/modal detail logic.
+  }, []);
 
+  // Memoized data for FlatList
+  const availableMenuItems = useMemo(() => menuItems.filter(item => item.isAvailable).slice(0, 4), [menuItems]);
+
+  // Infinite scroll handler for popular items
+  const handleLoadMoreItems = useCallback(() => {
+    if (availableMenuItems.length > itemsToShow) {
+      setItemsToShow((prev) => Math.min(prev + 4, availableMenuItems.length));
+    }
+  }, [availableMenuItems, itemsToShow]);
+
+  // Memoized visible items for FlatList
+  const visibleMenuItems = useMemo(() => availableMenuItems.slice(0, itemsToShow), [availableMenuItems, itemsToShow]);
+
+  // --- Handlers ---
   const handleSearch = () => {
     if (searchQuery.trim()) {
       router.push({
@@ -330,7 +329,7 @@ export default function ExploreScreen() {
             style={styles.searchInput}
             placeholder="Search items..."
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={handleSearchChange}
             onSubmitEditing={handleSearch}
             returnKeyType="search"
           />
@@ -361,109 +360,144 @@ export default function ExploreScreen() {
         >
           <View style={styles.modalContent}>
             <ThemedText style={styles.modalTitle}>Select a Vendor</ThemedText>
-            <ScrollView style={styles.vendorList}>
-              {allFetchedVendors.length === 0 ? (
-                <ThemedText style={styles.emptyText}>No vendors available.</ThemedText>
-              ) : (
-                allFetchedVendors.map((vendor) => (
-                  <TouchableOpacity
-                    key={vendor._id}
-                    style={styles.vendorItem}
-                    onPress={() => handleVendorSelect(vendor)}
-                  >
-                    <Ionicons name="storefront-outline" size={24} color="#4CAF50" />
-                    <ThemedText style={styles.vendorName}>{vendor.businessName}</ThemedText>
-                    <Ionicons 
-                      name={selectedVendor?._id === vendor._id ? "checkmark-circle" : "ellipse-outline"}
-                      size={20} 
-                      color={selectedVendor?._id === vendor._id ? "#4CAF50" : "#ccc"}
-                    />
-                  </TouchableOpacity>
-                ))
+            <FlatList
+              data={allFetchedVendors}
+              keyExtractor={vendor => vendor._id}
+              renderItem={({ item }) => (
+                <VendorItem
+                  vendor={item}
+                  selectedVendor={selectedVendor}
+                  onSelect={handleVendorSelect}
+                />
               )}
-            </ScrollView>
+              ListEmptyComponent={<ThemedText style={styles.emptyText}>No vendors available.</ThemedText>}
+              style={styles.vendorList}
+            />
           </View>
         </TouchableOpacity>
       </Modal>
 
-      {/* Category Section */}
-      <ScrollView 
-        style={styles.content} 
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+      {/* Modal for select destination */}
+      <Modal
+        visible={showSelectDestinationModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {}}
       >
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Categories</ThemedText>
-          <View style={styles.categoriesGrid}>
-            {loadingInitialData ? (
-              <ActivityIndicator size="large" color="#4CAF50" />
-            ) : categories.length === 0 ? (
-              <ThemedText style={styles.emptyText}>No categories available</ThemedText>
-            ) : (
-              categories.map((category) => (
-                <TouchableOpacity
-                  key={category}
-                  style={styles.categoryCard}
-                  onPress={() => handleCategoryPress(category)}
-                >
-                  <View style={styles.categoryIcon}>
-                    <Ionicons 
-                      name={getCategoryIcon(category)} 
-                      size={28} 
-                      color="#4CAF50" 
-                    />
-                  </View>
-                  <ThemedText style={styles.categoryName}>{category}</ThemedText>
-                  <ThemedText style={styles.categoryItems}>
-                    {menuItems.filter(item => item.category === category).length} items
-                  </ThemedText>
-                </TouchableOpacity>
-              ))
-            )}
+        <View style={styles.destinationModalOverlay}>
+          <View style={styles.destinationModalContent}>
+            <Ionicons name="navigate" size={48} color="#4CAF50" style={{ marginBottom: 16 }} />
+            <ThemedText style={styles.destinationModalTitle}>Select Destination</ThemedText>
+            <ThemedText style={styles.destinationModalText}>
+              Please select a destination on the map to explore items.
+            </ThemedText>
+            <TouchableOpacity
+              style={styles.destinationModalButton}
+              onPress={() => {
+                setShowSelectDestinationModal(false);
+                router.replace('/(tabs)/map');
+              }}
+            >
+              <ThemedText style={styles.destinationModalButtonText}>Go to Map</ThemedText>
+            </TouchableOpacity>
           </View>
         </View>
+      </Modal>
 
-        {/* Menu Items Section */}
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Popular Items</ThemedText>
-          {loadingInitialData ? (
-            <ActivityIndicator size="large" color="#4CAF50" />
-          ) : menuItems.length === 0 ? (
-            <ThemedText style={styles.emptyText}>No menu items available.</ThemedText>
-          ) : (
-            menuItems
-              .filter(item => item.isAvailable) // Only show available items on explore
-              .slice(0, 4) // Show top 4 popular items
-              .map((item) => (
-                <TouchableOpacity
-                  key={item._id}
-                  style={styles.itemCard}
-                  onPress={() => handleItemPress(item)}
-                >
-                  <Image
-                    source={{ uri: item.image || 'https://via.placeholder.com/150' }}
-                    style={styles.itemImage}
-                    defaultSource={{ uri: 'https://via.placeholder.com/150' }}
+      {/* Category Section */}
+      <View style={styles.section}>
+        <ThemedText style={styles.sectionTitle}>Categories</ThemedText>
+        {loadingInitialData ? (
+          <FlatList
+            data={[1,2,3,4]}
+            keyExtractor={item => item.toString()}
+            numColumns={2}
+            renderItem={() => (
+              <Skeleton style={{ width: '47%', height: 90, marginBottom: 10 }} />
+            )}
+            columnWrapperStyle={{ justifyContent: 'space-between', gap: 15, marginBottom: 10 }}
+            contentContainerStyle={{ paddingBottom: 10 }}
+          />
+        ) : categories.length === 0 ? (
+          <ThemedText style={styles.emptyText}>No categories available</ThemedText>
+        ) : (
+          <FlatList
+            data={categories}
+            keyExtractor={(item) => item}
+            numColumns={2}
+            renderItem={({ item: category }) => (
+              <TouchableOpacity
+                style={styles.categoryCard}
+                onPress={() => memoizedHandleCategoryPress(category)}
+              >
+                <View style={styles.categoryIcon}>
+                  <Ionicons 
+                    name={getCategoryIcon(category)} 
+                    size={28} 
+                    color="#4CAF50" 
                   />
-                  <View style={styles.itemInfo}>
-                    <ThemedText style={styles.itemName}>{item.name}</ThemedText>
-                    <ThemedText style={styles.itemDescription}>{item.description}</ThemedText>
-                    <View style={styles.itemFooter}>
-                      <ThemedText style={styles.itemPrice}>₹{item.price}</ThemedText>
-                      {/* Assuming menu items don't have ratings directly, remove or adapt */}
-                      <View style={styles.rating}>
-                        <Ionicons name="star" size={16} color="#FFD700" />
-                        <ThemedText style={styles.ratingText}>4.5</ThemedText>
-                      </View>
+                </View>
+                <ThemedText style={styles.categoryName}>{category}</ThemedText>
+                <ThemedText style={styles.categoryItems}>
+                  {categoryCounts[category] || 0} items
+                </ThemedText>
+              </TouchableOpacity>
+            )}
+            columnWrapperStyle={{ justifyContent: 'space-between', gap: 15, marginBottom: 10 }}
+            ListEmptyComponent={<ThemedText style={styles.emptyText}>No categories available</ThemedText>}
+            contentContainerStyle={{ paddingBottom: 10 }}
+          />
+        )}
+      </View>
+
+      {/* Menu Items Section */}
+      <View style={styles.section}>
+        <ThemedText style={styles.sectionTitle}>Popular Items</ThemedText>
+        {loadingInitialData ? (
+          <FlatList
+            data={[1,2,3,4]}
+            keyExtractor={item => item.toString()}
+            renderItem={() => (
+              <Skeleton style={{ height: 100, borderRadius: 12, marginBottom: 16 }} />
+            )}
+            contentContainerStyle={{ paddingBottom: 10 }}
+          />
+        ) : visibleMenuItems.length === 0 ? (
+          <ThemedText style={styles.emptyText}>No menu items available.</ThemedText>
+        ) : (
+          <FlatList
+            data={visibleMenuItems}
+            keyExtractor={(item) => item._id}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.itemCard}
+                onPress={() => memoizedHandleItemPress(item)}
+              >
+                <Image
+                  source={{ uri: item.image || 'https://via.placeholder.com/150' }}
+                  style={styles.itemImage}
+                  defaultSource={{ uri: 'https://via.placeholder.com/150' }}
+                />
+                <View style={styles.itemInfo}>
+                  <ThemedText style={styles.itemName}>{item.name}</ThemedText>
+                  <ThemedText style={styles.itemDescription}>{item.description}</ThemedText>
+                  <View style={styles.itemFooter}>
+                    <ThemedText style={styles.itemPrice}>₹{item.price}</ThemedText>
+                    <View style={styles.rating}>
+                      <Ionicons name="star" size={16} color="#FFD700" />
+                      <ThemedText style={styles.ratingText}>4.5</ThemedText>
                     </View>
                   </View>
-                </TouchableOpacity>
-              ))
-          )}
-        </View>
-      </ScrollView>
+                </View>
+              </TouchableOpacity>
+            )}
+            onEndReached={handleLoadMoreItems}
+            onEndReachedThreshold={0.5}
+            ListEmptyComponent={<ThemedText style={styles.emptyText}>No menu items available.</ThemedText>}
+            contentContainerStyle={{ paddingBottom: 10 }}
+          />
+        )}
+      </View>
     </ThemedView>
   );
 }
@@ -668,5 +702,49 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginTop: 20,
+  },
+  destinationModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  destinationModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 28,
+    alignItems: 'center',
+    width: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  destinationModalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#222',
+    textAlign: 'center',
+  },
+  destinationModalText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  destinationModalButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    marginTop: 8,
+  },
+  destinationModalButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });

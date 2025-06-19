@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-export const API_URL = 'http://192.168.57.230:3000'; // Your computer's IP address for mobile device access
+export const API_URL = 'http://192.168.4.176:3000'; // Your computer's IP address for mobile device access
 
 console.log('Using API URL:', API_URL);
 
