@@ -16,6 +16,7 @@ const userAuthRoutes = require('./routes/userAuth');
 const routeRoutes = require('./routes/routeRoutes');
 const journeyRoutes = require('./routes/journeyRoutes');
 const routeSessionRoutes = require('./routes/routeSessionRoutes');
+const userOrderRoutes = require('./routes/userOrderRoutes');
 const rateLimit = require('express-rate-limit');
 
 // Load environment variables
@@ -102,6 +103,7 @@ app.use('/api/routes', routeRoutes);
 app.use('/api/users/journey', journeyRoutes);
 app.use('/api/users/route-session', routeSessionRoutes);
 app.use('/api/users', userAuthRoutes);
+app.use('/api/orders', userOrderRoutes);
 
 // Test route
 app.get('/api/test', (req, res) => {

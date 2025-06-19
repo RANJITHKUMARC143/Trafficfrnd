@@ -42,6 +42,15 @@ const orderSchema = new mongoose.Schema({
   specialInstructions: {
     type: String
   },
+  vehicleNumber: {
+    type: String,
+    required: true
+  },
+  routeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Route',
+    required: true
+  },
   timestamp: {
     type: Date,
     default: Date.now

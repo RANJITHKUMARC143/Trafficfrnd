@@ -96,6 +96,7 @@ export default function CategoryScreen() {
           price: item.price,
           quantity: 1,
           imageUrl: item.image,
+          vendorId: item.vendorId,
         });
       }
       await AsyncStorage.setItem('cart', JSON.stringify(cartItems));

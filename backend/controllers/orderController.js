@@ -1,4 +1,5 @@
 const Order = require('../models/Order');
+const mongoose = require('mongoose');
 
 // Get all orders for the authenticated vendor
 const getOrders = async (req, res) => {
@@ -69,9 +70,66 @@ const getOrdersByStatus = async (req, res) => {
   }
 };
 
+// Create a new order (user)
+const createOrder = async (req, res) => {
+  try {
+    const { items, totalAmount, vendorId, deliveryAddress, specialInstructions, vehicleNumber, routeId } = req.body;
+    const customerName = req.user.name || req.user.username;
+
+    if (!vendorId) {
+      return res.status(400).json({ message: 'vendorId is required' });
+    }
+    if (!vehicleNumber) {
+      return res.status(400).json({ message: 'vehicleNumber is required' });
+    }
+    if (!routeId) {
+      return res.status(400).json({ message: 'routeId is required' });
+    }
+
+    // Convert vendorId and routeId to ObjectId if they're strings
+    const vendorObjectId = new mongoose.Types.ObjectId(vendorId);
+    const routeObjectId = new mongoose.Types.ObjectId(routeId);
+
+    const order = new Order({
+      vendorId: vendorObjectId,
+      routeId: routeObjectId,
+      customerName,
+      items,
+      totalAmount,
+      status: 'confirmed',
+      deliveryAddress,
+      specialInstructions,
+      vehicleNumber,
+      timestamp: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await order.save();
+    console.log('Order created:', order);
+    res.status(201).json(order);
+  } catch (error) {
+    console.error('Error creating order:', error);
+    res.status(500).json({ message: 'Error creating order', error: error.message });
+  }
+};
+
+// Get all orders for the authenticated user
+const getUserOrders = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const orders = await Order.find({ user: userId }).sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (error) {
+    console.error('Error fetching user orders:', error);
+    res.status(500).json({ message: 'Error fetching user orders', error: error.message });
+  }
+};
+
 module.exports = {
   getOrders,
   getOrderById,
   updateOrderStatus,
-  getOrdersByStatus
+  getOrdersByStatus,
+  createOrder,
+  getUserOrders,
 }; 

@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const Vendor = require('../models/Vendor');
 const DeliveryBoy = require('../models/DeliveryBoy');
+const User = require('../models/User');
 
 const auth = async (req, res, next) => {
   try {
@@ -27,10 +28,13 @@ const auth = async (req, res, next) => {
         console.log('Auth middleware - Delivery boy not active/approved:', user.status);
         return res.status(403).json({ message: 'Account is not active or approved' });
       }
+    } else if (decoded.userId) {
+      console.log('Auth middleware - Finding user:', decoded.userId);
+      user = await User.findById(decoded.userId);
     }
 
     if (!user) {
-      console.log('Auth middleware - User (Vendor or Delivery Boy) not found');
+      console.log('Auth middleware - User (Vendor, Delivery Boy, or User) not found');
       return res.status(401).json({ message: 'Invalid token or user not found' });
     }
 

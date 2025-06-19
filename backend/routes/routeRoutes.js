@@ -136,13 +136,26 @@ router.get('/:routeId/selected-checkpoint', authenticateToken, async (req, res) 
     const selectedCheckpoint = await SelectedCheckpoint.findOne({
       user: req.user.userId,
       route: req.params.routeId
-    }).populate('route');
+    });
 
     if (!selectedCheckpoint) {
       return res.status(404).json({ message: 'No checkpoint selected for this route' });
     }
 
-    res.json({ selectedCheckpoint });
+    // Fetch the route and find the checkpoint object
+    const Route = require('../models/Route');
+    const route = await Route.findById(selectedCheckpoint.route);
+    let checkpointObj = null;
+    if (route && selectedCheckpoint.checkpoint) {
+      checkpointObj = route.checkpoints.id(selectedCheckpoint.checkpoint);
+    }
+
+    if (!checkpointObj) {
+      return res.status(404).json({ message: 'Checkpoint object not found in route' });
+    }
+
+    // Return the selectedCheckpoint with the full checkpoint object
+    res.json({ selectedCheckpoint: { ...selectedCheckpoint.toObject(), checkpoint: checkpointObj } });
   } catch (error) {
     console.error('Get selected checkpoint error:', error);
     res.status(500).json({ message: 'Error fetching selected checkpoint', error: error.message });
