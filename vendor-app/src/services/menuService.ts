@@ -128,4 +128,6 @@ export class MenuService {
   disconnect() {
     socketService.disconnect();
   }
-} 
+}
+
+export const menuService = new MenuService(); 

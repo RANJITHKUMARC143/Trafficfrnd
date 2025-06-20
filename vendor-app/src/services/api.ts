@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-export const API_URL = 'http://192.168.4.176:3000'; // Your computer's IP address for mobile device access
+export const API_URL = 'http://192.168.4.176:3000'; // Updated backend API URL
 
 console.log('Using API URL:', API_URL);
 
@@ -82,15 +82,15 @@ export const authService = {
   login: async (email: string, password: string) => {
     try {
       console.log('Attempting login for:', email);
-      const response = await api.post('/api/login', { email, password });
-      const { token, user } = response.data;
+      const response = await api.post('/api/vendors/login', { email, password });
+      const { token, vendor } = response.data;
       
-      if (!token || !user) {
+      if (!token || !vendor) {
         throw new Error('Invalid response from server');
       }
 
       await AsyncStorage.setItem('token', token);
-      await AsyncStorage.setItem('user', JSON.stringify(user));
+      await AsyncStorage.setItem('vendor', JSON.stringify(vendor));
       return response.data;
     } catch (error: any) {
       console.error('Login Error:', error);
@@ -110,7 +110,7 @@ export const authService = {
   }) => {
     try {
       console.log('Attempting registration for:', vendorData.email);
-      const response = await api.post('/vendors/register', vendorData);
+      const response = await api.post('/api/vendors/register', vendorData);
       const { token, vendor } = response.data;
       
       if (!token || !vendor) {
@@ -166,3 +166,7 @@ export const authService = {
 };
 
 export default api; 
+
+class SocketService {
+  private readonly SOCKET_URL = 'http://192.168.4.176:3000'; // Updated backend socket URL
+} 

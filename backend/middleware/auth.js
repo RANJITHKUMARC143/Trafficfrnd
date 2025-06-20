@@ -21,6 +21,9 @@ const auth = async (req, res, next) => {
     if (decoded.vendorId) {
       console.log('Auth middleware - Finding vendor:', decoded.vendorId);
       user = await Vendor.findById(decoded.vendorId);
+      if (user) {
+        req.vendor = user;
+      }
     } else if (decoded.id) {
       console.log('Auth middleware - Finding delivery boy:', decoded.id);
       user = await DeliveryBoy.findById(decoded.id);

@@ -17,6 +17,7 @@ class OrderService {
     try {
       const headers = await this.getAuthHeaders();
       const response = await api.get('/api/vendors/orders', { headers });
+      console.log('getOrders response:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -27,14 +28,8 @@ class OrderService {
   async getOrderById(orderId: string): Promise<Order> {
     try {
       const headers = await this.getAuthHeaders();
-      const vendorStr = await AsyncStorage.getItem('vendor');
-      if (!vendorStr) {
-        throw new Error('No vendor found in storage');
-      }
-      const vendor = JSON.parse(vendorStr);
-      
-      console.log('Fetching order:', orderId, 'for vendor:', vendor._id);
-      const response = await api.get(`/api/vendors/${vendor._id}/orders/${orderId}`, { headers });
+      console.log('Fetching order:', orderId);
+      const response = await api.get(`/api/vendors/orders/${orderId}`, { headers });
       console.log('Order response:', response.data);
       return response.data;
     } catch (error) {

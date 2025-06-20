@@ -208,6 +208,7 @@ export const OrdersScreen = () => {
     try {
       setLoading(true);
       const data = await orderService.getOrders();
+      console.log('OrdersScreen fetched orders:', data);
       setOrders(data);
     } catch (error) {
       console.error('Error loading orders:', error);

@@ -8,7 +8,7 @@ class SocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 3;
   private reconnectTimeout: NodeJS.Timeout | null = null;
-  private readonly SOCKET_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.57.230:3000';
+  private readonly SOCKET_URL = 'http://192.168.4.176:3000';
   private eventListeners: Map<string, Set<Function>> = new Map();
 
   private constructor() {}

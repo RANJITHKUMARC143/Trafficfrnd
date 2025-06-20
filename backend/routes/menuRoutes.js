@@ -8,6 +8,9 @@ const Vendor = require('../models/Vendor');
 // Get all menu items for a vendor
 router.get('/', auth, async (req, res) => {
   try {
+    if (!req.vendor || !req.vendor._id) {
+      return res.status(401).json({ message: 'Unauthorized: Vendor not authenticated' });
+    }
     const menuItems = await MenuItem.find({ vendorId: req.vendor._id });
     res.json(menuItems);
   } catch (error) {

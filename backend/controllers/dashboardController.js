@@ -4,7 +4,7 @@ const Vendor = require('../models/Vendor');
 
 async function getDashboardMetrics(req, res) {
   try {
-    const vendorId = req.vendor._id;
+    const vendorId = req.user._id;
     console.log('Fetching metrics for vendor:', vendorId);
 
     // Create a test order if no active orders exist

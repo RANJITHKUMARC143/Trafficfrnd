@@ -4,7 +4,11 @@ const mongoose = require('mongoose');
 // Get all orders for the authenticated vendor
 const getOrders = async (req, res) => {
   try {
-    const orders = await Order.find({ vendorId: req.vendor._id }).sort({ timestamp: -1 });
+    if (!req.user || !req.user._id) {
+      console.error('No vendor user found on request! req.user:', req.user);
+      return res.status(401).json({ message: 'Unauthorized: No vendor user found' });
+    }
+    const orders = await Order.find({ vendorId: req.user._id }).sort({ timestamp: -1 });
     res.json(orders);
   } catch (error) {
     console.error('Error fetching orders:', error);
@@ -15,9 +19,13 @@ const getOrders = async (req, res) => {
 // Get a specific order by ID
 const getOrderById = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      console.error('No vendor user found on request!');
+      return res.status(401).json({ message: 'Unauthorized: No vendor user found' });
+    }
     const order = await Order.findOne({
       _id: req.params.orderId,
-      vendorId: req.vendor._id
+      vendorId: req.user._id
     });
 
     if (!order) {
@@ -34,9 +42,13 @@ const getOrderById = async (req, res) => {
 // Update order status
 const updateOrderStatus = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      console.error('No vendor user found on request!');
+      return res.status(401).json({ message: 'Unauthorized: No vendor user found' });
+    }
     const { status } = req.body;
     const order = await Order.findOneAndUpdate(
-      { _id: req.params.orderId, vendorId: req.vendor._id },
+      { _id: req.params.orderId, vendorId: req.user._id },
       { status, updatedAt: Date.now() },
       { new: true }
     );
@@ -46,7 +58,7 @@ const updateOrderStatus = async (req, res) => {
     }
 
     // Emit real-time update
-    req.app.get('io').to(req.vendor._id.toString()).emit('orderStatusUpdate', order);
+    req.app.get('io').to(req.user._id.toString()).emit('orderStatusUpdate', order);
 
     res.json(order);
   } catch (error) {
@@ -58,8 +70,12 @@ const updateOrderStatus = async (req, res) => {
 // Get orders by status
 const getOrdersByStatus = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      console.error('No vendor user found on request!');
+      return res.status(401).json({ message: 'Unauthorized: No vendor user found' });
+    }
     const orders = await Order.find({
-      vendorId: req.vendor._id,
+      vendorId: req.user._id,
       status: req.params.status
     }).sort({ timestamp: -1 });
 
@@ -96,7 +112,7 @@ const createOrder = async (req, res) => {
       customerName,
       items,
       totalAmount,
-      status: 'confirmed',
+      status: 'pending',
       deliveryAddress,
       specialInstructions,
       vehicleNumber,

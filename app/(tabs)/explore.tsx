@@ -320,6 +320,30 @@ export default function ExploreScreen() {
     // ... rest of the existing handleAddToCart code ...
   };
 
+  const handleVendorSelect = async (vendor: Vendor) => {
+    setSelectedVendor(vendor);
+    setVendorModalVisible(false);
+    setLoadingMenu(true);
+    try {
+      const items = await fetchMenuItemsForVendor(vendor._id);
+      setMenuItems(items);
+      // Update categories and categoryCounts for this vendor
+      const uniqueCategories = Array.from(new Set(items.map((item: MenuItem) => item.category)));
+      setCategories(uniqueCategories);
+      const counts: { [cat: string]: number } = {};
+      items.forEach(item => {
+        counts[item.category] = (counts[item.category] || 0) + 1;
+      });
+      setCategoryCounts(counts);
+    } catch (error) {
+      setMenuItems([]);
+      setCategories([]);
+      setCategoryCounts({});
+    } finally {
+      setLoadingMenu(false);
+    }
+  };
+
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
