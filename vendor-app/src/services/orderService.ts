@@ -33,7 +33,11 @@ class OrderService {
       console.log('Order response:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error fetching order:', error);
+      if (error.response) {
+        console.error('Error fetching order (response):', error.response.status, error.response.data);
+      } else {
+        console.error('Error fetching order:', error);
+      }
       throw error;
     }
   }
@@ -41,15 +45,9 @@ class OrderService {
   async updateOrderStatus(orderId: string, status: Order['status']): Promise<Order> {
     try {
       const headers = await this.getAuthHeaders();
-      const vendorStr = await AsyncStorage.getItem('vendor');
-      if (!vendorStr) {
-        throw new Error('No vendor found in storage');
-      }
-      const vendor = JSON.parse(vendorStr);
-      
-      console.log('Updating order:', orderId, 'status to:', status, 'for vendor:', vendor._id);
+      console.log('Updating order:', orderId, 'status to:', status);
       const response = await api.patch(
-        `/api/vendors/${vendor._id}/orders/${orderId}/status`,
+        `/api/vendors/orders/${orderId}/status`,
         { status },
         { headers }
       );

@@ -133,7 +133,7 @@ export const DashboardScreen = () => {
   };
 
   const handleAddItem = () => {
-    navigation.navigate('MenuItemForm', { mode: 'add' });
+    navigation.navigate('Menu');
   };
 
   const handleViewReports = () => {

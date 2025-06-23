@@ -90,6 +90,10 @@ const vendorSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  expoPushToken: {
+    type: String,
+    default: '',
   }
 }, {
   timestamps: true

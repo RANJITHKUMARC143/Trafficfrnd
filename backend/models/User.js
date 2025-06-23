@@ -31,6 +31,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  expoPushToken: {
+    type: String,
+    default: '',
+  },
   role: {
     type: String,
     default: 'user',

@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { orderService } from '../services/orderService';
 import { orderNotificationService } from '../services/orderNotificationService';
 import { Order } from '../types/order';
+import { showOrderNotificationWithSound, showOrderStatusNotificationWithSound } from '../services/notificationBridge';
 
 const mockOrders: Order[] = [
   {
@@ -186,10 +187,16 @@ export const OrdersScreen = () => {
           order._id === updatedOrder._id ? updatedOrder : order
         )
       );
+      showOrderStatusNotificationWithSound(updatedOrder, () => {
+        navigation.navigate('OrderDetails', { orderId: updatedOrder._id });
+      });
     });
 
     orderNotificationService.onNewOrder((newOrder) => {
       setOrders(currentOrders => [newOrder, ...currentOrders]);
+      showOrderNotificationWithSound(newOrder, () => {
+        navigation.navigate('OrderDetails', { orderId: newOrder._id });
+      });
     });
 
     orderNotificationService.onOrderCancelled((orderId) => {

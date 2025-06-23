@@ -1,4 +1,5 @@
 import { Alert } from 'react-native';
+import { Audio } from 'expo-av';
 import { socketService } from './socketService';
 
 export interface OrderNotification {
@@ -12,6 +13,55 @@ export interface OrderNotification {
     price: number;
   }>;
   timestamp: string;
+}
+
+async function playNotificationSound() {
+  try {
+    const { sound } = await Audio.Sound.createAsync(
+      require('../assets/notification.mp3')
+    );
+    await sound.playAsync();
+  } catch (e) {
+    console.warn('Failed to play sound', e);
+  }
+}
+
+export async function showOrderNotificationWithSound(order: OrderNotification, onViewDetails?: () => void) {
+  await playNotificationSound();
+  Alert.alert(
+    'New Order Received',
+    `Order #${order.orderId} from ${order.customerName}\nTotal: ₹${order.totalAmount}`,
+    [
+      {
+        text: 'View Details',
+        onPress: onViewDetails || (() => {}),
+      },
+      {
+        text: 'Dismiss',
+        style: 'cancel',
+      },
+    ],
+    { cancelable: true }
+  );
+}
+
+export async function showOrderStatusNotificationWithSound(order: OrderNotification, onViewDetails?: () => void) {
+  await playNotificationSound();
+  Alert.alert(
+    'Order Status Update',
+    `Order #${order.orderId} is now ${order.status}`,
+    [
+      {
+        text: 'View Details',
+        onPress: onViewDetails || (() => {}),
+      },
+      {
+        text: 'Dismiss',
+        style: 'cancel',
+      },
+    ],
+    { cancelable: true }
+  );
 }
 
 class OrderNotificationService {

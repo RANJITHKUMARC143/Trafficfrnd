@@ -294,4 +294,19 @@ router.post('/test/sample-vendor', async (req, res) => {
   }
 });
 
+// Update vendor's Expo push token
+router.put('/push-token', auth, async (req, res) => {
+  try {
+    const vendor = await Vendor.findById(req.vendor._id);
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+    vendor.expoPushToken = req.body.expoPushToken;
+    await vendor.save();
+    res.json({ message: 'Expo push token updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating push token', error: error.message });
+  }
+});
+
 module.exports = router; 

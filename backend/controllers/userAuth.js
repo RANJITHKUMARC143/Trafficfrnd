@@ -282,4 +282,19 @@ exports.updateLocation = async (req, res) => {
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
+};
+
+// Update Expo push token
+exports.updatePushToken = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    user.expoPushToken = req.body.expoPushToken;
+    await user.save();
+    res.json({ message: 'Expo push token updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating push token', error: error.message });
+  }
 }; 

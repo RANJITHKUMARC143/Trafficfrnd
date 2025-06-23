@@ -1,5 +1,24 @@
 const Order = require('../models/Order');
 const mongoose = require('mongoose');
+const User = require('../models/User');
+const Vendor = require('../models/Vendor');
+const fetch = require('node-fetch');
+
+async function sendExpoPushNotification(expoPushToken, message, data) {
+  if (!expoPushToken) return;
+  await fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to: expoPushToken,
+      sound: 'default',
+      title: message.title,
+      body: message.body,
+      data: data || {},
+      priority: 'high',
+    }),
+  });
+}
 
 // Get all orders for the authenticated vendor
 const getOrders = async (req, res) => {
@@ -19,6 +38,7 @@ const getOrders = async (req, res) => {
 // Get a specific order by ID
 const getOrderById = async (req, res) => {
   try {
+    console.log('[BACKEND] getOrderById called with orderId:', req.params.orderId, 'vendorId:', req.user && req.user._id);
     if (!req.user || !req.user._id) {
       console.error('No vendor user found on request!');
       return res.status(401).json({ message: 'Unauthorized: No vendor user found' });
@@ -29,9 +49,11 @@ const getOrderById = async (req, res) => {
     });
 
     if (!order) {
+      console.log('[BACKEND] Order not found for orderId:', req.params.orderId, 'vendorId:', req.user._id);
       return res.status(404).json({ message: 'Order not found' });
     }
 
+    console.log('[BACKEND] Order found:', order);
     res.json(order);
   } catch (error) {
     console.error('Error fetching order:', error);
@@ -59,6 +81,16 @@ const updateOrderStatus = async (req, res) => {
 
     // Emit real-time update
     req.app.get('io').to(req.user._id.toString()).emit('orderStatusUpdate', order);
+
+    // Notify user
+    const user = await User.findById(order.user);
+    if (user && user.expoPushToken) {
+      await sendExpoPushNotification(
+        user.expoPushToken,
+        { title: 'Order Update', body: `Your order status is now: ${status}` },
+        { orderId: order._id, status }
+      );
+    }
 
     res.json(order);
   } catch (error) {
@@ -118,10 +150,22 @@ const createOrder = async (req, res) => {
       vehicleNumber,
       timestamp: new Date(),
       updatedAt: new Date(),
+      user: req.user._id,
     });
 
     await order.save();
     console.log('Order created:', order);
+
+    // Notify vendor
+    const vendor = await Vendor.findById(vendorId);
+    if (vendor && vendor.expoPushToken) {
+      await sendExpoPushNotification(
+        vendor.expoPushToken,
+        { title: 'New Order', body: `You have a new order from ${customerName}` },
+        { orderId: order._id }
+      );
+    }
+
     res.status(201).json(order);
   } catch (error) {
     console.error('Error creating order:', error);

@@ -1,14 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
-  Modal,
-  Pressable,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,182 +19,161 @@ export const OrderDetailsScreen = () => {
   const { orderId } = route.params as { orderId: string };
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchOrderDetails = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const orderData = await orderService.getOrderById(orderId);
+      setOrder(orderData);
+    } catch (err: any) {
+      setOrder(null);
+      setError(err?.message || 'Failed to fetch order details');
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId]);
 
   useEffect(() => {
     fetchOrderDetails();
-  }, [orderId]);
+  }, [fetchOrderDetails]);
 
-  const fetchOrderDetails = async () => {
+  const handleStatusUpdate = async (status: Order['status']) => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      const orderData = await orderService.getOrderById(orderId);
-      setOrder(orderData);
-    } catch (error) {
-      console.error('Error fetching order details:', error);
-      setOrder(null); // Explicitly set to null on error
+      await orderService.updateOrderStatus(orderId, status);
+      await fetchOrderDetails();
+    } catch (err: any) {
+      setError(err?.message || `Failed to update order status to ${status}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleClose = () => {
-    setModalVisible(false);
-    navigation.goBack();
-  };
-
-  const handleAcceptOrder = async () => {
-    try {
-      await orderService.updateOrderStatus(orderId, 'preparing');
-      fetchOrderDetails(); // Refresh order details
-    } catch (error) {
-      console.error('Error accepting order:', error);
-      Alert.alert('Error', 'Failed to accept order');
-    }
-  };
-
-  const handleMarkReady = async () => {
-    try {
-      await orderService.updateOrderStatus(orderId, 'ready');
-      fetchOrderDetails(); // Refresh order details
-    } catch (error) {
-      console.error('Error marking order as ready:', error);
-      Alert.alert('Error', 'Failed to mark order as ready');
-    }
-  };
-
-  const handleConfirmOrder = async () => {
-    try {
-      await orderService.updateOrderStatus(orderId, 'confirmed');
-      fetchOrderDetails();
-    } catch (error) {
-      console.error('Error confirming order:', error);
-      Alert.alert('Error', 'Failed to confirm order');
-    }
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending':
-        return theme.colors.warning;
-      case 'preparing':
-        return theme.colors.info;
-      case 'ready':
-        return theme.colors.success;
-      case 'completed':
-        return theme.colors.success;
-      case 'cancelled':
-        return theme.colors.error;
-      default:
-        return theme.colors.textSecondary;
+      case 'pending': return theme.colors.warning;
+      case 'confirmed': return theme.colors.primary;
+      case 'preparing': return theme.colors.info || theme.colors.primary;
+      case 'ready': return theme.colors.success;
+      case 'completed': return theme.colors.success;
+      case 'cancelled': return theme.colors.error;
+      default: return theme.colors.textSecondary;
     }
   };
 
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={{ marginTop: 12, color: theme.colors.text }}>Loading order details...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centered}>
+        <Ionicons name="alert-circle" size={48} color={theme.colors.error} style={{ marginBottom: 12 }} />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity onPress={fetchOrderDetails} style={[styles.acceptButton, { marginTop: 16 }]}> 
+          <Text style={styles.buttonText}>Retry</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.acceptButton, { marginTop: 8, backgroundColor: '#ccc' }]}> 
+          <Text style={[styles.buttonText, { color: '#333' }]}>Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!order) {
+    return (
+      <View style={styles.centered}>
+        <Ionicons name="alert-circle" size={48} color={theme.colors.error} style={{ marginBottom: 12 }} />
+        <Text style={styles.errorText}>Order not found or failed to load.</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.acceptButton, { marginTop: 16 }]}> 
+          <Text style={styles.buttonText}>Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.modalBackdrop}>
-      <View style={styles.modalContainer}>
-        <Pressable style={styles.closeButton} onPress={handleClose}>
-          <Ionicons name="close" size={28} color={theme.colors.text} />
-        </Pressable>
-        {console.log('[OrderDetailsScreen] order:', order)}
-        {loading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={{ marginTop: 12, color: theme.colors.text }}>Loading order details...</Text>
-          </View>
-        ) : !order ? (
-          <View style={styles.centered}>
-            <Ionicons name="alert-circle" size={48} color={theme.colors.error} style={{ marginBottom: 12 }} />
-            <Text style={styles.errorText}>Order not found or failed to load.</Text>
-            <TouchableOpacity onPress={handleClose} style={[styles.acceptButton, { marginTop: 16 }]}> 
-              <Text style={styles.buttonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <ScrollView style={styles.content}>
-            <Text style={styles.modalTitle}>Order Details</Text>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Order Information</Text>
-              <View style={styles.infoRow}><Text style={styles.label}>Order ID:</Text><Text style={styles.value}>#{order._id.slice(-6)}</Text></View>
-              <View style={styles.infoRow}><Text style={styles.label}>Customer:</Text><Text style={styles.value}>{order.customerName}</Text></View>
-              <View style={styles.infoRow}><Text style={styles.label}>Time:</Text><Text style={styles.value}>{new Date(order.timestamp).toLocaleString()}</Text></View>
-              <View style={styles.infoRow}><Text style={styles.label}>Status:</Text><Text style={[styles.value, { color: getStatusColor(order.status), fontWeight: 'bold' }]}>{order.status}</Text></View>
-            </View>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Items</Text>
-              {order.items.map((item, index) => (
-                <View key={index} style={styles.itemRow}>
-                  <Text style={styles.itemName}>{item.name}</Text>
-                  <View style={styles.itemDetails}>
-                    <Text style={styles.itemQuantity}>x{item.quantity}</Text>
-                    <Text style={styles.itemPrice}>₹{item.price}</Text>
-                  </View>
-                </View>
-              ))}
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Total Amount:</Text>
-                <Text style={styles.totalValue}>₹{order.totalAmount}</Text>
-              </View>
-            </View>
-            {order.status === 'pending' && (
-              <View style={styles.actions}>
-                <TouchableOpacity style={styles.acceptButton} onPress={handleConfirmOrder}>
-                  <Text style={styles.buttonText}>Confirm Order</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            {order.status === 'confirmed' && (
-              <View style={styles.actions}>
-                <TouchableOpacity style={styles.acceptButton} onPress={handleAcceptOrder}>
-                  <Text style={styles.buttonText}>Start Preparing</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            {order.status === 'preparing' && (
-              <View style={styles.actions}>
-                <TouchableOpacity style={styles.readyButton} onPress={handleMarkReady}>
-                  <Text style={styles.buttonText}>Mark as Ready</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </ScrollView>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 32 }}>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+        <Text style={styles.backText}>Back</Text>
+      </TouchableOpacity>
+      <Text style={styles.title}>Order Details</Text>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Order Information</Text>
+        <View style={styles.infoRow}><Text style={styles.label}>Order ID:</Text><Text style={styles.value}>#{order._id.slice(-6)}</Text></View>
+        <View style={styles.infoRow}><Text style={styles.label}>Customer:</Text><Text style={styles.value}>{order.customerName}</Text></View>
+        <View style={styles.infoRow}><Text style={styles.label}>Time:</Text><Text style={styles.value}>{new Date(order.timestamp).toLocaleString()}</Text></View>
+        <View style={styles.infoRow}><Text style={styles.label}>Status:</Text><Text style={[styles.value, { color: getStatusColor(order.status), fontWeight: 'bold' }]}>{order.status}</Text></View>
+        {order.deliveryAddress && (
+          <View style={styles.infoRow}><Text style={styles.label}>Delivery Address:</Text><Text style={styles.value}>{order.deliveryAddress}</Text></View>
+        )}
+        {order.specialInstructions && (
+          <View style={styles.infoRow}><Text style={styles.label}>Instructions:</Text><Text style={styles.value}>{order.specialInstructions}</Text></View>
         )}
       </View>
-    </View>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Items</Text>
+        {order.items.map((item, index) => (
+          <View key={item._id || index} style={styles.itemRow}>
+            <Text style={styles.itemName}>{item.name}</Text>
+            <View style={styles.itemDetails}>
+              <Text style={styles.itemQuantity}>x{item.quantity}</Text>
+              <Text style={styles.itemPrice}>₹{item.price}</Text>
+            </View>
+          </View>
+        ))}
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>Total Amount:</Text>
+          <Text style={styles.totalValue}>₹{order.totalAmount}</Text>
+        </View>
+      </View>
+      <View style={styles.actions}>
+        {order.status === 'pending' && (
+          <TouchableOpacity style={styles.acceptButton} onPress={() => handleStatusUpdate('confirmed')}>
+            <Text style={styles.buttonText}>Confirm Order</Text>
+          </TouchableOpacity>
+        )}
+        {order.status === 'confirmed' && (
+          <TouchableOpacity style={styles.acceptButton} onPress={() => handleStatusUpdate('preparing')}>
+            <Text style={styles.buttonText}>Start Preparing</Text>
+          </TouchableOpacity>
+        )}
+        {order.status === 'preparing' && (
+          <TouchableOpacity style={styles.readyButton} onPress={() => handleStatusUpdate('ready')}>
+            <Text style={styles.buttonText}>Mark as Ready</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  modalBackdrop: {
+  container: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    width: '92%',
-    maxHeight: '90%',
     backgroundColor: theme.colors.background,
-    borderRadius: 24,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
-    position: 'relative',
+    padding: 16,
   },
-  closeButton: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    zIndex: 10,
-    backgroundColor: theme.colors.surface,
-    borderRadius: 16,
-    padding: 4,
-    elevation: 2,
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  modalTitle: {
+  backText: {
+    marginLeft: 6,
+    color: theme.colors.text,
+    fontSize: theme.typography.fontSize.md,
+  },
+  title: {
     fontSize: 22,
     fontWeight: 'bold',
     color: theme.colors.text,
@@ -209,18 +185,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.colors.background,
+    padding: 16,
   },
   errorText: {
     color: theme.colors.error,
     fontSize: theme.typography.fontSize.md,
-  },
-  content: {
-    flex: 1,
+    textAlign: 'center',
   },
   section: {
     backgroundColor: theme.colors.white,
     marginTop: 16,
     padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 1,
   },
   sectionTitle: {
     fontSize: theme.typography.fontSize.md,
@@ -241,6 +223,8 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize.sm,
     color: theme.colors.text,
     fontFamily: theme.typography.fontFamily.medium,
+    flex: 1,
+    textAlign: 'right',
   },
   itemRow: {
     flexDirection: 'row',
@@ -293,6 +277,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
+    marginBottom: 8,
   },
   readyButton: {
     backgroundColor: theme.colors.success,

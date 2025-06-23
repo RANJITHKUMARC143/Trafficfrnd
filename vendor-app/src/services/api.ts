@@ -165,6 +165,16 @@ export const authService = {
   }
 };
 
+export const updateVendorPushToken = async (expoPushToken: string) => {
+  const token = await AsyncStorage.getItem('token');
+  const response = await api.put('/api/vendors/push-token', { expoPushToken }, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return response.data;
+};
+
 export default api; 
 
 class SocketService {

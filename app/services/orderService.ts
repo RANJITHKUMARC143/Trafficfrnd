@@ -26,4 +26,18 @@ export async function fetchUserOrders() {
   });
   if (!res.ok) throw new Error('Failed to fetch orders');
   return res.json();
+}
+
+export async function updatePushToken(expoPushToken) {
+  const token = await AsyncStorage.getItem('token');
+  const res = await fetch(`${API_BASE_URL}/userAuth/push-token`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ expoPushToken }),
+  });
+  if (!res.ok) throw new Error('Failed to update push token');
+  return res.json();
 } 

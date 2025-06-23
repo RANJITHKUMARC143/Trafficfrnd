@@ -17,6 +17,7 @@ import { AnalyticsScreen } from '../screens/AnalyticsScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { OrderDetailsScreen } from '../screens/OrderDetailsScreen';
 import { AuthNavigator } from './AuthNavigator';
+import { EditProfileScreen } from '../screens/EditProfileScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -123,7 +124,11 @@ export const AppNavigator = () => {
         {!isAuthenticated ? (
           <Stack.Screen name="Auth" component={AuthNavigator} />
         ) : (
-          <Stack.Screen name="Main" component={TabNavigator} />
+          <>
+            <Stack.Screen name="Main" component={TabNavigator} />
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+            <Stack.Screen name="OrderDetails" component={OrderDetailsScreen} />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>
