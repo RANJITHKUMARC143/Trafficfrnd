@@ -11,6 +11,8 @@ import React from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import MapViewDirections from 'react-native-maps-directions';
+import { menuService } from '@/services/menuService';
+import { MenuItem } from '@/types/menu';
 
 type Category = {
   id: number;
@@ -118,6 +120,8 @@ export default function HomeScreen() {
   const [trafficLocations, setTrafficLocations] = useState<TrafficLocation[]>([]);
   const [updateInterval, setUpdateInterval] = useState<NodeJS.Timeout | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [recommendedItems, setRecommendedItems] = useState<MenuItem[]>([]);
+  const [loadingRecommended, setLoadingRecommended] = useState(true);
 
   useEffect(() => {
     getCurrentLocation();
@@ -159,6 +163,29 @@ export default function HomeScreen() {
 
   useEffect(() => {
     loadAppMode();
+  }, []);
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    let mounted = true;
+    setLoadingRecommended(true);
+    // Fetch all menu items initially
+    menuService.getAllMenuItems().then((items) => {
+      if (mounted) {
+        setRecommendedItems(items.filter(item => item.isAvailable));
+        setLoadingRecommended(false);
+      }
+    });
+    // Subscribe to real-time updates
+    unsubscribe = menuService.onMenuUpdate((items) => {
+      if (mounted) {
+        setRecommendedItems(items.filter(item => item.isAvailable));
+      }
+    });
+    return () => {
+      mounted = false;
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const loadAppMode = async () => {
@@ -255,41 +282,6 @@ export default function HomeScreen() {
     { id: 2, name: 'Cool Drinks', icon: 'beer-outline' },
     { id: 3, name: 'Pharmacy', icon: 'medical-outline' },
     { id: 4, name: 'Electronics', icon: 'phone-portrait-outline' }
-  ];
-
-  const recommendedItems: RecommendedItem[] = [
-    {
-      id: 1,
-      name: 'Mixed Snacks Pack',
-      image: { uri: 'https://images.unsplash.com/photo-1621447504864-d8686f12c84a?w=500&auto=format' },
-      price: '₹199',
-      time: '7 min',
-      type: 'S-scoter'
-    },
-    {
-      id: 2,
-      name: 'Soft Drinks Pack',
-      image: { uri: 'https://images.unsplash.com/photo-1570526427001-9d80d114054d?w=500&auto=format' },
-      price: '₹299',
-      time: '5 min',
-      type: 'S-scoter'
-    },
-    {
-      id: 3,
-      name: 'First Aid Kit',
-      image: { uri: 'https://images.unsplash.com/photo-1603398938378-e54eab446dde?w=500&auto=format' },
-      price: '₹499',
-      time: '9 min',
-      type: 'Walker'
-    },
-    {
-      id: 4,
-      name: 'Wireless Earbuds',
-      image: { uri: 'https://images.unsplash.com/photo-1605464315542-bda3e2f4e605?w=500&auto=format' },
-      price: '₹1999',
-      time: '6 min',
-      type: 'E-scoter'
-    }
   ];
 
   const handleCategoryPress = (category: Category) => {
@@ -776,32 +768,41 @@ export default function HomeScreen() {
         <View style={styles.recommendedSection}>
           <ThemedText style={styles.sectionTitle}>Recommended</ThemedText>
           <View style={styles.recommendedGrid}>
-            {recommendedItems.map((item) => (
-              <TouchableOpacity 
-                key={item.id} 
-                style={styles.recommendedItem}
-                onPress={() => handleItemPress(item)}
-                activeOpacity={0.8}
-              >
-                <Image source={item.image} style={styles.itemImage} />
-                <ThemedText style={styles.itemName}>{item.name}</ThemedText>
-                <ThemedText style={styles.itemPrice}>{item.price}</ThemedText>
-                <View style={styles.itemInfoContainer}>
-                  <View style={styles.itemTimeContainer}>
-                    <Ionicons name="time-outline" size={14} color="#666" />
-                    <ThemedText style={styles.itemTime}>{item.time}</ThemedText>
+            {loadingRecommended ? (
+              <ThemedText>Loading recommended items...</ThemedText>
+            ) : recommendedItems.length === 0 ? (
+              <ThemedText>No recommended items available.</ThemedText>
+            ) : (
+              recommendedItems.slice(0, 10).map((item) => (
+                <TouchableOpacity 
+                  key={item._id} 
+                  style={styles.recommendedItem}
+                  onPress={() => handleItemPress({
+                    id: item._id,
+                    name: item.name,
+                    image: { uri: item.image },
+                    price: `₹${item.price}`,
+                    time: item.preparationTime ? `${item.preparationTime} min` : 'N/A',
+                    type: 'S-scoter', // You can adjust this if you have a type field
+                  })}
+                  activeOpacity={0.8}
+                >
+                  <Image source={{ uri: item.image }} style={styles.itemImage} />
+                  <ThemedText style={styles.itemName}>{item.name}</ThemedText>
+                  <ThemedText style={styles.itemPrice}>{`₹${item.price}`}</ThemedText>
+                  <View style={styles.itemInfoContainer}>
+                    <View style={styles.itemTimeContainer}>
+                      <Ionicons name="time-outline" size={14} color="#666" />
+                      <ThemedText style={styles.itemTime}>{item.preparationTime ? `${item.preparationTime} min` : 'N/A'}</ThemedText>
+                    </View>
+                    <View style={styles.itemTypeContainer}>
+                      <Ionicons name={'bicycle'} size={14} color="#666" />
+                      <ThemedText style={styles.itemType}>S-scoter</ThemedText>
+                    </View>
                   </View>
-                  <View style={styles.itemTypeContainer}>
-                    <Ionicons 
-                      name={item.type.toLowerCase().includes('scoter') ? 'bicycle' : 'walk'} 
-                      size={14} 
-                      color="#666" 
-                    />
-                    <ThemedText style={styles.itemType}>{item.type}</ThemedText>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              ))
+            )}
           </View>
         </View>
 

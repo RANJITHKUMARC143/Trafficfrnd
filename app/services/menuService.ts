@@ -143,7 +143,7 @@ class MenuService {
 
   async getAllMenuItems(): Promise<MenuItem[]> {
     try {
-      const response = await this.fetchWithTimeout(`${API_URL}/api/vendors/menu`);
+      const response = await this.fetchWithTimeout(`${API_URL}/api/vendors/menu/public/explore/all`);
       
       if (!response.ok) {
         const errorText = await response.text();
