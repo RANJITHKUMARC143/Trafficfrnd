@@ -191,7 +191,7 @@ const PartnersDelivery: React.FC = () => {
       setFormLoading(false);
     }
   };
-
+  
   const columns = [
     { key: 'id', header: 'ID', sortable: true, render: (v: string) => <span className="font-bold text-gray-800">{v}</span> },
     { key: 'fullName', header: 'Full Name', sortable: true },
@@ -206,7 +206,7 @@ const PartnersDelivery: React.FC = () => {
     { key: 'createdAt', header: 'Created At', render: (v: string) => v ? new Date(v).toLocaleString() : 'N/A', sortable: true },
     { key: 'updatedAt', header: 'Updated At', render: (v: string) => v ? new Date(v).toLocaleString() : 'N/A', sortable: true },
   ];
-
+  
   const rowActions = (row: DeliveryPartner) => (
     <div className="flex space-x-2">
       <Button
@@ -228,7 +228,7 @@ const PartnersDelivery: React.FC = () => {
       </Button>
     </div>
   );
-
+  
   return (
     <div>
       <PageHeader
@@ -238,10 +238,10 @@ const PartnersDelivery: React.FC = () => {
         actions={
           <>
             <div className="relative inline-block text-left mr-2">
-              <Button
-                variant="secondary"
-                size="md"
-                icon={<FileDown size={16} />}
+            <Button 
+              variant="secondary"
+              size="md"
+              icon={<FileDown size={16} />}
                 onClick={e => {
                   const menu = document.getElementById('export-menu');
                   if (menu) menu.classList.toggle('hidden');
@@ -340,20 +340,20 @@ const PartnersDelivery: React.FC = () => {
         ) : error ? (
           <div className="text-center py-10 text-red-600">{error}</div>
         ) : (
-          <DataTable
-            title="All Delivery Partners"
-            subtitle="Showing all registered delivery and logistics partners"
+        <DataTable
+          title="All Delivery Partners"
+          subtitle="Showing all registered delivery and logistics partners"
             data={filteredPartners}
-            columns={columns}
-            rowActions={rowActions}
-            searchable={true}
-            filterable={true}
-            pagination={{
-              itemsPerPage: 10,
+          columns={columns}
+          rowActions={rowActions}
+          searchable={true}
+          filterable={true}
+          pagination={{
+            itemsPerPage: 10,
               totalItems: filteredPartners.length,
-              currentPage: currentPage,
-              onPageChange: setCurrentPage
-            }}
+            currentPage: currentPage,
+            onPageChange: setCurrentPage
+          }}
           />
         )}
         {/* Edit Modal */}

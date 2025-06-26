@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, Truck, Megaphone, CreditCard, Settings, ChevronDown, ChevronRight, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, Users, Truck, Megaphone, CreditCard, Settings, ChevronDown, ChevronRight, LogOut, X, Building2, Package } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
@@ -101,6 +101,16 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
     navigate('/login');
   };
 
+  const navLinks = [
+    { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+    { to: '/users', label: 'Users', icon: <Users size={18} /> },
+    { to: '/partners/vendors', label: 'Vendors', icon: <Building2 size={18} /> },
+    { to: '/partners/delivery', label: 'Delivery Partners', icon: <Truck size={18} /> },
+    { to: '/orders', label: 'Orders', icon: <Package size={18} /> },
+    { to: '/payments', label: 'Payments', icon: <CreditCard size={18} /> },
+    { to: '/settings', label: 'Settings', icon: <Settings size={18} /> },
+  ];
+
   return (
     <motion.div 
       className="h-full flex flex-col bg-white"
@@ -159,6 +169,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
             { title: "Invoices", path: "/payments/invoices" },
             { title: "Reports", path: "/payments/reports" },
           ]} 
+        />
+        <NavItem 
+          icon={<Package size={20} />} 
+          title="Orders"
+          path="/orders" 
         />
         <NavItem 
           icon={<Settings size={20} />} 

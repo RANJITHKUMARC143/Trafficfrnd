@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Layout
 import Layout from './components/layout/Layout';
@@ -22,6 +24,7 @@ import PaymentsReports from './pages/payments/PaymentsReports';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Orders from './pages/Orders';
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -43,38 +46,32 @@ function PublicRoute({ children }: { children: JSX.Element }) {
 function App() {
   return (
     <Router>
-      <AnimatePresence mode="wait">
-        <Routes>
-          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-          <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-          <Route
-            path="/*"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/users" element={<UserManagement />} />
-                    <Route path="/users/candidates" element={<UserCandidates />} />
-                    <Route path="/users/employers" element={<UserEmployers />} />
-                    <Route path="/users/admins" element={<UserAdmins />} />
-                    <Route path="/partners" element={<Partners />} />
-                    <Route path="/partners/vendors" element={<PartnersVendors />} />
-                    <Route path="/partners/delivery" element={<PartnersDelivery />} />
-                    <Route path="/campaigns" element={<Campaigns />} />
-                    <Route path="/payments" element={<Payments />} />
-                    <Route path="/payments/transactions" element={<PaymentsTransactions />} />
-                    <Route path="/payments/invoices" element={<PaymentsInvoices />} />
-                    <Route path="/payments/reports" element={<PaymentsReports />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                  </Routes>
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </AnimatePresence>
+      <Layout>
+        <AnimatePresence mode="wait">
+          <Routes>
+            <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/users/candidates" element={<ProtectedRoute><UserCandidates /></ProtectedRoute>} />
+            <Route path="/users/employers" element={<ProtectedRoute><UserEmployers /></ProtectedRoute>} />
+            <Route path="/users/admins" element={<ProtectedRoute><UserAdmins /></ProtectedRoute>} />
+            <Route path="/users/inactive" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
+            <Route path="/partners" element={<ProtectedRoute><Partners /></ProtectedRoute>} />
+            <Route path="/partners/vendors" element={<ProtectedRoute><PartnersVendors /></ProtectedRoute>} />
+            <Route path="/partners/delivery" element={<ProtectedRoute><PartnersDelivery /></ProtectedRoute>} />
+            <Route path="/campaigns" element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
+            <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
+            <Route path="/payments/transactions" element={<ProtectedRoute><PaymentsTransactions /></ProtectedRoute>} />
+            <Route path="/payments/invoices" element={<ProtectedRoute><PaymentsInvoices /></ProtectedRoute>} />
+            <Route path="/payments/reports" element={<ProtectedRoute><PaymentsReports /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+            <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+            <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </AnimatePresence>
+        <ToastContainer position="top-right" autoClose={2000} />
+      </Layout>
     </Router>
   );
 }
