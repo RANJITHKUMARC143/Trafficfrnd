@@ -190,4 +190,17 @@ router.put('/:routeId/checkpoint-status', authenticateToken, async (req, res) =>
   }
 });
 
+// Get route by ID (for admin or internal use)
+router.get('/:routeId', authenticateToken, async (req, res) => {
+  try {
+    const route = await Route.findById(req.params.routeId);
+    if (!route) {
+      return res.status(404).json({ message: 'Route not found' });
+    }
+    res.json(route);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching route', error: error.message });
+  }
+});
+
 module.exports = router; 
