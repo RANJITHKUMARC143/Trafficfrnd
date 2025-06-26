@@ -95,6 +95,26 @@ npx expo start
 npm start
 ```
 
+## Cloning This Repository with Submodules
+
+This project uses git submodules (e.g., `Delivery_app`). To ensure you get all the code, including submodules, **clone the repository using:**
+
+```sh
+git clone --recurse-submodules https://github.com/RANJITHKUMARC143/Trafficfrnd.git
+```
+
+If you already cloned the repository without submodules, run:
+
+```sh
+git submodule update --init --recursive
+```
+
+This will fetch and initialize all submodules (such as `Delivery_app`) with the correct code.
+
+**Note:**
+- If you do not use these commands, the submodule folders may be empty or incomplete.
+- Always push changes to both the main repo and any submodules you modify.
+
 ## Contributing
 
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
