@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Search, Menu, X, User, Settings, HelpCircle } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface NotificationType {
@@ -17,6 +17,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -89,6 +90,13 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
       case 'success': return 'bg-emerald-50 border-l-4 border-emerald-500';
       default: return 'bg-gray-50';
     }
+  };
+
+  const handleSignOut = (e: React.MouseEvent) => {
+    e.preventDefault();
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login');
   };
 
   return (
@@ -244,7 +252,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                     </a>
                   </div>
                   <div className="py-1 border-t border-gray-100">
-                    <a href="#" className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
+                    <a href="#" onClick={handleSignOut} className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
                       Sign out
                     </a>
                   </div>

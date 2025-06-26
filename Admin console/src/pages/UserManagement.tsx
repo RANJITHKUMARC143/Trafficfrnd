@@ -12,13 +12,13 @@ const UserManagement: React.FC = () => {
   
   const userCategories = [
     {
-      title: 'Candidates',
+      title: 'Users',
       count: 3254,
       icon: <User size={20} />,
       path: '/users/candidates',
       color: 'bg-blue-50 text-blue-600',
       change: '+124 this month',
-      description: 'Job seekers looking for employment opportunities'
+      description: 'All registered users in the system'
     },
     {
       title: 'Employers',

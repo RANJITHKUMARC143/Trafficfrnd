@@ -92,7 +92,15 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const navigate = useNavigate();
   
+  const handleSignOut = (e: React.MouseEvent) => {
+    e.preventDefault();
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login');
+  };
+
   return (
     <motion.div 
       className="h-full flex flex-col bg-white"
@@ -123,7 +131,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
           title="User Management"
           path="/users"
           subItems={[
-            { title: "Candidates", path: "/users/candidates" },
+            { title: "Users", path: "/users/candidates" },
             { title: "Employers", path: "/users/employers" },
             { title: "Administrators", path: "/users/admins" },
           ]} 
@@ -172,6 +180,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
         <motion.button
           className="mt-4 flex items-center text-sm text-gray-600 hover:text-red-600 w-full"
           whileHover={{ x: 2 }}
+          onClick={handleSignOut}
         >
           <LogOut size={16} className="mr-2" />
           Sign Out

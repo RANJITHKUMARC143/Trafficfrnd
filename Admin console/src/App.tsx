@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 
 // Layout
@@ -20,43 +20,61 @@ import PaymentsTransactions from './pages/payments/PaymentsTransactions';
 import PaymentsInvoices from './pages/payments/PaymentsInvoices';
 import PaymentsReports from './pages/payments/PaymentsReports';
 import Settings from './pages/Settings';
+import Login from './pages/Login';
+import Register from './pages/Register';
+
+function ProtectedRoute({ children }: { children: JSX.Element }) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const location = useLocation();
+  if (!token) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  return children;
+}
+
+function PublicRoute({ children }: { children: JSX.Element }) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  if (token) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
 
 function App() {
   return (
     <Router>
-      <Layout>
-        <AnimatePresence mode="wait">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            
-            {/* User Management Routes */}
-            <Route path="/users" element={<UserManagement />} />
-            <Route path="/users/candidates" element={<UserCandidates />} />
-            <Route path="/users/employers" element={<UserEmployers />} />
-            <Route path="/users/admins" element={<UserAdmins />} />
-            
-            {/* Partners Routes */}
-            <Route path="/partners" element={<Partners />} />
-            <Route path="/partners/vendors" element={<PartnersVendors />} />
-            <Route path="/partners/delivery" element={<PartnersDelivery />} />
-            
-            {/* Campaigns Route */}
-            <Route path="/campaigns" element={<Campaigns />} />
-            
-            {/* Payments Routes */}
-            <Route path="/payments" element={<Payments />} />
-            <Route path="/payments/transactions" element={<PaymentsTransactions />} />
-            <Route path="/payments/invoices" element={<PaymentsInvoices />} />
-            <Route path="/payments/reports" element={<PaymentsReports />} />
-            
-            {/* Settings Route */}
-            <Route path="/settings" element={<Settings />} />
-            
-            {/* Fallback route */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </AnimatePresence>
-      </Layout>
+      <AnimatePresence mode="wait">
+        <Routes>
+          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/users" element={<UserManagement />} />
+                    <Route path="/users/candidates" element={<UserCandidates />} />
+                    <Route path="/users/employers" element={<UserEmployers />} />
+                    <Route path="/users/admins" element={<UserAdmins />} />
+                    <Route path="/partners" element={<Partners />} />
+                    <Route path="/partners/vendors" element={<PartnersVendors />} />
+                    <Route path="/partners/delivery" element={<PartnersDelivery />} />
+                    <Route path="/campaigns" element={<Campaigns />} />
+                    <Route path="/payments" element={<Payments />} />
+                    <Route path="/payments/transactions" element={<PaymentsTransactions />} />
+                    <Route path="/payments/invoices" element={<PaymentsInvoices />} />
+                    <Route path="/payments/reports" element={<PaymentsReports />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </AnimatePresence>
     </Router>
   );
 }
