@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Vendor = require('../models/Vendor');
 const fetch = require('node-fetch');
+const Earnings = require('../models/Earnings');
 
 async function sendExpoPushNotification(expoPushToken, message, data) {
   if (!expoPushToken) return;
@@ -90,6 +91,21 @@ const updateOrderStatus = async (req, res) => {
         { title: 'Order Update', body: `Your order status is now: ${status}` },
         { orderId: order._id, status }
       );
+    }
+
+    // Create Earnings record if order is completed and not already present
+    if (status === 'completed' && order.deliveryBoyId) {
+      const existingEarning = await Earnings.findOne({ orderId: order._id });
+      if (!existingEarning) {
+        await Earnings.create({
+          deliveryBoyId: order.deliveryBoyId,
+          orderId: order._id,
+          amount: order.totalAmount,
+          hours: 1, // You may want to calculate actual hours
+          date: new Date(),
+          status: 'completed',
+        });
+      }
     }
 
     res.json(order);

@@ -451,35 +451,10 @@ function getTimeframeDate(timeframe) {
 // Get all orders assigned to the authenticated delivery boy, but only if within 100m of vendor
 exports.getAssignedOrders = async (req, res) => {
   try {
-    const deliveryBoy = await DeliveryBoy.findById(req.user._id);
-    if (!deliveryBoy || !deliveryBoy.currentLocation || !deliveryBoy.currentLocation.coordinates) {
-      return res.status(400).json({ message: 'Delivery boy location not available' });
-    }
-
-    // Get all orders assigned to this delivery boy
-    const orders = await Order.find({ deliveryBoyId: req.user._id });
-
-    // For each order, get the vendor and calculate distance
-    const filteredOrders = [];
-    for (const order of orders) {
-      const vendor = await Vendor.findById(order.vendorId);
-      if (vendor && vendor.location && vendor.location.coordinates) {
-        const vendorCoords = {
-          latitude: vendor.location.coordinates[1],
-          longitude: vendor.location.coordinates[0]
-        };
-        const boyCoords = {
-          latitude: deliveryBoy.currentLocation.coordinates[1],
-          longitude: deliveryBoy.currentLocation.coordinates[0]
-        };
-        const distance = haversine(boyCoords, vendorCoords); // in meters
-        if (distance <= 100) {
-          filteredOrders.push(order);
-        }
-      }
-    }
-
-    res.json(filteredOrders);
+    // Return all orders assigned to this delivery boy, including vendor info
+    const orders = await Order.find({ deliveryBoyId: req.user._id })
+      .populate({ path: 'vendorId', select: 'businessName address phone location' });
+    res.json(orders);
   } catch (error) {
     console.error('Error fetching assigned orders:', error);
     res.status(500).json({ message: 'Error fetching assigned orders', error: error.message });
