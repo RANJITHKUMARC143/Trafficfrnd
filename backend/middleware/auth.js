@@ -46,6 +46,10 @@ const auth = async (req, res, next) => {
     console.log('Auth middleware - Authentication successful for user ID:', user._id);
     req.token = token;
     req.user = user;
+    // Update lastActive for the user
+    if (decoded.userId) {
+      await User.findByIdAndUpdate(decoded.userId, { lastActive: new Date() });
+    }
     next();
   } catch (error) {
     console.error('Auth middleware - Error:', error);

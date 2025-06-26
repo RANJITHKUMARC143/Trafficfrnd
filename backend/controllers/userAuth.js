@@ -119,6 +119,10 @@ exports.login = async (req, res) => {
       });
     }
 
+    // Update lastActive
+    user.lastActive = new Date();
+    await user.save();
+
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id },

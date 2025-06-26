@@ -309,4 +309,80 @@ router.put('/push-token', auth, async (req, res) => {
   }
 });
 
+// Get all vendors (admin)
+router.get('/', auth, async (req, res) => {
+  try {
+    const vendors = await Vendor.find({}, '-password');
+    const vendorsWithId = vendors.map(vendor => ({ ...vendor.toObject(), id: vendor._id }));
+    res.json(vendorsWithId);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching vendors', error: error.message });
+  }
+});
+
+// Add vendor (admin)
+router.post('/', auth, async (req, res) => {
+  try {
+    const { businessName, ownerName, email, phone, password, status, isVerified, isOpen, address, businessHours, rating, totalRatings, expoPushToken } = req.body;
+    if (!businessName || !ownerName || !email || !phone || !password) {
+      return res.status(400).json({ message: 'businessName, ownerName, email, phone, and password are required' });
+    }
+    const existingVendor = await Vendor.findOne({ email });
+    if (existingVendor) {
+      return res.status(400).json({ message: 'Vendor with this email already exists' });
+    }
+    const vendor = new Vendor({
+      businessName,
+      ownerName,
+      email,
+      phone,
+      password,
+      status: status || 'active',
+      isVerified: isVerified || false,
+      isOpen: isOpen || false,
+      address: address || {},
+      businessHours: businessHours || {},
+      rating: rating || 0,
+      totalRatings: totalRatings || 0,
+      expoPushToken: expoPushToken || ''
+    });
+    await vendor.save();
+    res.status(201).json({ vendor: vendor.getPublicProfile() });
+  } catch (error) {
+    res.status(500).json({ message: 'Error adding vendor', error: error.message });
+  }
+});
+
+// Update vendor by ID (admin)
+router.put('/:id', auth, async (req, res) => {
+  try {
+    const updates = req.body;
+    delete updates.password;
+    const vendor = await Vendor.findByIdAndUpdate(
+      req.params.id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select('-password');
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+    res.json(vendor.getPublicProfile());
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating vendor', error: error.message });
+  }
+});
+
+// Delete vendor by ID (admin)
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const vendor = await Vendor.findByIdAndDelete(req.params.id);
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+    res.json({ message: 'Vendor deleted successfully', id: req.params.id });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting vendor', error: error.message });
+  }
+});
+
 module.exports = router; 
