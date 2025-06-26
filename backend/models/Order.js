@@ -58,6 +58,11 @@ const orderSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  deliveryBoyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'DeliveryBoy',
+    required: false
   }
 }, {
   collection: 'food_orders'

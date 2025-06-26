@@ -7,9 +7,11 @@ const auth = async (req, res, next) => {
   try {
     console.log('Auth middleware - Headers:', req.headers);
     const token = req.header('Authorization')?.replace('Bearer ', '');
+    console.log('Auth middleware - Raw Authorization header:', req.header('Authorization'));
+    console.log('Auth middleware - Token after replace:', token);
     
-    if (!token) {
-      console.log('Auth middleware - No token provided');
+    if (!token || token === 'null' || token === 'undefined' || token.split('.').length !== 3) {
+      console.log('Auth middleware - No valid token provided (final check)');
       return res.status(401).json({ message: 'Authentication required' });
     }
 

@@ -24,6 +24,11 @@ router.put('/profile', auth, deliveryBoyController.updateProfile);
 router.put('/location', auth, deliveryBoyController.updateLocation);
 router.put('/status', auth, deliveryBoyController.updateOnlineStatus);
 
+// Orders routes for delivery boy
+router.get('/orders', auth, deliveryBoyController.getAssignedOrders);
+router.get('/orders/:id', auth, deliveryBoyController.getOrderById);
+router.put('/orders/:id/status', auth, deliveryBoyController.updateOrderStatus);
+
 // Earnings routes
 router.get('/earnings/summary', auth, deliveryBoyController.getEarningsSummary);
 router.get('/earnings/history', auth, deliveryBoyController.getEarningsHistory);

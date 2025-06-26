@@ -3,6 +3,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Earnings = require('../models/Earnings');
 const Cashout = require('../models/Cashout');
+const Order = require('../models/Order');
+const haversine = require('haversine-distance');
+const Vendor = require('../models/Vendor');
 
 // Register a new delivery boy
 exports.register = async (req, res) => {
@@ -359,7 +362,7 @@ exports.getEarningsSummary = async (req, res) => {
     // Get earnings data from database
     const earnings = await Earnings.find({
       deliveryBoyId,
-      createdAt: {
+      date: {
         $gte: getTimeframeDate(timeframe)
       }
     });
@@ -444,3 +447,120 @@ function getTimeframeDate(timeframe) {
       return new Date(now.setHours(0, 0, 0, 0));
   }
 } 
+
+// Get all orders assigned to the authenticated delivery boy, but only if within 100m of vendor
+exports.getAssignedOrders = async (req, res) => {
+  try {
+    const deliveryBoy = await DeliveryBoy.findById(req.user._id);
+    if (!deliveryBoy || !deliveryBoy.currentLocation || !deliveryBoy.currentLocation.coordinates) {
+      return res.status(400).json({ message: 'Delivery boy location not available' });
+    }
+
+    // Get all orders assigned to this delivery boy
+    const orders = await Order.find({ deliveryBoyId: req.user._id });
+
+    // For each order, get the vendor and calculate distance
+    const filteredOrders = [];
+    for (const order of orders) {
+      const vendor = await Vendor.findById(order.vendorId);
+      if (vendor && vendor.location && vendor.location.coordinates) {
+        const vendorCoords = {
+          latitude: vendor.location.coordinates[1],
+          longitude: vendor.location.coordinates[0]
+        };
+        const boyCoords = {
+          latitude: deliveryBoy.currentLocation.coordinates[1],
+          longitude: deliveryBoy.currentLocation.coordinates[0]
+        };
+        const distance = haversine(boyCoords, vendorCoords); // in meters
+        if (distance <= 100) {
+          filteredOrders.push(order);
+        }
+      }
+    }
+
+    res.json(filteredOrders);
+  } catch (error) {
+    console.error('Error fetching assigned orders:', error);
+    res.status(500).json({ message: 'Error fetching assigned orders', error: error.message });
+  }
+};
+
+// Get a specific order by ID (only if assigned to the delivery boy)
+exports.getOrderById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Find the order and ensure it's assigned to the current delivery boy
+    const order = await Order.findOne({ 
+      _id: id, 
+      deliveryBoyId: req.user._id 
+    });
+
+    if (!order) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Order not found or not assigned to you' 
+      });
+    }
+
+    res.json(order);
+  } catch (error) {
+    console.error('Error fetching order by ID:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching order details', 
+      error: error.message 
+    });
+  }
+};
+
+// Update order status
+exports.updateOrderStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    // Validate status
+    const validStatuses = ['pending', 'confirmed', 'pickup', 'enroute', 'delivered', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid status value' 
+      });
+    }
+
+    // Find and update the order (only if assigned to the current delivery boy)
+    const order = await Order.findOneAndUpdate(
+      { 
+        _id: id, 
+        deliveryBoyId: req.user._id 
+      },
+      { 
+        status,
+        updatedAt: new Date()
+      },
+      { new: true }
+    );
+
+    if (!order) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Order not found or not assigned to you' 
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Order status updated successfully',
+      order
+    });
+  } catch (error) {
+    console.error('Error updating order status:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error updating order status', 
+      error: error.message 
+    });
+  }
+}; 
