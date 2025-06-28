@@ -11,7 +11,15 @@ const DeliveryBoy = require('../models/DeliveryBoy');
 // List all orders (admin)
 router.get('/admin', auth, async (req, res) => {
   try {
-    const orders = await Order.find({})
+    const { vendorId } = req.query;
+    let query = {};
+    
+    // If vendorId is provided, filter by vendor
+    if (vendorId) {
+      query.vendorId = vendorId;
+    }
+    
+    const orders = await Order.find(query)
       .populate('vendorId', 'businessName')
       .populate('deliveryBoyId', 'fullName')
       .populate('routeId', 'name')
@@ -71,5 +79,26 @@ router.patch('/:orderId/status', auth, updateOrderStatus);
 
 // Get orders by status
 router.get('/status/:status', auth, getOrdersByStatus);
+
+// Get detailed order information (admin)
+router.get('/admin/:orderId/details', auth, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    const order = await Order.findById(orderId)
+      .populate('vendorId', 'businessName ownerName email phone address')
+      .populate('deliveryBoyId', 'fullName email phone vehicleType vehicleNumber currentLocation')
+      .populate('routeId', 'startLocation destination checkpoints distance duration')
+      .populate('user', 'name email phone');
+    
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+    
+    res.json(order);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching order details', error: error.message });
+  }
+});
 
 module.exports = router; 

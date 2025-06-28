@@ -5,6 +5,30 @@ const Vendor = require('../models/Vendor');
 const fetch = require('node-fetch');
 const Earnings = require('../models/Earnings');
 
+// Utility function to get address from coordinates
+async function getAddressFromCoordinates(latitude, longitude) {
+  try {
+    if (!latitude || !longitude) return '';
+    
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${process.env.GOOGLE_MAPS_API_KEY}`
+    );
+    
+    if (!response.ok) return '';
+    
+    const data = await response.json();
+    
+    if (data.results && data.results.length > 0) {
+      return data.results[0].formatted_address;
+    }
+    
+    return '';
+  } catch (error) {
+    console.error('Error getting address from coordinates:', error);
+    return '';
+  }
+}
+
 async function sendExpoPushNotification(expoPushToken, message, data) {
   if (!expoPushToken) return;
   await fetch('https://exp.host/--/api/v2/push/send', {
@@ -137,7 +161,16 @@ const getOrdersByStatus = async (req, res) => {
 // Create a new order (user)
 const createOrder = async (req, res) => {
   try {
-    const { items, totalAmount, vendorId, deliveryAddress, specialInstructions, vehicleNumber, routeId } = req.body;
+    const { 
+      items, 
+      totalAmount, 
+      vendorId, 
+      deliveryAddress, 
+      specialInstructions, 
+      vehicleNumber, 
+      routeId,
+      userLocation // New field for user's current location
+    } = req.body;
     const customerName = req.user.name || req.user.username;
 
     if (!vendorId) {
@@ -154,6 +187,34 @@ const createOrder = async (req, res) => {
     const vendorObjectId = new mongoose.Types.ObjectId(vendorId);
     const routeObjectId = new mongoose.Types.ObjectId(routeId);
 
+    // Get vendor's current location
+    const vendor = await Vendor.findById(vendorId);
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    // Prepare location data
+    const locationData = {
+      user: {
+        latitude: userLocation?.latitude || null,
+        longitude: userLocation?.longitude || null,
+        address: userLocation?.address || deliveryAddress || await getAddressFromCoordinates(userLocation?.latitude, userLocation?.longitude),
+        timestamp: new Date()
+      },
+      vendor: {
+        latitude: vendor.location?.coordinates?.[1] || null, // MongoDB stores as [longitude, latitude]
+        longitude: vendor.location?.coordinates?.[0] || null,
+        address: vendor.address ? `${vendor.address.street || ''}, ${vendor.address.city || ''}, ${vendor.address.state || ''}`.trim() : await getAddressFromCoordinates(vendor.location?.coordinates?.[1], vendor.location?.coordinates?.[0]),
+        timestamp: new Date()
+      },
+      deliveryBoy: {
+        latitude: null,
+        longitude: null,
+        address: '',
+        timestamp: null
+      }
+    };
+
     const order = new Order({
       vendorId: vendorObjectId,
       routeId: routeObjectId,
@@ -164,17 +225,17 @@ const createOrder = async (req, res) => {
       deliveryAddress,
       specialInstructions,
       vehicleNumber,
+      locations: locationData,
       timestamp: new Date(),
       updatedAt: new Date(),
       user: req.user._id,
     });
 
     await order.save();
-    console.log('Order created:', order);
+    console.log('Order created with locations:', order);
 
     // Notify vendor
-    const vendor = await Vendor.findById(vendorId);
-    if (vendor && vendor.expoPushToken) {
+    if (vendor.expoPushToken) {
       await sendExpoPushNotification(
         vendor.expoPushToken,
         { title: 'New Order', body: `You have a new order from ${customerName}` },
@@ -201,6 +262,44 @@ const getUserOrders = async (req, res) => {
   }
 };
 
+// Update delivery boy location when accepting order
+const updateDeliveryBoyLocation = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { latitude, longitude, address } = req.body;
+    
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Unauthorized: No delivery boy found' });
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Update delivery boy location in the order
+    order.locations.deliveryBoy = {
+      latitude: latitude || null,
+      longitude: longitude || null,
+      address: address || await getAddressFromCoordinates(latitude, longitude),
+      timestamp: new Date()
+    };
+
+    // Set delivery boy ID if not already set
+    if (!order.deliveryBoyId) {
+      order.deliveryBoyId = req.user._id;
+    }
+
+    await order.save();
+    console.log('Delivery boy location updated for order:', orderId);
+
+    res.json(order);
+  } catch (error) {
+    console.error('Error updating delivery boy location:', error);
+    res.status(500).json({ message: 'Error updating delivery boy location', error: error.message });
+  }
+};
+
 module.exports = {
   getOrders,
   getOrderById,
@@ -208,4 +307,5 @@ module.exports = {
   getOrdersByStatus,
   createOrder,
   getUserOrders,
+  updateDeliveryBoyLocation,
 }; 

@@ -147,11 +147,13 @@ router.get('/public/explore/all', async (req, res) => {
       .populate('vendorId', 'businessName') // Populate vendor information
       .sort({ createdAt: -1 }); // Sort by newest first
     
-    // Transform the data to include vendor name
-    const transformedItems = menuItems.map(item => ({
-      ...item.toObject(),
-      vendorName: item.vendorId.businessName
-    }));
+    // Transform the data to include vendor name and filter out items with null vendorId
+    const transformedItems = menuItems
+      .filter(item => item.vendorId) // Filter out items with null vendorId
+      .map(item => ({
+        ...item.toObject(),
+        vendorName: item.vendorId.businessName || 'Unknown Vendor'
+      }));
     
     res.json(transformedItems);
   } catch (error) {
@@ -217,6 +219,17 @@ router.post('/test/sample-items', async (req, res) => {
   } catch (error) {
     console.error('Error creating sample items:', error);
     res.status(500).json({ message: 'Error creating sample items', error: error.message });
+  }
+});
+
+// Admin route: Get all menu items for a vendor by vendorId (with auth)
+router.get('/vendor/:vendorId', auth, async (req, res) => {
+  try {
+    const menuItems = await MenuItem.find({ vendorId: req.params.vendorId })
+      .sort({ createdAt: -1 });
+    res.json(menuItems);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching menu items', error: error.message });
   }
 });
 

@@ -3,6 +3,8 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const Vendor = require('../models/Vendor');
 const auth = require('../middleware/auth');
+const Order = require('../models/Order');
+const MenuItem = require('../models/MenuItem');
 
 // Test route
 router.get('/test', (req, res) => {
@@ -382,6 +384,66 @@ router.delete('/:id', auth, async (req, res) => {
     res.json({ message: 'Vendor deleted successfully', id: req.params.id });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting vendor', error: error.message });
+  }
+});
+
+// Get vendor activity (admin)
+router.get('/:vendorId/activity', auth, async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const { limit = 10 } = req.query;
+    
+    // Get recent orders for this vendor
+    const orders = await Order.find({ vendorId })
+      .sort({ timestamp: -1 })
+      .limit(parseInt(limit))
+      .populate('user', 'name');
+    
+    // Get recent menu updates
+    const menuUpdates = await MenuItem.find({ vendorId })
+      .sort({ updatedAt: -1 })
+      .limit(parseInt(limit));
+    
+    // Format activity data
+    const activity = [];
+    
+    // Add order activities
+    orders.forEach(order => {
+      activity.push({
+        type: 'order',
+        action: order.status === 'completed' ? 'completed' : 'received',
+        description: `Order #${order.orderId} ${order.status === 'completed' ? 'completed' : 'received'}`,
+        timestamp: order.timestamp,
+        data: {
+          orderId: order.orderId,
+          amount: order.totalAmount,
+          status: order.status,
+          customerName: order.user?.name || 'Unknown'
+        }
+      });
+    });
+    
+    // Add menu activities
+    menuUpdates.forEach(item => {
+      activity.push({
+        type: 'menu',
+        action: 'updated',
+        description: `Menu item "${item.name}" updated`,
+        timestamp: item.updatedAt,
+        data: {
+          itemName: item.name,
+          price: item.price,
+          isAvailable: item.isAvailable
+        }
+      });
+    });
+    
+    // Sort by timestamp and limit
+    activity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    
+    res.json(activity.slice(0, parseInt(limit)));
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching vendor activity', error: error.message });
   }
 });
 

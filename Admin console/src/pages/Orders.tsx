@@ -25,6 +25,26 @@ interface Order {
   vehicleNumber?: string;
   timestamp?: string;
   updatedAt?: string;
+  locations?: {
+    user?: {
+      latitude?: number;
+      longitude?: number;
+      address?: string;
+      timestamp?: string;
+    };
+    vendor?: {
+      latitude?: number;
+      longitude?: number;
+      address?: string;
+      timestamp?: string;
+    };
+    deliveryBoy?: {
+      latitude?: number;
+      longitude?: number;
+      address?: string;
+      timestamp?: string;
+    };
+  };
 }
 
 interface RouteDetails {
@@ -64,7 +84,7 @@ const Orders: React.FC = () => {
       setError('');
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.183.3:3000'}/api/vendors/orders/admin`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/vendors/orders/admin`, {
           headers: { 'Authorization': token ? `Bearer ${token}` : '' }
         });
         const data = await res.json();
@@ -139,7 +159,7 @@ const Orders: React.FC = () => {
     if (!window.confirm(`Are you sure you want to delete order ${order._id}?`)) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.183.3:3000'}/api/vendors/orders/admin/${order._id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/vendors/orders/admin/${order._id}`, {
         method: 'DELETE',
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
@@ -169,7 +189,7 @@ const Orders: React.FC = () => {
     setFormError('');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.183.3:3000'}/api/vendors/orders/admin/${form._id}/status`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/vendors/orders/admin/${form._id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
         body: JSON.stringify({ status: form.status })
@@ -191,7 +211,7 @@ const Orders: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       // Fetch route details
-      const routeRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.183.3:3000'}/api/routes/${order.routeId._id}`, {
+      const routeRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/routes/${order.routeId._id}`, {
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
       const routeData = await routeRes.json();
@@ -201,7 +221,7 @@ const Orders: React.FC = () => {
       });
       // Fetch selected checkpoints for this route and user (if deliveryBoyId exists)
       if (order.deliveryBoyId && typeof order.deliveryBoyId === 'object') {
-        const scRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.183.3:3000'}/api/checkpoints/selected?route=${order.routeId._id}&user=${order.deliveryBoyId._id}`, {
+        const scRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/checkpoints/selected?route=${order.routeId._id}&user=${order.deliveryBoyId._id}`, {
           headers: { 'Authorization': token ? `Bearer ${token}` : '' }
         });
         const scData = await scRes.json();
@@ -271,7 +291,38 @@ const Orders: React.FC = () => {
   const copyLocationLink = (lat: number, lng: number, label?: string) => {
     const url = `https://www.google.com/maps?q=${lat},${lng}`;
     navigator.clipboard.writeText(url);
-    toast.success(`${label ? label + ' ' : ''}Location link copied!`);
+    toast.success(`Location link copied to clipboard!`);
+  };
+
+  // Calculate map center based on available locations
+  const getMapCenter = () => {
+    const locations = [];
+    
+    if (detailsModal.order?.locations?.user?.latitude && detailsModal.order?.locations?.user?.longitude) {
+      locations.push([detailsModal.order.locations.user.latitude, detailsModal.order.locations.user.longitude]);
+    }
+    
+    if (detailsModal.order?.locations?.vendor?.latitude && detailsModal.order?.locations?.vendor?.longitude) {
+      locations.push([detailsModal.order.locations.vendor.latitude, detailsModal.order.locations.vendor.longitude]);
+    }
+    
+    if (detailsModal.order?.locations?.deliveryBoy?.latitude && detailsModal.order?.locations?.deliveryBoy?.longitude) {
+      locations.push([detailsModal.order.locations.deliveryBoy.latitude, detailsModal.order.locations.deliveryBoy.longitude]);
+    }
+    
+    if (locations.length === 0) {
+      return [13.138755, 78.216145]; // Default to Kolar area
+    }
+    
+    if (locations.length === 1) {
+      return locations[0];
+    }
+    
+    // Calculate center point
+    const avgLat = locations.reduce((sum, loc) => sum + loc[0], 0) / locations.length;
+    const avgLng = locations.reduce((sum, loc) => sum + loc[1], 0) / locations.length;
+    
+    return [avgLat, avgLng];
   };
 
   return (
@@ -430,7 +481,7 @@ const Orders: React.FC = () => {
         {/* Order Details Modal */}
         {detailsModal.open && detailsModal.order && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-            <div className="bg-white rounded-lg shadow-lg p-6 relative max-w-lg w-full max-h-full overflow-y-auto">
+            <div className="bg-white rounded-lg shadow-lg p-6 relative max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <button
                 className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl"
                 onClick={() => setDetailsModal({ open: false, order: null })}
@@ -466,6 +517,196 @@ const Orders: React.FC = () => {
                     )}
                   </ul>
                 </div>
+                
+                {/* Location Details Section */}
+                {detailsModal.order.locations && (
+                  <div className="mt-4 border-t pt-4">
+                    <h3 className="font-bold text-base text-gray-800 mb-3">Location Details (at time of order)</h3>
+                    
+                    {/* User Location */}
+                    {detailsModal.order.locations.user && (
+                      <div className="mb-3 p-3 bg-blue-50 rounded-lg">
+                        <h4 className="font-semibold text-blue-800 mb-2 flex items-center">
+                          <User size={16} className="mr-2" />
+                          Customer Location
+                        </h4>
+                        <div className="text-sm space-y-1">
+                          <div><span className="font-medium">Address:</span> {detailsModal.order.locations.user.address || 'Not available'}</div>
+                          <div><span className="font-medium">Coordinates:</span> 
+                            {detailsModal.order.locations.user.latitude && detailsModal.order.locations.user.longitude ? (
+                              <span className="font-mono">
+                                {detailsModal.order.locations.user.latitude.toFixed(6)}, {detailsModal.order.locations.user.longitude.toFixed(6)}
+                                <button
+                                  className="ml-2 text-blue-600 hover:text-blue-800 text-xs"
+                                  onClick={() => copyLocationLink(detailsModal.order.locations.user.latitude, detailsModal.order.locations.user.longitude, 'Customer Location')}
+                                >
+                                  <Share2 size={12} className="inline mr-1" /> Share
+                                </button>
+                              </span>
+                            ) : (
+                              'Not available'
+                            )}
+                          </div>
+                          <div><span className="font-medium">Timestamp:</span> {detailsModal.order.locations.user.timestamp ? new Date(detailsModal.order.locations.user.timestamp).toLocaleString() : 'Not available'}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Vendor Location */}
+                    {detailsModal.order.locations.vendor && (
+                      <div className="mb-3 p-3 bg-green-50 rounded-lg">
+                        <h4 className="font-semibold text-green-800 mb-2 flex items-center">
+                          <Building2 size={16} className="mr-2" />
+                          Vendor Location
+                        </h4>
+                        <div className="text-sm space-y-1">
+                          <div><span className="font-medium">Address:</span> {detailsModal.order.locations.vendor.address || 'Not available'}</div>
+                          <div><span className="font-medium">Coordinates:</span> 
+                            {detailsModal.order.locations.vendor.latitude && detailsModal.order.locations.vendor.longitude ? (
+                              <span className="font-mono">
+                                {detailsModal.order.locations.vendor.latitude.toFixed(6)}, {detailsModal.order.locations.vendor.longitude.toFixed(6)}
+                                <button
+                                  className="ml-2 text-green-600 hover:text-green-800 text-xs"
+                                  onClick={() => copyLocationLink(detailsModal.order.locations.vendor.latitude, detailsModal.order.locations.vendor.longitude, 'Vendor Location')}
+                                >
+                                  <Share2 size={12} className="inline mr-1" /> Share
+                                </button>
+                              </span>
+                            ) : (
+                              'Not available'
+                            )}
+                          </div>
+                          <div><span className="font-medium">Timestamp:</span> {detailsModal.order.locations.vendor.timestamp ? new Date(detailsModal.order.locations.vendor.timestamp).toLocaleString() : 'Not available'}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Delivery Boy Location */}
+                    {detailsModal.order.locations.deliveryBoy && (
+                      <div className="mb-3 p-3 bg-yellow-50 rounded-lg">
+                        <h4 className="font-semibold text-yellow-800 mb-2 flex items-center">
+                          <Truck size={16} className="mr-2" />
+                          Delivery Partner Location
+                        </h4>
+                        <div className="text-sm space-y-1">
+                          <div><span className="font-medium">Address:</span> {detailsModal.order.locations.deliveryBoy.address || 'Not available'}</div>
+                          <div><span className="font-medium">Coordinates:</span> 
+                            {detailsModal.order.locations.deliveryBoy.latitude && detailsModal.order.locations.deliveryBoy.longitude ? (
+                              <span className="font-mono">
+                                {detailsModal.order.locations.deliveryBoy.latitude.toFixed(6)}, {detailsModal.order.locations.deliveryBoy.longitude.toFixed(6)}
+                                <button
+                                  className="ml-2 text-yellow-600 hover:text-yellow-800 text-xs"
+                                  onClick={() => copyLocationLink(detailsModal.order.locations.deliveryBoy.latitude, detailsModal.order.locations.deliveryBoy.longitude, 'Delivery Partner Location')}
+                                >
+                                  <Share2 size={12} className="inline mr-1" /> Share
+                                </button>
+                              </span>
+                            ) : (
+                              'Not available'
+                            )}
+                          </div>
+                          <div><span className="font-medium">Timestamp:</span> {detailsModal.order.locations.deliveryBoy.timestamp ? new Date(detailsModal.order.locations.deliveryBoy.timestamp).toLocaleString() : 'Not available'}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Combined Location Map */}
+                    {(detailsModal.order.locations.user || detailsModal.order.locations.vendor || detailsModal.order.locations.deliveryBoy) && (
+                      <div className="mt-4">
+                        <h4 className="font-bold text-base text-gray-800 mb-2">Location Map</h4>
+                        <div style={{ height: '250px', width: '100%' }}>
+                          <MapContainer
+                            center={getMapCenter()}
+                            zoom={12}
+                            scrollWheelZoom={false}
+                            style={{ height: '100%', width: '100%', borderRadius: '8px' }}
+                          >
+                            <TileLayer
+                              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                            />
+                            
+                            {/* User Location Marker */}
+                            {detailsModal.order.locations.user && detailsModal.order.locations.user.latitude && detailsModal.order.locations.user.longitude && (
+                              <Marker
+                                position={[detailsModal.order.locations.user.latitude, detailsModal.order.locations.user.longitude]}
+                                icon={L.icon({
+                                  iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', // blue marker
+                                  iconSize: [25, 41],
+                                  iconAnchor: [12, 41],
+                                  popupAnchor: [1, -34],
+                                  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                                  shadowSize: [41, 41]
+                                })}
+                              >
+                                <Popup>
+                                  <div>
+                                    <div className="font-semibold text-blue-700">Customer Location</div>
+                                    <div>{detailsModal.order.locations.user.address || 'No address'}</div>
+                                    <div className="text-xs text-gray-500">
+                                      {detailsModal.order.locations.user.latitude.toFixed(6)}, {detailsModal.order.locations.user.longitude.toFixed(6)}
+                                    </div>
+                                  </div>
+                                </Popup>
+                              </Marker>
+                            )}
+
+                            {/* Vendor Location Marker */}
+                            {detailsModal.order.locations.vendor && detailsModal.order.locations.vendor.latitude && detailsModal.order.locations.vendor.longitude && (
+                              <Marker
+                                position={[detailsModal.order.locations.vendor.latitude, detailsModal.order.locations.vendor.longitude]}
+                                icon={L.icon({
+                                  iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', // green marker
+                                  iconSize: [25, 41],
+                                  iconAnchor: [12, 41],
+                                  popupAnchor: [1, -34],
+                                  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                                  shadowSize: [41, 41]
+                                })}
+                              >
+                                <Popup>
+                                  <div>
+                                    <div className="font-semibold text-green-700">Vendor Location</div>
+                                    <div>{detailsModal.order.locations.vendor.address || 'No address'}</div>
+                                    <div className="text-xs text-gray-500">
+                                      {detailsModal.order.locations.vendor.latitude.toFixed(6)}, {detailsModal.order.locations.vendor.longitude.toFixed(6)}
+                                    </div>
+                                  </div>
+                                </Popup>
+                              </Marker>
+                            )}
+
+                            {/* Delivery Boy Location Marker */}
+                            {detailsModal.order.locations.deliveryBoy && detailsModal.order.locations.deliveryBoy.latitude && detailsModal.order.locations.deliveryBoy.longitude && (
+                              <Marker
+                                position={[detailsModal.order.locations.deliveryBoy.latitude, detailsModal.order.locations.deliveryBoy.longitude]}
+                                icon={L.icon({
+                                  iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', // yellow marker
+                                  iconSize: [25, 41],
+                                  iconAnchor: [12, 41],
+                                  popupAnchor: [1, -34],
+                                  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                                  shadowSize: [41, 41]
+                                })}
+                              >
+                                <Popup>
+                                  <div>
+                                    <div className="font-semibold text-yellow-700">Delivery Partner Location</div>
+                                    <div>{detailsModal.order.locations.deliveryBoy.address || 'No address'}</div>
+                                    <div className="text-xs text-gray-500">
+                                      {detailsModal.order.locations.deliveryBoy.latitude.toFixed(6)}, {detailsModal.order.locations.deliveryBoy.longitude.toFixed(6)}
+                                    </div>
+                                  </div>
+                                </Popup>
+                              </Marker>
+                            )}
+                          </MapContainer>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Route destination and checkpoints */}
                 {routeLoading ? (
                   <div className="text-blue-600">Loading route details...</div>

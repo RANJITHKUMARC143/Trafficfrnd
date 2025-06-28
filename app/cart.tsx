@@ -28,7 +28,8 @@ export default function CartScreen() {
   const [pendingOrder, setPendingOrder] = useState(false);
   const [routeId, setRouteId] = useState<string | null>(null);
   const [loadingCheckpoint, setLoadingCheckpoint] = useState(false);
-  const [checkpointError, setCheckpointError] = useState('');
+  const [checkpointError, setCheckpointError] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{latitude: number; longitude: number; address: string} | null>(null);
 
   useEffect(() => {
     loadCartItems();
@@ -105,6 +106,59 @@ export default function CartScreen() {
     }
   };
 
+  const getUserCurrentLocation = async () => {
+    try {
+      // Check if location services are enabled
+      const providerStatus = await Location.hasServicesEnabledAsync();
+      if (!providerStatus) {
+        console.log('Location services are disabled');
+        return null;
+      }
+
+      // Request permissions
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Location permission denied');
+        return null;
+      }
+
+      // Get current location
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+        maximumAge: 30000, // Accept locations up to 30 seconds old
+        timeout: 10000 // Timeout after 10 seconds
+      });
+
+      const { latitude, longitude } = location.coords;
+
+      // Get address from coordinates
+      let address = '';
+      try {
+        const [addressResult] = await Location.reverseGeocodeAsync({
+          latitude,
+          longitude
+        });
+
+        if (addressResult) {
+          address = [
+            addressResult.street,
+            addressResult.city,
+            addressResult.region,
+            addressResult.country
+          ].filter(Boolean).join(', ');
+        }
+      } catch (geocodeError) {
+        console.log('Could not get address:', geocodeError);
+        address = 'Current Location';
+      }
+
+      return { latitude, longitude, address };
+    } catch (error) {
+      console.error('Error getting current location:', error);
+      return null;
+    }
+  };
+
   const confirmVehicleNumberAndOrder = async () => {
     if (!vehicleNumber.trim()) {
       Alert.alert('Error', 'Please enter your vehicle number');
@@ -129,6 +183,10 @@ export default function CartScreen() {
     setVehicleModalVisible(false);
     setPendingOrder(false);
     try {
+      // Get user's current location
+      const currentLocation = await getUserCurrentLocation();
+      console.log('User current location:', currentLocation);
+
       const orderData = {
         vendorId,
         routeId,
@@ -139,6 +197,7 @@ export default function CartScreen() {
         })),
         totalAmount: calculateTotal(),
         vehicleNumber,
+        userLocation: currentLocation // Add user location to order data
       };
       console.log('Order payload:', orderData);
       const order = await createOrder(orderData);

@@ -28,6 +28,7 @@ router.put('/status', auth, deliveryBoyController.updateOnlineStatus);
 router.get('/orders', auth, deliveryBoyController.getAssignedOrders);
 router.get('/orders/:id', auth, deliveryBoyController.getOrderById);
 router.put('/orders/:id/status', auth, deliveryBoyController.updateOrderStatus);
+router.put('/orders/:orderId/location', auth, require('../controllers/orderController').updateDeliveryBoyLocation);
 
 // Earnings routes
 router.get('/earnings/summary', auth, deliveryBoyController.getEarningsSummary);

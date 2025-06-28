@@ -119,9 +119,12 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Update lastActive
-    user.lastActive = new Date();
-    await user.save();
+    // Update lastActive safely without triggering validation
+    await User.findByIdAndUpdate(
+      user._id,
+      { lastActive: new Date() },
+      { runValidators: false }
+    );
 
     // Generate JWT token
     const token = jwt.sign(

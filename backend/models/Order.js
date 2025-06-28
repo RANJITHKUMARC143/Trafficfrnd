@@ -51,6 +51,63 @@ const orderSchema = new mongoose.Schema({
     ref: 'Route',
     required: true
   },
+  // Location information at the time of order
+  locations: {
+    user: {
+      latitude: {
+        type: Number,
+        default: null
+      },
+      longitude: {
+        type: Number,
+        default: null
+      },
+      address: {
+        type: String,
+        default: ''
+      },
+      timestamp: {
+        type: Date,
+        default: Date.now
+      }
+    },
+    vendor: {
+      latitude: {
+        type: Number,
+        default: null
+      },
+      longitude: {
+        type: Number,
+        default: null
+      },
+      address: {
+        type: String,
+        default: ''
+      },
+      timestamp: {
+        type: Date,
+        default: Date.now
+      }
+    },
+    deliveryBoy: {
+      latitude: {
+        type: Number,
+        default: null
+      },
+      longitude: {
+        type: Number,
+        default: null
+      },
+      address: {
+        type: String,
+        default: ''
+      },
+      timestamp: {
+        type: Date,
+        default: null
+      }
+    }
+  },
   timestamp: {
     type: Date,
     default: Date.now
@@ -62,6 +119,11 @@ const orderSchema = new mongoose.Schema({
   deliveryBoyId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'DeliveryBoy',
+    required: false
+  },
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
     required: false
   }
 }, {
