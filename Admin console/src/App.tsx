@@ -16,6 +16,9 @@ import UserAdmins from './pages/users/UserAdmins';
 import Partners from './pages/Partners';
 import PartnersVendors from './pages/partners/PartnersVendors';
 import PartnersDelivery from './pages/partners/PartnersDelivery';
+import PartnersDeliveryEnhanced from './pages/partners/PartnersDeliveryEnhanced';
+import DeliveryPartnerDetail from './pages/partners/DeliveryPartnerDetail';
+import DeliveryPartnerDetailEnhanced from './pages/partners/DeliveryPartnerDetailEnhanced';
 import VendorOrders from './pages/partners/VendorOrders';
 import Campaigns from './pages/Campaigns';
 import Payments from './pages/Payments';
@@ -59,6 +62,7 @@ function App() {
             <Route path="/partners" element={<ProtectedRoute><Partners /></ProtectedRoute>} />
             <Route path="/partners/vendors" element={<ProtectedRoute><PartnersVendors /></ProtectedRoute>} />
             <Route path="/partners/delivery" element={<ProtectedRoute><PartnersDelivery /></ProtectedRoute>} />
+            <Route path="/partners/delivery/:id" element={<ProtectedRoute><DeliveryPartnerDetailEnhanced /></ProtectedRoute>} />
             <Route path="/partners/orders" element={<ProtectedRoute><VendorOrders /></ProtectedRoute>} />
             <Route path="/campaigns" element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
             <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />

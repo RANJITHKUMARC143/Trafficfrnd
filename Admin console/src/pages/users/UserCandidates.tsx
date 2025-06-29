@@ -1,7 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, FileDown, Filter, Edit, Trash, User, Mail } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { 
+  UserPlus, 
+  FileDown, 
+  Filter, 
+  Edit, 
+  Trash, 
+  User, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Search,
+  Plus,
+  Users,
+  Star,
+  Clock,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  Download,
+  Upload,
+  Eye
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
+import { useNavigate } from 'react-router-dom';
 
 import PageHeader from '../../components/ui/PageHeader';
 import Button from '../../components/ui/Button';
@@ -47,7 +69,18 @@ const UserCandidates: React.FC = () => {
     status: '',
     registrationDate: '',
     lastActive: '',
+    searchTerm: ''
   });
+  const navigate = useNavigate();
+
+  // Calculate statistics
+  const stats = {
+    total: users.length,
+    active: users.filter(u => u.status === 'active').length,
+    pending: users.filter(u => u.status === 'pending').length,
+    inactive: users.filter(u => u.status === 'inactive').length,
+    verified: users.filter(u => u.role === 'verified').length
+  };
   
   useEffect(() => {
     const fetchUsers = async () => {
@@ -71,58 +104,138 @@ const UserCandidates: React.FC = () => {
   }, []);
   
   const columns = [
-    { key: 'id', header: 'User ID', sortable: true, render: (value: string) => <span className="font-bold">{value}</span> },
-    { key: 'username', header: 'Username', sortable: true },
-    { key: 'name', header: 'Full Name', sortable: true },
-    { key: 'email', header: 'Email Address', sortable: true },
-    { key: 'phone', header: 'Phone Number', sortable: true },
-    { key: 'address', header: 'Address', sortable: true },
+    { key: 'id', header: 'ID', sortable: true, render: (v: string) => <span className="font-mono text-xs text-gray-500">{v.slice(-8)}</span> },
+    { 
+      key: 'name', 
+      header: 'User', 
+      sortable: true,
+      render: (v: string, row: UserType) => (
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+            {v?.charAt(0).toUpperCase() || 'U'}
+          </div>
+          <div>
+            <div className="font-semibold text-gray-900">{v || 'N/A'}</div>
+            <div className="text-sm text-gray-500">{row.email}</div>
+          </div>
+        </div>
+      )
+    },
+    { 
+      key: 'username', 
+      header: 'Username', 
+      sortable: true,
+      render: (v: string) => (
+        <div className="flex items-center space-x-2">
+          <User className="w-4 h-4 text-gray-400" />
+          <span className="font-medium">{v || 'N/A'}</span>
+        </div>
+      )
+    },
+    { 
+      key: 'phone', 
+      header: 'Contact', 
+      sortable: true,
+      render: (v: string) => (
+        <div className="flex items-center space-x-2">
+          <Phone className="w-4 h-4 text-gray-400" />
+          <span className="font-mono text-sm">{v || 'N/A'}</span>
+        </div>
+      )
+    },
+    { 
+      key: 'role', 
+      header: 'Role', 
+      sortable: true,
+      render: (v: string) => {
+        const roleConfig = {
+          candidate: { icon: User, color: 'text-blue-600', bg: 'bg-blue-100', label: 'Candidate' },
+          employer: { icon: UserPlus, color: 'text-green-600', bg: 'bg-green-100', label: 'Employer' },
+          admin: { icon: User, color: 'text-purple-600', bg: 'bg-purple-100', label: 'Admin' },
+          verified: { icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-100', label: 'Verified' }
+        };
+        const config = roleConfig[v as keyof typeof roleConfig] || { icon: User, color: 'text-gray-600', bg: 'bg-gray-100', label: v };
+        const Icon = config.icon;
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.color}`}>
+            <Icon className="w-3 h-3 mr-1" />
+            {config.label}
+          </span>
+        );
+      }
+    },
+    { 
+      key: 'status', 
+      header: 'Status', 
+      sortable: true,
+      render: (v: string) => {
+        const statusConfig = {
+          active: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-100', label: 'Active' },
+          pending: { icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-100', label: 'Pending' },
+          inactive: { icon: XCircle, color: 'text-gray-600', bg: 'bg-gray-100', label: 'Inactive' }
+        };
+        const config = statusConfig[v as keyof typeof statusConfig] || { icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-100', label: v };
+        const Icon = config.icon;
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.color}`}>
+            <Icon className="w-3 h-3 mr-1" />
+            {config.label}
+          </span>
+        );
+      }
+    },
+    { 
+      key: 'address', 
+      header: 'Location', 
+      sortable: true,
+      render: (v: string) => (
+        <div className="flex items-center space-x-2">
+          <MapPin className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-600">{v || 'N/A'}</span>
+        </div>
+      )
+    },
+    { 
+      key: 'registrationDate', 
+      header: 'Registered', 
+      render: (v: string) => v ? (
+        <div className="flex items-center space-x-1">
+          <Clock className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-600">{new Date(v).toLocaleDateString()}</span>
+        </div>
+      ) : 'N/A', 
+      sortable: true 
+    },
     {
       key: 'profileImage',
-      header: 'Profile Image',
+      header: 'Profile',
       render: (value: string) => value ? (
-        <button
-          className="text-blue-600 underline hover:text-blue-800"
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<Eye size={14} />}
           onClick={() => setImageModal({ open: true, src: value })}
+          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
         >
           View
-        </button>
+        </Button>
       ) : (
         <span className="text-gray-400">N/A</span>
       )
     },
-    { key: 'expoPushToken', header: 'Expo Push Token', sortable: false },
-    { key: 'role', header: 'Role', sortable: true },
-    {
-      key: 'location',
-      header: 'Location',
-      render: (value: any) => value && (value.latitude || value.longitude) ? (
-        <div>
-          <div>Lat: {value.latitude ?? 'N/A'}</div>
-          <div>Lng: {value.longitude ?? 'N/A'}</div>
-          <div>Addr: {value.address ?? 'N/A'}</div>
-          <div>Updated: {value.updatedAt ? new Date(value.updatedAt).toLocaleString() : 'N/A'}</div>
-        </div>
-      ) : <span className="text-gray-400">N/A</span>
-    },
-    {
-      key: 'createdAt',
-      header: 'Created At',
-      render: (value: string) => value ? new Date(value).toLocaleString() : 'N/A',
-      sortable: true
-    },
-    { key: 'status', header: 'Account Status', sortable: true },
-    { key: 'registrationDate', header: 'Registered On', sortable: true },
-    { key: 'lastActive', header: 'Last Active', render: (value: string) => value ? new Date(value).toLocaleString() : 'N/A', sortable: true },
   ];
   
   const rowActions = (row: UserType) => (
-    <div className="flex space-x-2">
+    <div className="flex items-center space-x-1">
       <Button
         variant="ghost"
         size="sm"
         icon={<Edit size={14} />}
-        onClick={() => openEdit(row)}
+        onClick={e => {
+          e.stopPropagation();
+          openEdit(row);
+        }}
+        className="text-green-600 hover:text-green-700 hover:bg-green-50"
       >
         Edit
       </Button>
@@ -131,7 +244,10 @@ const UserCandidates: React.FC = () => {
         size="sm"
         icon={<Trash size={14} />}
         className="text-red-600 hover:text-red-700 hover:bg-red-50"
-        onClick={() => handleDelete(row)}
+        onClick={e => {
+          e.stopPropagation();
+          handleDelete(row);
+        }}
       >
         Delete
       </Button>
@@ -220,13 +336,24 @@ const UserCandidates: React.FC = () => {
 
   // Filtering logic
   const filteredUsers = users.filter(user => {
+    if (filters.searchTerm) {
+      const searchLower = filters.searchTerm.toLowerCase();
+      const matchesSearch = 
+        user.name?.toLowerCase().includes(searchLower) ||
+        user.username?.toLowerCase().includes(searchLower) ||
+        user.email?.toLowerCase().includes(searchLower) ||
+        user.phone?.includes(filters.searchTerm);
+      if (!matchesSearch) return false;
+    }
     if (filters.role && user.role !== filters.role) return false;
     if (filters.status && user.status !== filters.status) return false;
-    if (filters.registrationDate && user.createdAt) {
-      if (!user.createdAt.startsWith(filters.registrationDate)) return false;
+    if (filters.registrationDate && user.registrationDate) {
+      const userDate = new Date(user.registrationDate).toISOString().split('T')[0];
+      if (userDate !== filters.registrationDate) return false;
     }
-    if (filters.lastActive && user.lastActive) {
-      if (!user.lastActive.startsWith(filters.lastActive)) return false;
+    if (filters.lastActive && user.lastActivity) {
+      const userDate = new Date(user.lastActivity).toISOString().split('T')[0];
+      if (userDate !== filters.lastActive) return false;
     }
     return true;
   });
@@ -273,50 +400,205 @@ const UserCandidates: React.FC = () => {
   };
 
   return (
-    <div>
+    <div className="min-h-screen bg-gray-50">
       <PageHeader
         title="User Management"
-        description="View and manage all users"
+        description="Manage and monitor all users with comprehensive analytics and tools"
         backLink="/users"
         actions={
-          <>
-            <div className="relative inline-block text-left mr-2">
-              <Button
+          <div className="flex items-center space-x-3">
+            <div className="relative">
+              <Button 
                 variant="secondary"
                 size="md"
-                icon={<FileDown size={16} />}
-                onClick={e => {
+                icon={<Download size={16} />}
+                onClick={() => {
                   const menu = document.getElementById('export-menu');
                   if (menu) menu.classList.toggle('hidden');
                 }}
+                className="relative"
               >
                 Export
               </Button>
-              <div id="export-menu" className="hidden absolute z-10 mt-2 w-36 bg-white border border-gray-200 rounded shadow-lg">
-                <button className="block w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { handleExportCSV(); document.getElementById('export-menu')?.classList.add('hidden'); }}>Export to CSV</button>
-                <button className="block w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { handleExportExcel(); document.getElementById('export-menu')?.classList.add('hidden'); }}>Export to Excel</button>
+              <div id="export-menu" className="hidden absolute z-10 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg">
+                <button 
+                  className="flex items-center w-full px-4 py-2 text-sm hover:bg-gray-100" 
+                  onClick={() => { handleExportCSV(); document.getElementById('export-menu')?.classList.add('hidden'); }}
+                >
+                  <FileDown size={14} className="mr-2" />
+                  Export to CSV
+                </button>
+                <button 
+                  className="flex items-center w-full px-4 py-2 text-sm hover:bg-gray-100" 
+                  onClick={() => { handleExportExcel(); document.getElementById('export-menu')?.classList.add('hidden'); }}
+                >
+                  <Upload size={14} className="mr-2" />
+                  Export to Excel
+                </button>
               </div>
             </div>
             <Button
               variant="secondary"
-              size="sm"
-              icon={<Filter size={14} />}
+              size="md"
+              icon={<Filter size={16} />}
               onClick={() => setFilterModal(true)}
             >
-              Advanced Filters
+              Filters
             </Button>
             <Button 
               variant="primary"
               size="md"
-              icon={<UserPlus size={16} />}
+              icon={<Plus size={16} />}
               onClick={openAdd}
+              className="bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700"
             >
               Add User
             </Button>
-          </>
+          </div>
         }
       />
-      
+
+      {/* Statistics Cards */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="mb-8"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Users</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+              </div>
+              <div className="p-3 bg-emerald-100 rounded-lg">
+                <Users className="w-6 h-6 text-emerald-600" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Active</p>
+                <p className="text-2xl font-bold text-green-600">{stats.active}</p>
+              </div>
+              <div className="p-3 bg-green-100 rounded-lg">
+                <CheckCircle className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pending</p>
+                <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+              </div>
+              <div className="p-3 bg-yellow-100 rounded-lg">
+                <Clock className="w-6 h-6 text-yellow-600" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Inactive</p>
+                <p className="text-2xl font-bold text-gray-600">{stats.inactive}</p>
+              </div>
+              <div className="p-3 bg-gray-100 rounded-lg">
+                <XCircle className="w-6 h-6 text-gray-600" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Verified</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.verified}</p>
+              </div>
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <CheckCircle className="w-6 h-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Search and Filters */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+        className="mb-6"
+      >
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 lg:space-x-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search users by name, username, email, or phone..."
+                value={filters.searchTerm}
+                onChange={(e) => setFilters(f => ({ ...f, searchTerm: e.target.value }))}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
+              />
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <span className="font-medium">{filteredUsers.length}</span>
+                <span>users found</span>
+                {(filters.role || filters.status || filters.registrationDate || filters.lastActive) && (
+                  <span className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-medium">
+                    Filtered
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Main Content */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+      >
+        {loading ? (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading users...</p>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12">
+            <div className="text-center">
+              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+              <p className="text-red-600 text-lg font-medium">{error}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <DataTable
+              title=""
+              subtitle=""
+              data={filteredUsers}
+              columns={columns}
+              rowActions={rowActions}
+              searchable={false}
+              filterable={false}
+              pagination={{
+                itemsPerPage: 10,
+                totalItems: filteredUsers.length,
+                currentPage: currentPage,
+                onPageChange: setCurrentPage
+              }}
+            />
+          </div>
+        )}
+      </motion.div>
+
       {/* Advanced Filter Modal */}
       {filterModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
@@ -377,106 +659,82 @@ const UserCandidates: React.FC = () => {
                 />
               </div>
               <Button type="submit" variant="primary" size="md" className="w-full">Apply Filters</Button>
-              <Button type="button" variant="secondary" size="md" className="w-full" onClick={() => setFilters({ role: '', status: '', registrationDate: '', lastActive: '' })}>Clear Filters</Button>
+              <Button type="button" variant="secondary" size="md" className="w-full" onClick={() => setFilters({ role: '', status: '', registrationDate: '', lastActive: '', searchTerm: '' })}>Clear Filters</Button>
             </form>
           </div>
         </div>
       )}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        {loading ? (
-          <div className="text-center py-10 text-gray-500">Loading users...</div>
-        ) : error ? (
-          <div className="text-center py-10 text-red-600">{error}</div>
-        ) : (
-          <DataTable
-            title="All Users"
-            subtitle="Showing all registered users in the system"
-            data={filteredUsers}
-            columns={columns}
-            rowActions={rowActions}
-            searchable={true}
-            filterable={true}
-            pagination={{
-              itemsPerPage: 10,
-              totalItems: filteredUsers.length,
-              currentPage: currentPage,
-              onPageChange: setCurrentPage
-            }}
-          />
-        )}
-        {/* Image Modal */}
-        {imageModal.open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-            <div className="bg-white rounded-lg shadow-lg p-6 relative max-w-full max-h-full flex flex-col items-center">
-              <button
-                className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl"
-                onClick={() => setImageModal({ open: false, src: '' })}
-                aria-label="Close"
-              >
-                &times;
-              </button>
-              <img
-                src={imageModal.src}
-                alt="Profile Preview"
-                className="max-w-[80vw] max-h-[80vh] rounded-lg border"
-              />
-            </div>
+
+      {/* Image Modal */}
+      {imageModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+          <div className="bg-white rounded-lg shadow-lg p-6 relative max-w-full max-h-full flex flex-col items-center">
+            <button
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl"
+              onClick={() => setImageModal({ open: false, src: '' })}
+              aria-label="Close"
+            >
+              &times;
+            </button>
+            <img
+              src={imageModal.src}
+              alt="Profile Preview"
+              className="max-w-[80vw] max-h-[80vh] rounded-lg border"
+            />
           </div>
-        )}
-        {/* Edit Modal */}
-        {editModal.open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-            <div className="bg-white rounded-lg shadow-lg p-6 relative max-w-full max-h-full flex flex-col items-center">
-              <button
-                className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl"
-                onClick={() => setEditModal({ open: false, user: null })}
-                aria-label="Close"
-              >
-                &times;
-              </button>
-              <h2 className="text-lg font-bold mb-4">Edit User</h2>
-              <form className="space-y-4 w-80" onSubmit={e => { e.preventDefault(); handleEditSave(); }}>
-                <input name="username" value={form.username || ''} onChange={handleFormChange} placeholder="Username" className="w-full border rounded p-2" required />
-                <input name="name" value={form.name || ''} onChange={handleFormChange} placeholder="Full Name" className="w-full border rounded p-2" required />
-                <input name="email" value={form.email || ''} onChange={handleFormChange} placeholder="Email" className="w-full border rounded p-2" required />
-                <input name="phone" value={form.phone || ''} onChange={handleFormChange} placeholder="Phone" className="w-full border rounded p-2" />
-                <input name="address" value={form.address || ''} onChange={handleFormChange} placeholder="Address" className="w-full border rounded p-2" />
-                {formError && <div className="text-red-600 text-sm text-center">{formError}</div>}
-                <Button type="submit" variant="primary" size="md" isLoading={formLoading} className="w-full">Save</Button>
-              </form>
-            </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+          <div className="bg-white rounded-lg shadow-lg p-6 relative max-w-full max-h-full flex flex-col items-center">
+            <button
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl"
+              onClick={() => setEditModal({ open: false, user: null })}
+              aria-label="Close"
+            >
+              &times;
+            </button>
+            <h2 className="text-lg font-bold mb-4">Edit User</h2>
+            <form className="space-y-4 w-80" onSubmit={e => { e.preventDefault(); handleEditSave(); }}>
+              <input name="username" value={form.username || ''} onChange={handleFormChange} placeholder="Username" className="w-full border rounded p-2" required />
+              <input name="name" value={form.name || ''} onChange={handleFormChange} placeholder="Full Name" className="w-full border rounded p-2" required />
+              <input name="email" value={form.email || ''} onChange={handleFormChange} placeholder="Email" className="w-full border rounded p-2" required />
+              <input name="phone" value={form.phone || ''} onChange={handleFormChange} placeholder="Phone" className="w-full border rounded p-2" />
+              <input name="address" value={form.address || ''} onChange={handleFormChange} placeholder="Address" className="w-full border rounded p-2" />
+              {formError && <div className="text-red-600 text-sm text-center">{formError}</div>}
+              <Button type="submit" variant="primary" size="md" isLoading={formLoading} className="w-full">Save</Button>
+            </form>
           </div>
-        )}
-        {/* Add Modal */}
-        {addModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-            <div className="bg-white rounded-lg shadow-lg p-6 relative max-w-full max-h-full flex flex-col items-center">
-              <button
-                className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl"
-                onClick={() => setAddModal(false)}
-                aria-label="Close"
-              >
-                &times;
-              </button>
-              <h2 className="text-lg font-bold mb-4">Add User</h2>
-              <form className="space-y-4 w-80" onSubmit={e => { e.preventDefault(); handleAddSave(); }}>
-                <input name="username" value={form.username || ''} onChange={handleFormChange} placeholder="Username" className="w-full border rounded p-2" required />
-                <input name="name" value={form.name || ''} onChange={handleFormChange} placeholder="Full Name" className="w-full border rounded p-2" required />
-                <input name="email" value={form.email || ''} onChange={handleFormChange} placeholder="Email" className="w-full border rounded p-2" required />
-                <input name="password" type="password" value={form.password || ''} onChange={handleFormChange} placeholder="Password" className="w-full border rounded p-2" required />
-                <input name="phone" value={form.phone || ''} onChange={handleFormChange} placeholder="Phone" className="w-full border rounded p-2" />
-                <input name="address" value={form.address || ''} onChange={handleFormChange} placeholder="Address" className="w-full border rounded p-2" />
-                {formError && <div className="text-red-600 text-sm text-center">{formError}</div>}
-                <Button type="submit" variant="primary" size="md" isLoading={formLoading} className="w-full">Add</Button>
-              </form>
-            </div>
+        </div>
+      )}
+
+      {/* Add Modal */}
+      {addModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+          <div className="bg-white rounded-lg shadow-lg p-6 relative max-w-full max-h-full flex flex-col items-center">
+            <button
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl"
+              onClick={() => setAddModal(false)}
+              aria-label="Close"
+            >
+              &times;
+            </button>
+            <h2 className="text-lg font-bold mb-4">Add User</h2>
+            <form className="space-y-4 w-80" onSubmit={e => { e.preventDefault(); handleAddSave(); }}>
+              <input name="username" value={form.username || ''} onChange={handleFormChange} placeholder="Username" className="w-full border rounded p-2" required />
+              <input name="name" value={form.name || ''} onChange={handleFormChange} placeholder="Full Name" className="w-full border rounded p-2" required />
+              <input name="email" value={form.email || ''} onChange={handleFormChange} placeholder="Email" className="w-full border rounded p-2" required />
+              <input name="password" type="password" value={form.password || ''} onChange={handleFormChange} placeholder="Password" className="w-full border rounded p-2" required />
+              <input name="phone" value={form.phone || ''} onChange={handleFormChange} placeholder="Phone" className="w-full border rounded p-2" />
+              <input name="address" value={form.address || ''} onChange={handleFormChange} placeholder="Address" className="w-full border rounded p-2" />
+              {formError && <div className="text-red-600 text-sm text-center">{formError}</div>}
+              <Button type="submit" variant="primary" size="md" isLoading={formLoading} className="w-full">Add</Button>
+            </form>
           </div>
-        )}
-      </motion.div>
+        </div>
+      )}
     </div>
   );
 };

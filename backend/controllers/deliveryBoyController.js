@@ -539,3 +539,44 @@ exports.updateOrderStatus = async (req, res) => {
     });
   }
 }; 
+
+// Log activity for delivery partner
+exports.logActivity = async (deliveryBoyId, action, details = {}) => {
+  try {
+    await DeliveryBoy.findByIdAndUpdate(deliveryBoyId, {
+      $push: {
+        activityLog: {
+          action,
+          timestamp: new Date(),
+          details
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error logging activity:', error);
+  }
+};
+
+// Get delivery partner activity log
+exports.getActivityLog = async (req, res) => {
+  try {
+    const deliveryBoy = await DeliveryBoy.findById(req.params.id)
+      .select('activityLog')
+      .lean();
+
+    if (!deliveryBoy) {
+      return res.status(404).json({ message: 'Delivery partner not found' });
+    }
+
+    const activityLog = deliveryBoy.activityLog || [];
+    const activityWithId = activityLog.map((activity, index) => ({
+      ...activity,
+      id: index,
+      timestamp: activity.timestamp
+    }));
+
+    res.json(activityWithId);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching activity log', error: error.message });
+  }
+}; 

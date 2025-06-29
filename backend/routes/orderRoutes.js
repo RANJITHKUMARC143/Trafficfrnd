@@ -45,7 +45,12 @@ router.get('/admin/:orderId', auth, async (req, res) => {
 // Update order status (admin)
 router.patch('/admin/:orderId/status', auth, async (req, res) => {
   try {
+    console.log('PATCH /admin/:orderId/status called by user:', req.user);
     const { status } = req.body;
+    // Only allow admin or super_admin
+    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'super_admin')) {
+      return res.status(403).json({ message: 'Forbidden: Only admins can update order status' });
+    }
     const order = await Order.findByIdAndUpdate(
       req.params.orderId,
       { status, updatedAt: Date.now() },

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Package, FileDown, Filter, Edit, Trash, User, Building2, Truck, Eye, Share2 } from 'lucide-react';
+import { Package, FileDown, Filter, Edit, Trash, User, Building2, Truck, Eye, Share2, CheckCircle, Clock, XCircle, Search, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import * as XLSX from 'xlsx';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
@@ -72,6 +72,7 @@ const Orders: React.FC = () => {
     vendor: '',
     deliveryBoy: '',
     createdAt: '',
+    searchTerm: '',
   });
   const [detailsModal, setDetailsModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null });
   const [routeDetails, setRouteDetails] = useState<RouteDetails | null>(null);
@@ -107,6 +108,7 @@ const Orders: React.FC = () => {
     if (filters.createdAt && order.timestamp) {
       if (!order.timestamp.startsWith(filters.createdAt)) return false;
     }
+    if (filters.searchTerm && !order.customerName.toLowerCase().includes(filters.searchTerm.toLowerCase())) return false;
     return true;
   });
 
@@ -184,22 +186,58 @@ const Orders: React.FC = () => {
 
   // Save edit (status only)
   const handleEditSave = async () => {
-    if (!form._id) return;
+    if (!form._id) {
+      setFormError('Order ID is missing');
+      return;
+    }
+    
+    if (!form.status) {
+      setFormError('Please select a status');
+      return;
+    }
+    
     setFormLoading(true);
     setFormError('');
+    
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/vendors/orders/admin/${form._id}/status`, {
+      const apiUrl = `${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/vendors/orders/admin/${form._id}/status`;
+      
+      console.log('Updating order status:', {
+        orderId: form._id,
+        newStatus: form.status,
+        apiUrl: apiUrl
+      });
+      
+      const res = await fetch(apiUrl, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': token ? `Bearer ${token}` : '' 
+        },
         body: JSON.stringify({ status: form.status })
       });
-      if (!res.ok) throw new Error('Failed to update order');
+      
+      console.log('Response status:', res.status);
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('API Error:', errorData);
+        throw new Error(errorData.message || `HTTP ${res.status}: Failed to update order status`);
+      }
+      
       const updated = await res.json();
+      console.log('Order updated successfully:', updated);
+      
       setOrders(orders => orders.map(o => o._id === form._id ? { ...o, ...updated } : o));
       setEditModal({ open: false, order: null });
+      
+      // Show success message
+      toast.success(`Order status updated to ${form.status}`);
+      
     } catch (err: any) {
-      setFormError(err.message);
+      console.error('Error updating order status:', err);
+      setFormError(err.message || 'Failed to update order status. Please try again.');
     } finally {
       setFormLoading(false);
     }
@@ -246,24 +284,93 @@ const Orders: React.FC = () => {
     }
   };
 
+  // Modern columns for Orders table
   const columns = [
-    { key: '_id', header: 'Order ID', sortable: true, render: (v: string) => <span className="font-bold text-gray-800">{v}</span> },
-    { key: 'customerName', header: 'Customer', sortable: true },
-    { key: 'vendorId', header: 'Vendor', sortable: true, render: (v: any) => v && v.businessName ? v.businessName : '' },
-    { key: 'deliveryBoyId', header: 'Delivery Partner', sortable: true, render: (v: any) => v && v.fullName ? v.fullName : '' },
-    { key: 'totalAmount', header: 'Total Amount', sortable: true },
-    { key: 'status', header: 'Status', sortable: true },
-    { key: 'timestamp', header: 'Created At', render: (v: string) => v ? new Date(v).toLocaleString() : 'N/A', sortable: true },
-    { key: 'updatedAt', header: 'Updated At', render: (v: string) => v ? new Date(v).toLocaleString() : 'N/A', sortable: true },
+    { key: '_id', header: 'Order ID', sortable: true, render: (v: string) => <span className="font-mono text-xs text-gray-500">{v.slice(-8)}</span> },
+    {
+      key: 'customerName',
+      header: 'Customer',
+      sortable: true,
+      render: (v: string) => (
+        <div className="flex items-center space-x-2">
+          <User className="w-4 h-4 text-blue-500" />
+          <span className="font-semibold text-gray-900">{v}</span>
+        </div>
+      )
+    },
+    {
+      key: 'vendorId',
+      header: 'Vendor',
+      sortable: true,
+      render: (v: any) => (
+        <div className="flex items-center space-x-2">
+          <Building2 className="w-4 h-4 text-emerald-500" />
+          <span className="font-medium">{typeof v === 'object' && v && 'businessName' in v ? v.businessName : '-'}</span>
+        </div>
+      )
+    },
+    {
+      key: 'deliveryBoyId',
+      header: 'Delivery Partner',
+      sortable: true,
+      render: (v: any) => (
+        <div className="flex items-center space-x-2">
+          <Truck className="w-4 h-4 text-purple-500" />
+          <span className="font-medium">{typeof v === 'object' && v && 'fullName' in v ? v.fullName : '-'}</span>
+        </div>
+      )
+    },
+    {
+      key: 'totalAmount',
+      header: 'Amount',
+      sortable: true,
+      render: (v: number) => <span className="font-bold text-green-600">₹{v}</span>
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      sortable: true,
+      render: (v: string) => {
+        const statusConfig = {
+          completed: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-100', label: 'Completed' },
+          pending: { icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-100', label: 'Pending' },
+          cancelled: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-100', label: 'Cancelled' },
+          confirmed: { icon: CheckCircle, color: 'text-blue-600', bg: 'bg-blue-100', label: 'Confirmed' },
+          preparing: { icon: Package, color: 'text-orange-600', bg: 'bg-orange-100', label: 'Preparing' },
+          ready: { icon: Package, color: 'text-purple-600', bg: 'bg-purple-100', label: 'Ready' }
+        };
+        const config = statusConfig[v as keyof typeof statusConfig] || { icon: Clock, color: 'text-gray-600', bg: 'bg-gray-100', label: v };
+        const Icon = config.icon;
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.color}`}>
+            <Icon className="w-3 h-3 mr-1" />
+            {config.label}
+          </span>
+        );
+      }
+    },
+    {
+      key: 'timestamp',
+      header: 'Date',
+      sortable: true,
+      render: (v: string) => v ? (
+        <div className="flex items-center space-x-1">
+          <Clock className="w-4 h-4 text-gray-400" />
+          <span className="text-sm text-gray-600">{new Date(v).toLocaleString()}</span>
+        </div>
+      ) : 'N/A'
+    }
   ];
 
+  // Modern row actions (keep logic unchanged)
   const rowActions = (row: Order) => (
-    <div className="flex space-x-2">
+    <div className="flex items-center space-x-1">
       <Button
         variant="ghost"
         size="sm"
         icon={<Eye size={14} />}
         onClick={() => openDetails(row)}
+        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
       >
         View
       </Button>
@@ -272,6 +379,7 @@ const Orders: React.FC = () => {
         size="sm"
         icon={<Edit size={14} />}
         onClick={() => openEdit(row)}
+        className="text-green-600 hover:text-green-700 hover:bg-green-50"
       >
         Edit
       </Button>
@@ -325,42 +433,137 @@ const Orders: React.FC = () => {
     return [avgLat, avgLng];
   };
 
+  // Calculate statistics
+  const stats = {
+    total: orders.length,
+    completed: orders.filter(o => o.status === 'completed').length,
+    pending: orders.filter(o => o.status === 'pending').length,
+    cancelled: orders.filter(o => o.status === 'cancelled').length,
+    revenue: orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0)
+  };
+
   return (
-    <div>
+    <div className="min-h-screen bg-gray-50">
       <PageHeader
         title="Order Management"
-        description="View and manage all orders in the system"
-        backLink="/dashboard"
+        description="Manage and monitor all orders with analytics and tools"
         actions={
-          <>
-            <div className="relative inline-block text-left mr-2">
-              <Button
-                variant="secondary"
-                size="md"
-                icon={<FileDown size={16} />}
-                onClick={e => {
-                  const menu = document.getElementById('export-menu');
-                  if (menu) menu.classList.toggle('hidden');
-                }}
-              >
-                Export
-              </Button>
-              <div id="export-menu" className="hidden absolute z-10 mt-2 w-36 bg-white border border-gray-200 rounded shadow-lg">
-                <button className="block w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { handleExportCSV(); document.getElementById('export-menu')?.classList.add('hidden'); }}>Export to CSV</button>
-                <button className="block w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => { handleExportExcel(); document.getElementById('export-menu')?.classList.add('hidden'); }}>Export to Excel</button>
-              </div>
-            </div>
+          <div className="flex items-center space-x-3">
             <Button
               variant="secondary"
-              size="sm"
-              icon={<Filter size={14} />}
+              size="md"
+              icon={<FileDown size={16} />}
+              onClick={handleExportCSV}
+            >
+              Export CSV
+            </Button>
+            <Button
+              variant="secondary"
+              size="md"
+              icon={<Filter size={16} />}
               onClick={() => setFilterModal(true)}
             >
-              Advanced Filters
+              Filters
             </Button>
-          </>
+          </div>
         }
       />
+
+      {/* Statistics Cards */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="mb-8"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Orders</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+              </div>
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Package className="w-6 h-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Completed</p>
+                <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
+              </div>
+              <div className="p-3 bg-green-100 rounded-lg">
+                <CheckCircle className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pending</p>
+                <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+              </div>
+              <div className="p-3 bg-yellow-100 rounded-lg">
+                <Clock className="w-6 h-6 text-yellow-600" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Cancelled</p>
+                <p className="text-2xl font-bold text-red-600">{stats.cancelled}</p>
+              </div>
+              <div className="p-3 bg-red-100 rounded-lg">
+                <XCircle className="w-6 h-6 text-red-600" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+                <p className="text-2xl font-bold text-purple-600">₹{stats.revenue.toLocaleString()}</p>
+              </div>
+              <div className="p-3 bg-purple-100 rounded-lg">
+                <Package className="w-6 h-6 text-purple-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Search Bar */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+        className="mb-6"
+      >
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 lg:space-x-4">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                placeholder="Search orders by customer, status, or vendor..."
+                value={filters.searchTerm || ''}
+                onChange={e => setFilters(f => ({ ...f, searchTerm: e.target.value }))}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+              />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <span className="font-medium">{filteredOrders.length}</span>
+                <span>orders found</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Advanced Filter Modal */}
       {filterModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
@@ -420,7 +623,7 @@ const Orders: React.FC = () => {
                 />
               </div>
               <Button type="submit" variant="primary" size="md" className="w-full">Apply Filters</Button>
-              <Button type="button" variant="secondary" size="md" className="w-full" onClick={() => setFilters({ status: '', vendor: '', deliveryBoy: '', createdAt: '' })}>Clear Filters</Button>
+              <Button type="button" variant="secondary" size="md" className="w-full" onClick={() => setFilters({ status: '', vendor: '', deliveryBoy: '', createdAt: '', searchTerm: '' })}>Clear Filters</Button>
             </form>
           </div>
         </div>
@@ -431,49 +634,118 @@ const Orders: React.FC = () => {
         transition={{ duration: 0.4 }}
       >
         {loading ? (
-          <div className="text-center py-10 text-gray-500">Loading orders...</div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading orders...</p>
+            </div>
+          </div>
         ) : error ? (
-          <div className="text-center py-10 text-red-600">{error}</div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12">
+            <div className="text-center">
+              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+              <p className="text-red-600 text-lg font-medium">{error}</p>
+            </div>
+          </div>
         ) : (
-          <DataTable
-            title="All Orders"
-            subtitle="Showing all orders in the system"
-            data={filteredOrders}
-            columns={columns}
-            rowActions={rowActions}
-            searchable={true}
-            filterable={true}
-            pagination={{
-              itemsPerPage: 10,
-              totalItems: filteredOrders.length,
-              currentPage: currentPage,
-              onPageChange: setCurrentPage
-            }}
-          />
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <DataTable
+              title=""
+              subtitle=""
+              data={filteredOrders}
+              columns={columns}
+              rowActions={rowActions}
+              searchable={false}
+              filterable={false}
+              pagination={{
+                itemsPerPage: 10,
+                totalItems: filteredOrders.length,
+                currentPage: currentPage,
+                onPageChange: setCurrentPage
+              }}
+            />
+          </div>
         )}
         {/* Edit Modal */}
         {editModal.open && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-            <div className="bg-white rounded-lg shadow-lg p-6 relative max-w-full max-h-full flex flex-col items-center">
+            <div className="bg-white rounded-xl shadow-lg p-6 relative max-w-md w-full mx-4">
               <button
-                className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl"
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 text-2xl"
                 onClick={() => setEditModal({ open: false, order: null })}
                 aria-label="Close"
               >
                 &times;
               </button>
-              <h2 className="text-lg font-bold mb-4">Edit Order Status</h2>
-              <form className="space-y-4 w-80" onSubmit={e => { e.preventDefault(); handleEditSave(); }}>
-                <select name="status" value={form.status || ''} onChange={handleFormChange} className="w-full border rounded p-2">
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="preparing">Preparing</option>
-                  <option value="ready">Ready</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-                {formError && <div className="text-red-600 text-sm text-center">{formError}</div>}
-                <Button type="submit" variant="primary" size="md" isLoading={formLoading} className="w-full">Save</Button>
+              <h2 className="text-xl font-bold mb-6 text-gray-900">Edit Order Status</h2>
+              <form className="space-y-6" onSubmit={e => { e.preventDefault(); handleEditSave(); }}>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Order ID
+                  </label>
+                  <div className="text-sm text-gray-500 font-mono bg-gray-50 p-2 rounded border">
+                    {form._id}
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Customer
+                  </label>
+                  <div className="text-sm text-gray-900 bg-gray-50 p-2 rounded border">
+                    {form.customerName}
+                  </div>
+                </div>
+                
+                <div>
+                  <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
+                    New Status *
+                  </label>
+                  <select 
+                    id="status"
+                    name="status" 
+                    value={form.status || ''} 
+                    onChange={handleFormChange} 
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    required
+                  >
+                    <option value="">Select a status</option>
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="preparing">Preparing</option>
+                    <option value="ready">Ready</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+                
+                {formError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="text-red-600 text-sm font-medium">Error</div>
+                    <div className="text-red-500 text-sm">{formError}</div>
+                  </div>
+                )}
+                
+                <div className="flex space-x-3">
+                  <Button 
+                    type="button" 
+                    variant="secondary" 
+                    size="md" 
+                    onClick={() => setEditModal({ open: false, order: null })}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    variant="primary" 
+                    size="md" 
+                    isLoading={formLoading} 
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                  >
+                    {formLoading ? 'Updating...' : 'Update Status'}
+                  </Button>
+                </div>
               </form>
             </div>
           </div>
