@@ -28,31 +28,14 @@ export default function OrderConfirmationScreen() {
     setLoadingCheckpoint(true);
     setCheckpointError('');
     try {
-      // Get routeId from params or AsyncStorage
-      let routeIdToUse = routeId;
-      if (!routeIdToUse) {
-        routeIdToUse = await AsyncStorage.getItem('currentRouteId');
-      }
-      if (!routeIdToUse) {
-        setCheckpointError('Route information missing.');
+      // Get selected delivery point from AsyncStorage
+      const dp = await AsyncStorage.getItem('selectedDeliveryPoint');
+      if (!dp) {
+        setCheckpointError('Selected delivery point not found.');
         setLoadingCheckpoint(false);
         return;
       }
-      // Fetch selected checkpoint from backend
-      const token = await AsyncStorage.getItem('token');
-      const res = await fetch(`http://192.168.4.176:3000/api/routes/${routeIdToUse}/selected-checkpoint`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!res.ok) throw new Error('Failed to fetch selected checkpoint');
-      const data = await res.json();
-      if (!data.selectedCheckpoint || !data.selectedCheckpoint.checkpoint || !data.selectedCheckpoint.checkpoint.location) {
-        setCheckpointError('Checkpoint location not found.');
-        setLoadingCheckpoint(false);
-        return;
-      }
-      const checkpoint = data.selectedCheckpoint.checkpoint.location;
+      const selectedDeliveryPoint = JSON.parse(dp);
       // Get current location
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -62,7 +45,7 @@ export default function OrderConfirmationScreen() {
       }
       const currentLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const origin = `${currentLocation.coords.latitude},${currentLocation.coords.longitude}`;
-      const destination = `${checkpoint.latitude},${checkpoint.longitude}`;
+      const destination = `${selectedDeliveryPoint.latitude},${selectedDeliveryPoint.longitude}`;
       const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
       Linking.openURL(url);
       setShowLetsGoModal(false);

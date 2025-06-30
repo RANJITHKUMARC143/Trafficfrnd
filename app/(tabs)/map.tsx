@@ -11,6 +11,8 @@ import MapViewDirections from 'react-native-maps-directions';
 import { StatusBar } from 'react-native';
 import { API_URL } from '../../src/config';
 import { useRouter } from 'expo-router';
+import { fetchDeliveryPoints } from '../services/orderService';
+import { useIsFocused } from '@react-navigation/native';
 
 type RoutePoint = {
   latitude: number;
@@ -97,8 +99,10 @@ export default function MapScreen() {
   const [routeSheetY, setRouteSheetY] = useState(new Animated.Value(0));
   const [isDraggingSheet, setIsDraggingSheet] = useState(false);
   const [showDimOverlay, setShowDimOverlay] = useState(false);
+  const [noDeliveryPointsAlertShown, setNoDeliveryPointsAlertShown] = useState(false);
 
   const router = useRouter();
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     let locationSubscription: Location.LocationSubscription | null = null;
@@ -202,6 +206,13 @@ export default function MapScreen() {
 
     checkInitialAuth();
   }, []);
+
+  useEffect(() => {
+    setNearbyLocations([]); // Clear old points
+    if (selectedRoute && destination && locationCoords) {
+      findNearbyLocations();
+    }
+  }, [selectedRoute, destination, locationCoords]);
 
   const checkAuthStatus = async () => {
     try {
@@ -946,46 +957,7 @@ export default function MapScreen() {
       const payload = JSON.parse(atob(tokenParts[1]));
       console.log('Token payload:', payload);
 
-      // Generate the same delivery points that will be shown to the user
-      const routePoints = route.coordinates;
-      const checkpoints = [];
-      
-      // Generate 3 points along the route at different intervals
-      const intervals = [0.3, 0.5, 0.7]; // Generate points at 30%, 50%, and 70% of the route
-      const types: Array<'traffic' | 'busstop' | 'signal'> = ['traffic', 'busstop', 'signal'];
-      const names = [
-        'Route Checkpoint',
-        'Transit Stop',
-        'Signal Junction'
-      ];
-      
-      intervals.forEach((interval, index) => {
-        const pointIndex = Math.floor(routePoints.length * interval);
-        const point = routePoints[pointIndex];
-        
-        // Calculate actual distance along the route up to this point
-        let distance = 0;
-        for (let i = 1; i <= pointIndex; i++) {
-          const prev = routePoints[i - 1];
-          const curr = routePoints[i];
-          distance += calculateDistance(prev, curr);
-        }
-
-        checkpoints.push({
-          location: {
-            latitude: point.latitude,
-            longitude: point.longitude,
-            address: `${names[index]} ${index + 1}`
-          },
-          type: types[index] === 'traffic' ? 'intersection' : 
-                types[index] === 'busstop' ? 'stop' : 'marker',
-          name: `${names[index]} ${index + 1}`,
-          description: `Route checkpoint ${index + 1}`,
-          distance: distance
-        });
-      });
-
-      // Prepare route data according to backend schema
+      // Prepare route data according to backend schema (no automated checkpoints)
       const routeData = {
         startLocation: {
           latitude: locationCoords?.latitude,
@@ -997,9 +969,9 @@ export default function MapScreen() {
           longitude: destination?.longitude,
           address: destination?.address || 'Selected Destination'
         },
-        checkpoints: checkpoints,
-        distance: parseFloat(route.distance.replace(/[^0-9.]/g, '')), // Convert "3.2 km" to 3.2
-        duration: parseInt(route.duration.replace(/\D/g, '')) // Convert "25 mins" to 25
+        checkpoints: [], // Required by backend, even if empty
+        distance: parseFloat(route.distance.replace(/[^0-9.]/g, '')),
+        duration: parseInt(route.duration.replace(/\D/g, ''))
       };
 
       console.log('Saving route with data:', JSON.stringify(routeData, null, 2));
@@ -1028,12 +1000,11 @@ export default function MapScreen() {
         throw new Error('Invalid route response: missing route ID');
       }
 
-      // Store the route ID and checkpoint IDs from the response
+      // Store the route ID from the response
       await AsyncStorage.setItem('currentRouteId', routeResponseData.route._id);
-      await AsyncStorage.setItem('routeCheckpoints', JSON.stringify(routeResponseData.route.checkpoints));
       console.log('Route saved successfully with ID:', routeResponseData.route._id);
 
-      // Save journey data
+      // Save journey data (no checkpoints)
       const journeyData = {
         currentLocation: {
           latitude: locationCoords?.latitude,
@@ -1044,14 +1015,11 @@ export default function MapScreen() {
           latitude: destination?.latitude,
           longitude: destination?.longitude,
           address: destination?.address || 'Selected Destination'
-        },
-        checkpoints: checkpoints.map(cp => ({
-          latitude: cp.location.latitude,
-          longitude: cp.location.longitude,
-          address: cp.name
-        })),
-        selectedCheckpoint: 0 // Default to first checkpoint
+        }
       };
+      // Explicitly remove any stray fields
+      delete journeyData.checkpoints;
+      delete journeyData.selectedCheckpoint;
 
       console.log('Sending journey data:', journeyData);
       console.log('Using user ID:', payload.userId || payload.id);
@@ -1088,7 +1056,7 @@ export default function MapScreen() {
           longitude: destination?.longitude,
           address: destination?.address || 'Selected Destination'
         },
-        selectedCheckpoints: checkpoints.map(cp => cp._id)
+        selectedCheckpoints: []
       };
 
       const sessionResponse = await fetch(`${API_URL}/api/users/route-session/${payload.userId || payload.id}`, {
@@ -1169,6 +1137,25 @@ export default function MapScreen() {
     setShowLocationSelection(false);
     setSelectedDeliveryPoint(selectedLocation);
 
+    // Normalize and save selected delivery point to AsyncStorage
+    const normalizedDeliveryPoint = {
+      id: selectedLocation.id,
+      name: selectedLocation.name,
+      address: selectedLocation.name, // or selectedLocation.address if available
+      latitude: selectedLocation.location.latitude,
+      longitude: selectedLocation.location.longitude,
+      type: selectedLocation.type,
+    };
+    try {
+      await AsyncStorage.setItem('selectedDeliveryPoint', JSON.stringify(normalizedDeliveryPoint));
+      console.log('Selected delivery point saved:', normalizedDeliveryPoint);
+    } catch (error) {
+      console.error('Error saving selected delivery point:', error);
+    }
+
+    // Navigate to explore page after selecting delivery point
+    router.push('/explore');
+
     // Create a new destination object
     const newDestination = {
       latitude: selectedLocation.location.latitude,
@@ -1188,199 +1175,116 @@ export default function MapScreen() {
 
     // Animate map to show the route and selected point
     if (mapRef.current && locationCoords && newDestination) {
-      const points = [
-        { latitude: locationCoords.latitude, longitude: locationCoords.longitude },
-        selectedLocation.location,
-        { latitude: newDestination.latitude, longitude: newDestination.longitude }
-      ];
-      
-      const bounds = {
-        northEast: {
-          latitude: Math.max(...points.map(p => p.latitude)),
-          longitude: Math.max(...points.map(p => p.longitude)),
-        },
-        southWest: {
-          latitude: Math.min(...points.map(p => p.latitude)),
-          longitude: Math.min(...points.map(p => p.longitude)),
-        },
-      };
-
-      const padding = { top: 100, right: 50, bottom: 100, left: 50 };
-      mapRef.current.fitToCoordinates(
-        [
-          { latitude: bounds.northEast.latitude, longitude: bounds.northEast.longitude },
-          { latitude: bounds.southWest.latitude, longitude: bounds.southWest.longitude },
-        ],
-        { edgePadding: padding, animated: true }
-      );
+      mapRef.current.animateToRegion({
+        latitude: newDestination.latitude,
+        longitude: newDestination.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 1000);
     }
-
-    try {
-      // Get both token and route ID
-      const [token, routeId, checkpointsStr] = await Promise.all([
-        AsyncStorage.getItem('token'),
-        AsyncStorage.getItem('currentRouteId'),
-        AsyncStorage.getItem('routeCheckpoints')
-      ]);
-      
-      if (!token) {
-        console.log('No auth token available, skipping checkpoint save');
-        return;
-      }
-      
-      if (!routeId) {
-        console.log('No route ID available, skipping checkpoint save');
-        return;
-      }
-
-      if (!checkpointsStr) {
-        console.log('No checkpoints available, skipping checkpoint save');
-        return;
-      }
-
-      const checkpoints = JSON.parse(checkpointsStr);
-      
-      // Find the nearest checkpoint to the selected location
-      const nearestCheckpoint = findNearestCheckpoint(selectedLocation.location, checkpoints);
-      
-      if (!nearestCheckpoint) {
-        console.log('No nearby checkpoint found within 100 meters');
-        return;
-      }
-
-      console.log('Found nearest checkpoint:', nearestCheckpoint.name, 'at distance:', 
-        calculateDistance(selectedLocation.location, {
-          latitude: nearestCheckpoint.location.latitude,
-          longitude: nearestCheckpoint.location.longitude
-        }).toFixed(2), 'km');
-
-      // Prepare checkpoint data according to backend schema
-      const checkpointData = {
-        checkpointId: nearestCheckpoint._id,
-        location: {
-          latitude: selectedLocation.location.latitude,
-          longitude: selectedLocation.location.longitude,
-          address: nearestCheckpoint.name // Use the checkpoint's name from the route
-        },
-        type: nearestCheckpoint.type, // Use the checkpoint's type from the route
-        name: nearestCheckpoint.name,
-        distance: calculateDistance(selectedLocation.location, {
-          latitude: nearestCheckpoint.location.latitude,
-          longitude: nearestCheckpoint.location.longitude
-        })
-      };
-
-      console.log('Saving checkpoint with data:', JSON.stringify(checkpointData, null, 2));
-
-      // Save the selected checkpoint
-      const response = await fetch(`${API_URL}/api/routes/${routeId}/checkpoint`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(checkpointData)
-      });
-
-      const responseData = await response.json();
-      console.log('Checkpoint save response:', JSON.stringify(responseData, null, 2));
-
-      if (!response.ok) {
-        throw new Error(responseData.message || responseData.error || 'Failed to save checkpoint');
-      }
-
-      console.log('Checkpoint saved successfully:', responseData);
-
-    } catch (error) {
-      console.error('Error in checkpoint save:', error);
-      if (error instanceof Error) {
-        console.error('Error details:', error.message);
-      }
-    }
-
-    // Navigate to explore screen with location information
-    router.push({
-      pathname: '/(tabs)/explore',
-      params: {
-        locationId: selectedLocation.id,
-        locationType: selectedLocation.type,
-        locationName: selectedLocation.name
-      }
-    });
-  };
-
-  const handleOrderNow = async () => {
-    if (!isAuthenticated) {
-      Alert.alert(
-        'Authentication Required',
-        'Please log in to place orders.',
-        [
-          {
-            text: 'Go to Login',
-            onPress: () => router.push('/(tabs)/profile')
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          }
-        ]
-      );
-      return;
-    }
-
-    if (!locationCoords || !destination || !selectedRoute) {
-      Alert.alert('Route Selection Required', 'Please select a route before proceeding.');
-      return;
-    }
-
-    // Find delivery points along the selected route
-    await findNearbyLocations();
-    setShowLocationSelection(true);
   };
 
   const findNearbyLocations = async () => {
     if (!locationCoords || !selectedRoute || !selectedRoute.coordinates) return;
 
+    // Fetch admin-defined delivery points from backend
+    let adminDeliveryPoints = [];
+    try {
+      adminDeliveryPoints = await fetchDeliveryPoints();
+    } catch (err) {
+      setNearbyLocations([]);
+      setShowLocationSelection(true);
+      Alert.alert('Error', 'Failed to fetch delivery points from server.');
+        return;
+      }
+      
     // Get points along the route
     const routePoints = selectedRoute.coordinates;
-    const deliveryPoints: TrafficLocation[] = [];
-    
-    // Generate 3 points along the route at different intervals
-    const intervals = [0.3, 0.5, 0.7]; // Generate points at 30%, 50%, and 70% of the route
-    const types: Array<TrafficLocation['type']> = ['traffic', 'busstop', 'signal'];
-    const names = [
-      'Route Checkpoint',
-      'Transit Stop',
-      'Signal Junction'
-    ];
 
-    intervals.forEach((interval, index) => {
-      const pointIndex = Math.floor(routePoints.length * interval);
-      const point = routePoints[pointIndex];
-      
-      // Calculate actual distance along the route up to this point
-      let distance = 0;
-      for (let i = 1; i <= pointIndex; i++) {
-        const prev = routePoints[i - 1];
-        const curr = routePoints[i];
-        distance += calculateDistance(prev, curr);
+    // Helper to interpolate points between two coordinates
+    function interpolatePoints(start: { latitude: number; longitude: number }, end: { latitude: number; longitude: number }, maxDistanceMeters = 50) {
+      const points = [start];
+      const distance = calculateDistance(start, end) * 1000; // in meters
+      if (distance <= maxDistanceMeters) {
+        points.push(end);
+        return points;
       }
+      const numPoints = Math.ceil(distance / maxDistanceMeters);
+      for (let i = 1; i < numPoints; i++) {
+        const lat = start.latitude + (end.latitude - start.latitude) * (i / numPoints);
+        const lng = start.longitude + (end.longitude - start.longitude) * (i / numPoints);
+        points.push({ latitude: lat, longitude: lng });
+      }
+      points.push(end);
+      return points;
+    }
 
-      deliveryPoints.push({
-        id: `point_${index + 1}`, // Keep this format to match with checkpoint IDs
-        name: `${names[index]} ${index + 1}`,
-        type: types[index],
+    // Helper to densify a route polyline
+    function densifyRoute(route: { latitude: number; longitude: number }[], maxDistanceMeters = 50) {
+      if (!route || route.length < 2) return route;
+      const densified: { latitude: number; longitude: number }[] = [];
+      for (let i = 0; i < route.length - 1; i++) {
+        const segment = interpolatePoints(route[i], route[i + 1], maxDistanceMeters);
+        if (i === 0) {
+          densified.push(...segment);
+        } else {
+          densified.push(...segment.slice(1)); // avoid duplicate point
+        }
+      }
+      return densified;
+    }
+
+    // Densify the route for accurate proximity checks
+    const densifiedRoute = densifyRoute(routePoints, 50); // 50 meters between points
+
+    // Find unique delivery points within 100m of the densified route
+    const uniquePointsMap = new Map();
+    adminDeliveryPoints.forEach((point: any) => {
+      const isNearRoute = densifiedRoute.some((routePoint: any, idx: number) => {
+        if (idx === 0) return false;
+        const prev = densifiedRoute[idx - 1];
+        const dist = pointToLineDistance(
+          { latitude: point.latitude, longitude: point.longitude },
+          prev,
+          routePoint
+        );
+        return dist <= 0.0009;
+      });
+      if (isNearRoute && !uniquePointsMap.has(point._id)) {
+        uniquePointsMap.set(point._id, point);
+      }
+    });
+    const pointsWithin100m = Array.from(uniquePointsMap.values());
+
+    if (pointsWithin100m.length === 0) {
+      setNearbyLocations([]);
+      setShowLocationSelection(true);
+      if (!noDeliveryPointsAlertShown && isFocused) {
+        Alert.alert(
+          'No delivery points available',
+          'No delivery points are available within 100 meters of your route. Please change your route to continue.',
+          [
+            { text: 'OK', onPress: () => setNoDeliveryPointsAlertShown(true) }
+          ]
+        );
+      }
+      return;
+    }
+
+    // Map to TrafficLocation type for display, with correct distance from current location
+    let deliveryPoints: TrafficLocation[] = pointsWithin100m.map((point: any, idx: number) => ({
+      id: point._id,
+      name: point.name,
+      type: 'signal', // or use point.type if available
         location: {
           latitude: point.latitude,
           longitude: point.longitude
         },
-        distance: distance
-      });
-    });
+      distance: locationCoords ? calculateDistance(locationCoords, { latitude: point.latitude, longitude: point.longitude }) : 0
+    }));
 
-    // Sort by distance from start of route
-    deliveryPoints.sort((a, b) => a.distance - b.distance);
+    // Sort by distance (ascending)
+    deliveryPoints = deliveryPoints.sort((a, b) => a.distance - b.distance);
     
     setNearbyLocations(deliveryPoints);
     setShowLocationSelection(true);
@@ -1462,15 +1366,6 @@ export default function MapScreen() {
       );
     }
   };
-
-  const orderButton = (
-    <TouchableOpacity
-      style={[styles.orderButton, { backgroundColor: '#4CAF50' }]}
-      onPress={handleOrderNow}
-    >
-      <ThemedText style={styles.orderButtonText}>Order Now</ThemedText>
-    </TouchableOpacity>
-  );
 
   const renderTrafficPointsModal = () => {
     if (!showTrafficPointsModal) return null;
@@ -1715,6 +1610,11 @@ export default function MapScreen() {
     );
   };
 
+  // Reset the alert flag when route or destination changes
+  useEffect(() => {
+    setNoDeliveryPointsAlertShown(false);
+  }, [selectedRoute, destination]);
+
   return (
     <ThemedView style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -1842,7 +1742,6 @@ export default function MapScreen() {
 
       {showRouteOptions && renderRouteOptions()}
       {showLocationSelection && renderLocationSelection()}
-      {showOrderButton && orderButton}
       {renderTrafficPointsModal()}
     </ThemedView>
   );

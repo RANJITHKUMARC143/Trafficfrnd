@@ -74,7 +74,7 @@ router.post('/register', async (req, res) => {
         vendorId: vendor._id,
         role: vendor.role
       },
-      process.env.JWT_SECRET || 'your_jwt_secret_key_here', // Fallback for development
+      process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
@@ -127,7 +127,7 @@ router.post('/login', async (req, res) => {
         vendorId: vendor._id,
         role: vendor.role
       },
-      process.env.JWT_SECRET || 'your_jwt_secret_key_here', // Fallback for development
+      process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 

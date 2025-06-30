@@ -16,7 +16,7 @@ const auth = async (req, res, next) => {
     }
 
     console.log('Auth middleware - Verifying token');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_key_here');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('Auth middleware - Token decoded:', decoded);
 
     let user = null;

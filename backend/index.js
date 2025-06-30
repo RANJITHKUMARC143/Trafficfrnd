@@ -899,6 +899,8 @@ app.get('/api/test', (req, res) => {
   res.json({ message: 'API is working!' });
 });
 
+app.use('/api/delivery-points', require('./routes/deliveryPointRoutes'));
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT} and listening on all interfaces`);

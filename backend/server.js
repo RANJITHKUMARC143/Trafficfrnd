@@ -24,8 +24,8 @@ dotenv.config();
 
 // Set default JWT secret if not in environment
 if (!process.env.JWT_SECRET) {
-  process.env.JWT_SECRET = 'your_jwt_secret_key_here';
-  console.log('Using default JWT secret. For production, set JWT_SECRET in .env file');
+  console.error('JWT_SECRET is not set in environment. Please set it in your .env file.');
+  process.exit(1);
 }
 
 // Initialize express app
@@ -101,6 +101,9 @@ app.use('/api/users/journey', journeyRoutes);
 app.use('/api/users/route-session', routeSessionRoutes);
 app.use('/api/users', userAuthRoutes);
 app.use('/api/orders', userOrderRoutes);
+
+// Add delivery points route for admin console
+app.use('/api/delivery-points', require('./routes/deliveryPointRoutes'));
 
 // Test route
 app.get('/api/test', (req, res) => {

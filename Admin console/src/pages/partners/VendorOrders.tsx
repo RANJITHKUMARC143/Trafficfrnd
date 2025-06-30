@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Search, Filter, Eye, Clock, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Search, Filter, Eye, Clock, TrendingUp, Share2 } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { toast } from 'react-toastify';
 
 interface Order {
   _id: string;
@@ -93,6 +94,12 @@ interface Order {
       timestamp: string;
     };
   };
+  selectedDeliveryPoint?: {
+    name: string;
+    address: string;
+    latitude: number;
+    longitude: number;
+  };
 }
 
 interface Vendor {
@@ -140,6 +147,12 @@ const checkpointIcon = new L.Icon({
   shadowSize: [41, 41],
   className: 'checkpoint-marker',
 });
+
+const copyLocationLink = (lat: number, lng: number, label?: string) => {
+  const url = `https://www.google.com/maps?q=${lat},${lng}`;
+  navigator.clipboard.writeText(url);
+  toast.success(`${label || 'Location'} link copied to clipboard!`);
+};
 
 const VendorOrders: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -565,29 +578,6 @@ const VendorOrders: React.FC = () => {
                       </div>
                     </div>
                   )}
-
-                  {/* Checkpoints */}
-                  {selectedOrder.routeId && selectedOrder.routeId.checkpoints && selectedOrder.routeId.checkpoints.length > 0 && (
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <h3 className="text-lg font-semibold mb-3">Checkpoints ({selectedOrder.routeId.checkpoints.length})</h3>
-                      <div className="space-y-2 max-h-40 overflow-y-auto">
-                        {selectedOrder.routeId.checkpoints.map((checkpoint, index) => (
-                          <div key={checkpoint._id} className="bg-white rounded p-2 border">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="font-medium">{checkpoint.name}</div>
-                                <div className="text-sm text-gray-600">{checkpoint.type}</div>
-                                <div className="text-xs text-gray-500">{checkpoint.location.address}</div>
-                              </div>
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                                #{index + 1}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Order Items and Location Data */}
@@ -694,71 +684,47 @@ const VendorOrders: React.FC = () => {
                       </div>
                     </div>
                   )}
+
+                  {/* Selected Delivery Point */}
+                  {selectedOrder.selectedDeliveryPoint && (
+                    <div className="mt-4">
+                      <h3 className="font-bold text-base text-gray-800 mb-1">Selected Delivery Point (User Chosen)</h3>
+                      <div className="flex flex-col space-y-1">
+                        <span className="font-semibold text-blue-700">{selectedOrder.selectedDeliveryPoint.name}</span>
+                        <span className="text-xs text-gray-500">{selectedOrder.selectedDeliveryPoint.address}</span>
+                        <span className="text-xs text-gray-500">[lat: {selectedOrder.selectedDeliveryPoint.latitude}, lng: {selectedOrder.selectedDeliveryPoint.longitude}]
+                          {selectedOrder.selectedDeliveryPoint.latitude && selectedOrder.selectedDeliveryPoint.longitude && (
+                            <button
+                              className="ml-2 text-blue-700 hover:text-blue-900 text-xs inline-flex items-center"
+                              onClick={() => copyLocationLink(selectedOrder.selectedDeliveryPoint.latitude, selectedOrder.selectedDeliveryPoint.longitude, 'Selected Delivery Point')}
+                            >
+                              <Share2 size={14} className="mr-1" /> Share
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {(selectedOrder.locations?.user?.latitude && selectedOrder.locations?.user?.longitude) ||
-                (selectedOrder.locations?.vendor?.latitude && selectedOrder.locations?.vendor?.longitude) ||
-                (selectedOrder.locations?.deliveryBoy?.latitude && selectedOrder.locations?.deliveryBoy?.longitude) ||
-                (selectedOrder.routeId && selectedOrder.routeId.checkpoints && selectedOrder.routeId.checkpoints.length > 0) ? (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold mb-2">Order Map Reference</h3>
-                  <MapContainer
-                    center={[
-                      selectedOrder.locations?.user?.latitude ||
-                      selectedOrder.locations?.vendor?.latitude ||
-                      selectedOrder.locations?.deliveryBoy?.latitude ||
-                      (selectedOrder.routeId?.checkpoints?.[0]?.location?.latitude ?? 0),
-                      selectedOrder.locations?.user?.longitude ||
-                      selectedOrder.locations?.vendor?.longitude ||
-                      selectedOrder.locations?.deliveryBoy?.longitude ||
-                      (selectedOrder.routeId?.checkpoints?.[0]?.location?.longitude ?? 0)
-                    ]}
-                    zoom={13}
-                    style={{ height: 350, width: '100%' }}
-                    scrollWheelZoom={false}
-                  >
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    {/* User Marker */}
-                    {selectedOrder.locations?.user?.latitude && selectedOrder.locations?.user?.longitude && (
-                      <Marker position={[selectedOrder.locations.user.latitude, selectedOrder.locations.user.longitude]} icon={userIcon}>
-                        <Popup>User Location</Popup>
-                      </Marker>
-                    )}
-                    {/* Vendor Marker */}
-                    {selectedOrder.locations?.vendor?.latitude && selectedOrder.locations?.vendor?.longitude && (
-                      <Marker position={[selectedOrder.locations.vendor.latitude, selectedOrder.locations.vendor.longitude]} icon={vendorIcon}>
-                        <Popup>Vendor Location</Popup>
-                      </Marker>
-                    )}
-                    {/* Delivery Boy Marker */}
-                    {selectedOrder.locations?.deliveryBoy?.latitude && selectedOrder.locations?.deliveryBoy?.longitude && (
-                      <Marker position={[selectedOrder.locations.deliveryBoy.latitude, selectedOrder.locations.deliveryBoy.longitude]} icon={deliveryIcon}>
-                        <Popup>Delivery Boy Location</Popup>
-                      </Marker>
-                    )}
-                    {/* Checkpoints */}
-                    {selectedOrder.routeId && selectedOrder.routeId.checkpoints && selectedOrder.routeId.checkpoints.map((checkpoint, idx) => (
-                      <Marker
-                        key={checkpoint._id}
-                        position={[checkpoint.location.latitude, checkpoint.location.longitude]}
-                        icon={checkpointIcon}
+              {/* Destination */}
+              <div className="mt-4">
+                <h3 className="font-bold text-base text-gray-800 mb-1">Destination (User Entered)</h3>
+                <div className="flex flex-col space-y-1">
+                  <span className="font-semibold text-green-700">{selectedOrder.routeId?.destination?.address || '-'}</span>
+                  <span className="text-xs text-gray-500">[lat: {selectedOrder.routeId?.destination?.latitude}, lng: {selectedOrder.routeId?.destination?.longitude}]
+                    {selectedOrder.routeId?.destination?.latitude && selectedOrder.routeId?.destination?.longitude && (
+                      <button
+                        className="ml-2 text-green-700 hover:text-green-900 text-xs inline-flex items-center"
+                        onClick={() => copyLocationLink(selectedOrder.routeId.destination.latitude, selectedOrder.routeId.destination.longitude, 'Destination')}
                       >
-                        <Popup>
-                          <div>
-                            <div className="font-bold">Checkpoint #{idx + 1}</div>
-                            <div>{checkpoint.name}</div>
-                            <div className="text-xs text-gray-500">{checkpoint.location.address}</div>
-                          </div>
-                        </Popup>
-                      </Marker>
-                    ))}
-                  </MapContainer>
+                        <Share2 size={14} className="mr-1" /> Share
+                      </button>
+                    )}
+                  </span>
                 </div>
-              ) : null}
+              </div>
             </div>
           </div>
         </div>

@@ -52,11 +52,6 @@ interface RouteDetails {
   checkpoints?: { _id: string; name: string; type: string; location: { latitude: number; longitude: number; address: string }; description?: string }[];
 }
 
-interface SelectedCheckpoint {
-  checkpoint: string;
-  status: string;
-}
-
 const Orders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +71,6 @@ const Orders: React.FC = () => {
   });
   const [detailsModal, setDetailsModal] = useState<{ open: boolean; order: Order | null }>({ open: false, order: null });
   const [routeDetails, setRouteDetails] = useState<RouteDetails | null>(null);
-  const [selectedCheckpoints, setSelectedCheckpoints] = useState<SelectedCheckpoint[]>([]);
   const [routeLoading, setRouteLoading] = useState(false);
 
   useEffect(() => {
@@ -243,42 +237,9 @@ const Orders: React.FC = () => {
     }
   };
 
-  const fetchRouteDetails = useCallback(async (order: Order) => {
-    if (!order.routeId || typeof order.routeId === 'string') return;
-    setRouteLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      // Fetch route details
-      const routeRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/routes/${order.routeId._id}`, {
-        headers: { 'Authorization': token ? `Bearer ${token}` : '' }
-      });
-      const routeData = await routeRes.json();
-      setRouteDetails({
-        destination: routeData.destination,
-        checkpoints: routeData.checkpoints
-      });
-      // Fetch selected checkpoints for this route and user (if deliveryBoyId exists)
-      if (order.deliveryBoyId && typeof order.deliveryBoyId === 'object') {
-        const scRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/checkpoints/selected?route=${order.routeId._id}&user=${order.deliveryBoyId._id}`, {
-          headers: { 'Authorization': token ? `Bearer ${token}` : '' }
-        });
-        const scData = await scRes.json();
-        setSelectedCheckpoints(scData);
-      } else {
-        setSelectedCheckpoints([]);
-      }
-    } catch (err) {
-      setRouteDetails(null);
-      setSelectedCheckpoints([]);
-    } finally {
-      setRouteLoading(false);
-    }
-  }, []);
-
   const openDetails = (order: Order) => {
     setDetailsModal({ open: true, order });
     setRouteDetails(null);
-    setSelectedCheckpoints([]);
     if (order.routeId && typeof order.routeId === 'object') {
       fetchRouteDetails(order);
     }
@@ -790,325 +751,75 @@ const Orders: React.FC = () => {
                   </ul>
                 </div>
                 
-                {/* Location Details Section */}
-                {detailsModal.order.locations && (
-                  <div className="mt-4 border-t pt-4">
-                    <h3 className="font-bold text-base text-gray-800 mb-3">Location Details (at time of order)</h3>
-                    
-                    {/* User Location */}
-                    {detailsModal.order.locations.user && (
-                      <div className="mb-3 p-3 bg-blue-50 rounded-lg">
-                        <h4 className="font-semibold text-blue-800 mb-2 flex items-center">
-                          <User size={16} className="mr-2" />
-                          Customer Location
-                        </h4>
-                        <div className="text-sm space-y-1">
-                          <div><span className="font-medium">Address:</span> {detailsModal.order.locations.user.address || 'Not available'}</div>
-                          <div><span className="font-medium">Coordinates:</span> 
-                            {detailsModal.order.locations.user.latitude && detailsModal.order.locations.user.longitude ? (
-                              <span className="font-mono">
-                                {detailsModal.order.locations.user.latitude.toFixed(6)}, {detailsModal.order.locations.user.longitude.toFixed(6)}
-                                <button
-                                  className="ml-2 text-blue-600 hover:text-blue-800 text-xs"
-                                  onClick={() => copyLocationLink(detailsModal.order.locations.user.latitude, detailsModal.order.locations.user.longitude, 'Customer Location')}
-                                >
-                                  <Share2 size={12} className="inline mr-1" /> Share
-                                </button>
-                              </span>
-                            ) : (
-                              'Not available'
-                            )}
-                          </div>
-                          <div><span className="font-medium">Timestamp:</span> {detailsModal.order.locations.user.timestamp ? new Date(detailsModal.order.locations.user.timestamp).toLocaleString() : 'Not available'}</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Vendor Location */}
-                    {detailsModal.order.locations.vendor && (
-                      <div className="mb-3 p-3 bg-green-50 rounded-lg">
-                        <h4 className="font-semibold text-green-800 mb-2 flex items-center">
-                          <Building2 size={16} className="mr-2" />
-                          Vendor Location
-                        </h4>
-                        <div className="text-sm space-y-1">
-                          <div><span className="font-medium">Address:</span> {detailsModal.order.locations.vendor.address || 'Not available'}</div>
-                          <div><span className="font-medium">Coordinates:</span> 
-                            {detailsModal.order.locations.vendor.latitude && detailsModal.order.locations.vendor.longitude ? (
-                              <span className="font-mono">
-                                {detailsModal.order.locations.vendor.latitude.toFixed(6)}, {detailsModal.order.locations.vendor.longitude.toFixed(6)}
-                                <button
-                                  className="ml-2 text-green-600 hover:text-green-800 text-xs"
-                                  onClick={() => copyLocationLink(detailsModal.order.locations.vendor.latitude, detailsModal.order.locations.vendor.longitude, 'Vendor Location')}
-                                >
-                                  <Share2 size={12} className="inline mr-1" /> Share
-                                </button>
-                              </span>
-                            ) : (
-                              'Not available'
-                            )}
-                          </div>
-                          <div><span className="font-medium">Timestamp:</span> {detailsModal.order.locations.vendor.timestamp ? new Date(detailsModal.order.locations.vendor.timestamp).toLocaleString() : 'Not available'}</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Delivery Boy Location */}
-                    {detailsModal.order.locations.deliveryBoy && (
-                      <div className="mb-3 p-3 bg-yellow-50 rounded-lg">
-                        <h4 className="font-semibold text-yellow-800 mb-2 flex items-center">
-                          <Truck size={16} className="mr-2" />
-                          Delivery Partner Location
-                        </h4>
-                        <div className="text-sm space-y-1">
-                          <div><span className="font-medium">Address:</span> {detailsModal.order.locations.deliveryBoy.address || 'Not available'}</div>
-                          <div><span className="font-medium">Coordinates:</span> 
-                            {detailsModal.order.locations.deliveryBoy.latitude && detailsModal.order.locations.deliveryBoy.longitude ? (
-                              <span className="font-mono">
-                                {detailsModal.order.locations.deliveryBoy.latitude.toFixed(6)}, {detailsModal.order.locations.deliveryBoy.longitude.toFixed(6)}
-                                <button
-                                  className="ml-2 text-yellow-600 hover:text-yellow-800 text-xs"
-                                  onClick={() => copyLocationLink(detailsModal.order.locations.deliveryBoy.latitude, detailsModal.order.locations.deliveryBoy.longitude, 'Delivery Partner Location')}
-                                >
-                                  <Share2 size={12} className="inline mr-1" /> Share
-                                </button>
-                              </span>
-                            ) : (
-                              'Not available'
-                            )}
-                          </div>
-                          <div><span className="font-medium">Timestamp:</span> {detailsModal.order.locations.deliveryBoy.timestamp ? new Date(detailsModal.order.locations.deliveryBoy.timestamp).toLocaleString() : 'Not available'}</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Combined Location Map */}
-                    {(detailsModal.order.locations.user || detailsModal.order.locations.vendor || detailsModal.order.locations.deliveryBoy) && (
-                      <div className="mt-4">
-                        <h4 className="font-bold text-base text-gray-800 mb-2">Location Map</h4>
-                        <div style={{ height: '250px', width: '100%' }}>
-                          <MapContainer
-                            center={getMapCenter()}
-                            zoom={12}
-                            scrollWheelZoom={false}
-                            style={{ height: '100%', width: '100%', borderRadius: '8px' }}
-                          >
-                            <TileLayer
-                              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                            />
-                            
-                            {/* User Location Marker */}
-                            {detailsModal.order.locations.user && detailsModal.order.locations.user.latitude && detailsModal.order.locations.user.longitude && (
-                              <Marker
-                                position={[detailsModal.order.locations.user.latitude, detailsModal.order.locations.user.longitude]}
-                                icon={L.icon({
-                                  iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', // blue marker
-                                  iconSize: [25, 41],
-                                  iconAnchor: [12, 41],
-                                  popupAnchor: [1, -34],
-                                  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                                  shadowSize: [41, 41]
-                                })}
-                              >
-                                <Popup>
-                                  <div>
-                                    <div className="font-semibold text-blue-700">Customer Location</div>
-                                    <div>{detailsModal.order.locations.user.address || 'No address'}</div>
-                                    <div className="text-xs text-gray-500">
-                                      {detailsModal.order.locations.user.latitude.toFixed(6)}, {detailsModal.order.locations.user.longitude.toFixed(6)}
-                                    </div>
-                                  </div>
-                                </Popup>
-                              </Marker>
-                            )}
-
-                            {/* Vendor Location Marker */}
-                            {detailsModal.order.locations.vendor && detailsModal.order.locations.vendor.latitude && detailsModal.order.locations.vendor.longitude && (
-                              <Marker
-                                position={[detailsModal.order.locations.vendor.latitude, detailsModal.order.locations.vendor.longitude]}
-                                icon={L.icon({
-                                  iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', // green marker
-                                  iconSize: [25, 41],
-                                  iconAnchor: [12, 41],
-                                  popupAnchor: [1, -34],
-                                  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                                  shadowSize: [41, 41]
-                                })}
-                              >
-                                <Popup>
-                                  <div>
-                                    <div className="font-semibold text-green-700">Vendor Location</div>
-                                    <div>{detailsModal.order.locations.vendor.address || 'No address'}</div>
-                                    <div className="text-xs text-gray-500">
-                                      {detailsModal.order.locations.vendor.latitude.toFixed(6)}, {detailsModal.order.locations.vendor.longitude.toFixed(6)}
-                                    </div>
-                                  </div>
-                                </Popup>
-                              </Marker>
-                            )}
-
-                            {/* Delivery Boy Location Marker */}
-                            {detailsModal.order.locations.deliveryBoy && detailsModal.order.locations.deliveryBoy.latitude && detailsModal.order.locations.deliveryBoy.longitude && (
-                              <Marker
-                                position={[detailsModal.order.locations.deliveryBoy.latitude, detailsModal.order.locations.deliveryBoy.longitude]}
-                                icon={L.icon({
-                                  iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', // yellow marker
-                                  iconSize: [25, 41],
-                                  iconAnchor: [12, 41],
-                                  popupAnchor: [1, -34],
-                                  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                                  shadowSize: [41, 41]
-                                })}
-                              >
-                                <Popup>
-                                  <div>
-                                    <div className="font-semibold text-yellow-700">Delivery Partner Location</div>
-                                    <div>{detailsModal.order.locations.deliveryBoy.address || 'No address'}</div>
-                                    <div className="text-xs text-gray-500">
-                                      {detailsModal.order.locations.deliveryBoy.latitude.toFixed(6)}, {detailsModal.order.locations.deliveryBoy.longitude.toFixed(6)}
-                                    </div>
-                                  </div>
-                                </Popup>
-                              </Marker>
-                            )}
-                          </MapContainer>
-                        </div>
-                      </div>
-                    )}
+                {/* Selected Delivery Point Section */}
+                {detailsModal.order.selectedDeliveryPoint && (
+                  <div className="mt-4">
+                    <h3 className="font-bold text-base text-gray-800 mb-1">Selected Delivery Point</h3>
+                    <div className="flex flex-col space-y-1">
+                      <span className="font-semibold text-blue-700">{detailsModal.order.selectedDeliveryPoint.name}</span>
+                      <span className="text-xs text-gray-500">{detailsModal.order.selectedDeliveryPoint.address}</span>
+                      <span className="text-xs text-gray-500">[lat: {detailsModal.order.selectedDeliveryPoint.latitude}, lng: {detailsModal.order.selectedDeliveryPoint.longitude}]</span>
+                    </div>
                   </div>
                 )}
 
                 {/* Route destination and checkpoints */}
                 {routeLoading ? (
                   <div className="text-blue-600">Loading route details...</div>
-                ) : routeDetails && (
-                  <>
-                    {/* Map Section */}
-                    <div className="mt-4">
-                      <h3 className="font-bold text-base text-gray-800 mb-1">Route Map</h3>
-                      <div style={{ height: '300px', width: '100%' }}>
-                        <MapContainer
-                          center={routeDetails.destination ? [routeDetails.destination.latitude, routeDetails.destination.longitude] : (routeDetails.checkpoints && routeDetails.checkpoints.length > 0 ? [routeDetails.checkpoints[0].location.latitude, routeDetails.checkpoints[0].location.longitude] : [0,0])}
-                          zoom={13}
-                          scrollWheelZoom={false}
-                          style={{ height: '100%', width: '100%', borderRadius: '8px' }}
+                ) : routeDetails && routeDetails.destination && (
+                  <div className="mt-4">
+                    <h3 className="font-bold text-base text-gray-800 mb-1">Route Map</h3>
+                    <div style={{ height: '300px', width: '100%' }}>
+                      <MapContainer
+                        center={[routeDetails.destination.latitude, routeDetails.destination.longitude]}
+                        zoom={13}
+                        scrollWheelZoom={false}
+                        style={{ height: '100%', width: '100%', borderRadius: '8px' }}
+                      >
+                        <TileLayer
+                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                        <Marker
+                          position={[routeDetails.destination.latitude, routeDetails.destination.longitude]}
+                          icon={L.icon({
+                            iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                            iconSize: [30, 40],
+                            iconAnchor: [15, 40],
+                            popupAnchor: [1, -34],
+                            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                            shadowSize: [41, 41]
+                          })}
                         >
-                          <TileLayer
-                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                          />
-                          {/* Checkpoint markers */}
-                          {routeDetails.checkpoints && routeDetails.checkpoints.map((cp, idx) => (
-                            <Marker
-                              key={cp._id}
-                              position={[cp.location.latitude, cp.location.longitude]}
-                              icon={L.icon({
-                                iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                                iconSize: [25, 41],
-                                iconAnchor: [12, 41],
-                                popupAnchor: [1, -34],
-                                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                                shadowSize: [41, 41]
-                              })}
-                            >
-                              <Popup>
-                                <div>
-                                  <div className="font-semibold">Checkpoint</div>
-                                  <div>{cp.location.address}</div>
-                                  <div className="text-xs text-gray-500">({cp.type})</div>
-                                  <button
-                                    className="mt-2 flex items-center text-blue-600 hover:text-blue-800 text-xs"
-                                    onClick={() => copyLocationLink(cp.location.latitude, cp.location.longitude, 'Checkpoint')}
-                                  >
-                                    <Share2 size={14} className="mr-1" /> Share
-                                  </button>
-                                </div>
-                              </Popup>
-                            </Marker>
-                          ))}
-                          {/* Final destination marker (different color) */}
-                          {routeDetails.destination && (
-                            <Marker
-                              position={[routeDetails.destination.latitude, routeDetails.destination.longitude]}
-                              icon={L.icon({
-                                iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', // green marker
-                                iconSize: [30, 40],
-                                iconAnchor: [15, 40],
-                                popupAnchor: [1, -34],
-                                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                                shadowSize: [41, 41]
-                              })}
-                            >
-                              <Popup>
-                                <div>
-                                  <div className="font-semibold">Final Destination</div>
-                                  <div>{routeDetails.destination.address}</div>
-                                  <button
-                                    className="mt-2 flex items-center text-green-700 hover:text-green-900 text-xs"
-                                    onClick={() => copyLocationLink(routeDetails.destination.latitude, routeDetails.destination.longitude, 'Destination')}
-                                  >
-                                    <Share2 size={14} className="mr-1" /> Share
-                                  </button>
-                                </div>
-                              </Popup>
-                            </Marker>
-                          )}
-                        </MapContainer>
-                      </div>
-                    </div>
-                    {/* Delivery Checkpoints Section */}
-                    <div className="mt-4">
-                      <h3 className="font-bold text-base text-gray-800 mb-1">Delivery Checkpoints</h3>
-                      <ul className="ml-4 mt-1 list-disc">
-                        {routeDetails.checkpoints && routeDetails.checkpoints.length > 0 ? (
-                          routeDetails.checkpoints.map((cp, idx) => {
-                            const selected = selectedCheckpoints.find(s => s.checkpoint === cp._id);
-                            return (
-                              <li key={cp._id} className="mb-2 flex items-center">
-                                <div>
-                                  <span className="font-semibold text-blue-700">{cp.location.address}</span>
-                                  <span className="ml-2 text-xs text-gray-500">({cp.type})</span>
-                                  <span className="ml-2 text-xs text-gray-500">[lat: {cp.location.latitude}, lng: {cp.location.longitude}]</span>
-                                  {selected && (
-                                    <span className={`ml-2 px-2 py-0.5 rounded text-xs font-semibold ${selected.status === 'completed' ? 'bg-green-100 text-green-700' : selected.status === 'arrived' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'}`}>
-                                      {selected.status.charAt(0).toUpperCase() + selected.status.slice(1)}
-                                    </span>
-                                  )}
-                                  <button
-                                    className="ml-2 flex items-center text-blue-600 hover:text-blue-800 text-xs"
-                                    onClick={() => copyLocationLink(cp.location.latitude, cp.location.longitude, 'Checkpoint')}
-                                  >
-                                    <Share2 size={14} className="mr-1" /> Share
-                                  </button>
-                                </div>
-                                {cp.description && <div className="ml-2 text-xs text-gray-500">{cp.description}</div>}
-                              </li>
-                            );
-                          })
-                        ) : (
-                          <li>No checkpoints</li>
-                        )}
-                      </ul>
+                          <Popup>
+                            <div>
+                              <div className="font-semibold">Final Destination</div>
+                              <div>{routeDetails.destination.address}</div>
+                              <button
+                                className="mt-2 flex items-center text-green-700 hover:text-green-900 text-xs"
+                                onClick={() => copyLocationLink(routeDetails.destination.latitude, routeDetails.destination.longitude, 'Destination')}
+                              >
+                                <Share2 size={14} className="mr-1" /> Share
+                              </button>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      </MapContainer>
                     </div>
                     <div className="mt-4">
                       <h3 className="font-bold text-base text-gray-800 mb-1">Final Destination</h3>
                       <div className="flex items-center">
-                        <div className="font-semibold text-green-700">{routeDetails.destination?.address || '-'}</div>
-                        {routeDetails.destination && (
-                          <button
-                            className="ml-2 flex items-center text-green-700 hover:text-green-900 text-xs"
-                            onClick={() => copyLocationLink(routeDetails.destination.latitude, routeDetails.destination.longitude, 'Destination')}
-                          >
-                            <Share2 size={14} className="mr-1" /> Share
-                          </button>
-                        )}
+                        <div className="font-semibold text-green-700">{routeDetails.destination.address || '-'}</div>
+                        <button
+                          className="ml-2 flex items-center text-green-700 hover:text-green-900 text-xs"
+                          onClick={() => copyLocationLink(routeDetails.destination.latitude, routeDetails.destination.longitude, 'Destination')}
+                        >
+                          <Share2 size={14} className="mr-1" /> Share
+                        </button>
                       </div>
-                      {routeDetails.destination && (
-                        <div className="text-xs text-gray-500">[lat: {routeDetails.destination.latitude}, lng: {routeDetails.destination.longitude}]</div>
-                      )}
+                      <div className="text-xs text-gray-500">[lat: {routeDetails.destination.latitude}, lng: {routeDetails.destination.longitude}]</div>
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
             </div>

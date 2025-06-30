@@ -9,6 +9,7 @@ import { createOrder } from './services/orderService';
 import * as Location from 'expo-location';
 import { Linking, Modal as RNModal } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
+import { useIsFocused } from '@react-navigation/native';
 
 type CartItem = {
   id: string;
@@ -30,6 +31,8 @@ export default function CartScreen() {
   const [loadingCheckpoint, setLoadingCheckpoint] = useState(false);
   const [checkpointError, setCheckpointError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{latitude: number; longitude: number; address: string} | null>(null);
+  const isFocused = useIsFocused();
+  const [selectedDeliveryPoint, setSelectedDeliveryPoint] = useState(null);
 
   useEffect(() => {
     loadCartItems();
@@ -40,6 +43,22 @@ export default function CartScreen() {
     };
     loadRouteId();
   }, []);
+
+  // Re-read selectedDeliveryPoint whenever the cart screen is focused
+  useEffect(() => {
+    const fetchSelectedDeliveryPoint = async () => {
+      try {
+        const dp = await AsyncStorage.getItem('selectedDeliveryPoint');
+        if (dp) setSelectedDeliveryPoint(JSON.parse(dp));
+        else setSelectedDeliveryPoint(null);
+      } catch (e) {
+        setSelectedDeliveryPoint(null);
+      }
+    };
+    if (isFocused) {
+      fetchSelectedDeliveryPoint();
+    }
+  }, [isFocused]);
 
   const loadCartItems = async () => {
     try {
@@ -76,6 +95,14 @@ export default function CartScreen() {
     if (cartItems.length === 0) {
       Alert.alert('Error', 'Your cart is empty');
       return;
+    }
+    // Always re-read selectedDeliveryPoint before opening modal
+    try {
+      const dp = await AsyncStorage.getItem('selectedDeliveryPoint');
+      if (dp) setSelectedDeliveryPoint(JSON.parse(dp));
+      else setSelectedDeliveryPoint(null);
+    } catch (e) {
+      setSelectedDeliveryPoint(null);
     }
     setVehicleModalVisible(true);
     setPendingOrder(true);
@@ -175,9 +202,55 @@ export default function CartScreen() {
       return;
     }
     if (!routeId) {
-      Alert.alert('Error', 'Route information missing. Please select a route.');
-      setVehicleModalVisible(false);
-      setPendingOrder(false);
+      Alert.alert(
+        'Route Required',
+        'Please select a route to proceed.',
+        [
+          {
+            text: 'Go to Map',
+            onPress: () => {
+              setVehicleModalVisible(false);
+              setPendingOrder(false);
+              router.push('/map');
+            }
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              setVehicleModalVisible(false);
+              setPendingOrder(false);
+            }
+          }
+        ],
+        { cancelable: false }
+      );
+      return;
+    }
+    if (!selectedDeliveryPoint) {
+      Alert.alert(
+        'Delivery Point Required',
+        'Please select a delivery point to proceed.',
+        [
+          {
+            text: 'Go to Map',
+            onPress: () => {
+              setVehicleModalVisible(false);
+              setPendingOrder(false);
+              router.push('/map');
+            }
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              setVehicleModalVisible(false);
+              setPendingOrder(false);
+            }
+          }
+        ],
+        { cancelable: false }
+      );
       return;
     }
     setVehicleModalVisible(false);
@@ -197,7 +270,8 @@ export default function CartScreen() {
         })),
         totalAmount: calculateTotal(),
         vehicleNumber,
-        userLocation: currentLocation // Add user location to order data
+        userLocation: currentLocation, // Add user location to order data
+        selectedDeliveryPoint // Add selected delivery point to order data
       };
       console.log('Order payload:', orderData);
       const order = await createOrder(orderData);

@@ -54,10 +54,10 @@ router.post('/:userId', authenticateToken, async (req, res) => {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
-    const { currentLocation, finalDestination, checkpoints, selectedCheckpoint } = req.body;
+    const { currentLocation, finalDestination } = req.body;
     
-    if (!currentLocation || !finalDestination || !Array.isArray(checkpoints) || checkpoints.length !== 3) {
-      console.error('Invalid journey data:', { currentLocation, finalDestination, checkpoints });
+    if (!currentLocation || !finalDestination) {
+      console.error('Invalid journey data:', { currentLocation, finalDestination });
       return res.status(400).json({ message: 'Invalid journey data' });
     }
 
@@ -66,16 +66,12 @@ router.post('/:userId', authenticateToken, async (req, res) => {
     if (journey) {
       journey.currentLocation = currentLocation;
       journey.finalDestination = finalDestination;
-      journey.checkpoints = checkpoints;
-      journey.selectedCheckpoint = selectedCheckpoint;
       journey.updatedAt = new Date();
     } else {
       journey = new Journey({
         user: userId,
         currentLocation,
-        finalDestination,
-        checkpoints,
-        selectedCheckpoint
+        finalDestination
       });
     }
 

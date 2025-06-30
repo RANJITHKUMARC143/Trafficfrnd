@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, Truck, Megaphone, CreditCard, Settings, ChevronDown, ChevronRight, LogOut, X, Building2, Package } from 'lucide-react';
+import { LayoutDashboard, Users, Truck, Megaphone, CreditCard, Settings, ChevronDown, ChevronRight, LogOut, X, Building2, Package, MapPin } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
@@ -174,6 +174,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
           icon={<Package size={20} />} 
           title="Orders"
           path="/orders" 
+        />
+        <NavItem 
+          icon={<MapPin size={20} />} 
+          title="Delivery Point"
+          path="/delivery-points" 
         />
         <NavItem 
           icon={<Settings size={20} />} 

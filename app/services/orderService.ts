@@ -40,4 +40,15 @@ export async function updatePushToken(expoPushToken) {
   });
   if (!res.ok) throw new Error('Failed to update push token');
   return res.json();
+}
+
+export async function fetchDeliveryPoints() {
+  const token = await AsyncStorage.getItem('token');
+  const res = await fetch(`${API_BASE_URL}/delivery-points`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) throw new Error('Failed to fetch delivery points');
+  return res.json();
 } 

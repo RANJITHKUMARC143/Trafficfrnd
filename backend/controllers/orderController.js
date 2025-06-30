@@ -169,7 +169,8 @@ const createOrder = async (req, res) => {
       specialInstructions, 
       vehicleNumber, 
       routeId,
-      userLocation // New field for user's current location
+      userLocation, // New field for user's current location
+      selectedDeliveryPoint // New: selected delivery point from client
     } = req.body;
     const customerName = req.user.name || req.user.username;
 
@@ -229,6 +230,7 @@ const createOrder = async (req, res) => {
       timestamp: new Date(),
       updatedAt: new Date(),
       user: req.user._id,
+      selectedDeliveryPoint: selectedDeliveryPoint || undefined,
     });
 
     await order.save();

@@ -125,6 +125,13 @@ const orderSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: false
+  },
+  selectedDeliveryPoint: {
+    id: { type: String },
+    name: { type: String },
+    latitude: { type: Number },
+    longitude: { type: Number },
+    address: { type: String }
   }
 }, {
   collection: 'food_orders'

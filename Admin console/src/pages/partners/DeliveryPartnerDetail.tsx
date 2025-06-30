@@ -127,6 +127,12 @@ interface Order {
       timestamp: string;
     };
   };
+  selectedDeliveryPoint?: {
+    name: string;
+    address: string;
+    latitude: number;
+    longitude: number;
+  };
 }
 
 interface Vendor {
@@ -721,6 +727,17 @@ const DeliveryPartnerDetail: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {selectedOrder.selectedDeliveryPoint && (
+              <div className="mt-4">
+                <h3 className="font-bold text-base text-gray-800 mb-1">Selected Delivery Point</h3>
+                <div className="flex flex-col space-y-1">
+                  <span className="font-semibold text-blue-700">{selectedOrder.selectedDeliveryPoint.name}</span>
+                  <span className="text-xs text-gray-500">{selectedOrder.selectedDeliveryPoint.address}</span>
+                  <span className="text-xs text-gray-500">[lat: {selectedOrder.selectedDeliveryPoint.latitude}, lng: {selectedOrder.selectedDeliveryPoint.longitude}]</span>
+                </div>
+              </div>
+            )}
 
             <div className="mt-6">
               <h3 className="text-lg font-semibold mb-3">Order Items</h3>
