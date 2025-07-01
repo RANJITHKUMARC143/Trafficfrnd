@@ -33,16 +33,12 @@ router.get('/earnings/history', auth, deliveryBoyController.getEarningsHistory);
 router.post('/earnings/summary/cashout', auth, deliveryBoyController.requestCashout);
 
 // --- ADMIN CRUD ENDPOINTS ---
-// List all delivery partners
+// List all delivery boys (admin only)
+const DeliveryBoy = require('../models/DeliveryBoy');
 router.get('/', auth, async (req, res) => {
-  try {
-    // Optionally: check if req.user.role === 'admin'
-    const deliveryBoys = await require('../models/DeliveryBoy').find({}, '-password');
-    const deliveryBoysWithId = deliveryBoys.map(d => ({ ...d.toObject(), id: d._id }));
-    res.json(deliveryBoysWithId);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching delivery partners', error: error.message });
-  }
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+  const deliveryBoys = await DeliveryBoy.find({}, 'fullName email').sort({ fullName: 1 });
+  res.json(deliveryBoys);
 });
 
 // Add a delivery partner

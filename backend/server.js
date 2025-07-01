@@ -99,11 +99,14 @@ app.use('/api/delivery', deliveryBoyRoutes);
 app.use('/api/routes', routeRoutes);
 app.use('/api/users/journey', journeyRoutes);
 app.use('/api/users/route-session', routeSessionRoutes);
-app.use('/api/users', userAuthRoutes);
+app.use('/api', userAuthRoutes);
 app.use('/api/orders', userOrderRoutes);
 
 // Add delivery points route for admin console
 app.use('/api/delivery-points', require('./routes/deliveryPointRoutes'));
+
+// Register alert routes
+app.use('/api/alerts', require('./routes/alertRoutes'));
 
 // Test route
 app.get('/api/test', (req, res) => {

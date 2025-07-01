@@ -10,6 +10,8 @@ import * as Location from 'expo-location';
 import { Linking, Modal as RNModal } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
 import { useIsFocused } from '@react-navigation/native';
+import MapView, { Marker } from 'react-native-maps';
+import LottieView from 'lottie-react-native';
 
 type CartItem = {
   id: string;
@@ -20,6 +22,17 @@ type CartItem = {
   imageUrl: string;
   vendorId?: string;
 };
+
+async function fetchLatestDeliveryPoint(destination) {
+  const token = await AsyncStorage.getItem('token');
+  const userId = await AsyncStorage.getItem('userId');
+  const res = await fetch(`http://<your-backend>/api/users/${userId}/delivery-point?destination=${encodeURIComponent(destination)}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error('No delivery point found');
+  const data = await res.json();
+  return data.deliveryPoint;
+}
 
 export default function CartScreen() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -59,6 +72,16 @@ export default function CartScreen() {
       fetchSelectedDeliveryPoint();
     }
   }, [isFocused]);
+
+  // Fetch user location when vehicle modal opens
+  useEffect(() => {
+    if (vehicleModalVisible && !userLocation) {
+      (async () => {
+        const loc = await getUserCurrentLocation();
+        if (loc) setUserLocation(loc);
+      })();
+    }
+  }, [vehicleModalVisible]);
 
   const loadCartItems = async () => {
     try {
@@ -227,30 +250,22 @@ export default function CartScreen() {
       );
       return;
     }
-    if (!selectedDeliveryPoint) {
-      Alert.alert(
-        'Delivery Point Required',
-        'Please select a delivery point to proceed.',
-        [
-          {
-            text: 'Go to Map',
-            onPress: () => {
-              setVehicleModalVisible(false);
-              setPendingOrder(false);
-              router.push('/map');
-            }
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel',
-            onPress: () => {
-              setVehicleModalVisible(false);
-              setPendingOrder(false);
-            }
-          }
-        ],
-        { cancelable: false }
-      );
+    let deliveryPoint;
+    try {
+      // Always get the latest selected delivery point from AsyncStorage
+      const dp = await AsyncStorage.getItem('selectedDeliveryPoint');
+      if (!dp) throw new Error('No delivery point selected');
+      const parsed = JSON.parse(dp);
+      // Ensure all fields are present
+      deliveryPoint = {
+        id: parsed.id,
+        name: parsed.name,
+        latitude: parsed.latitude,
+        longitude: parsed.longitude,
+        address: parsed.address
+      };
+    } catch (e) {
+      Alert.alert('Error', 'No delivery point selected for this destination.');
       return;
     }
     setVehicleModalVisible(false);
@@ -271,7 +286,7 @@ export default function CartScreen() {
         totalAmount: calculateTotal(),
         vehicleNumber,
         userLocation: currentLocation, // Add user location to order data
-        selectedDeliveryPoint // Add selected delivery point to order data
+        selectedDeliveryPoint: deliveryPoint // Add selected delivery point to order data
       };
       console.log('Order payload:', orderData);
       const order = await createOrder(orderData);
@@ -371,6 +386,51 @@ export default function CartScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <LottieView
+              source={require('../assets/animations/animation.json')}
+              autoPlay
+              loop
+              style={{ width: 120, height: 120, marginBottom: 8 }}
+            />
+            <ThemedText style={styles.cautionHeading}>Confirm Location</ThemedText>
+            {/* Map for confirming delivery point */}
+            {selectedDeliveryPoint && selectedDeliveryPoint.latitude && selectedDeliveryPoint.longitude && (
+              <View style={{ width: '100%', height: 160, borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+                <MapView
+                  style={{ flex: 1 }}
+                  initialRegion={{
+                    latitude: selectedDeliveryPoint.latitude,
+                    longitude: selectedDeliveryPoint.longitude,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                  }}
+                  pointerEvents="none"
+                >
+                  {/* User's current location marker */}
+                  {userLocation && userLocation.latitude && userLocation.longitude && (
+                    <Marker
+                      coordinate={{
+                        latitude: userLocation.latitude,
+                        longitude: userLocation.longitude,
+                      }}
+                      title="Your Location"
+                      description={userLocation.address}
+                      pinColor="#4CAF50"
+                    />
+                  )}
+                  {/* Delivery point marker */}
+                  <Marker
+                    coordinate={{
+                      latitude: selectedDeliveryPoint.latitude,
+                      longitude: selectedDeliveryPoint.longitude,
+                    }}
+                    title={selectedDeliveryPoint.name}
+                    description={selectedDeliveryPoint.address}
+                    pinColor="#D32F2F"
+                  />
+                </MapView>
+              </View>
+            )}
             <ThemedText style={styles.modalTitle}>Enter Your Vehicle Number</ThemedText>
             <TextInput
               style={styles.input}
@@ -385,6 +445,16 @@ export default function CartScreen() {
               onPress={confirmVehicleNumberAndOrder}
             >
               <ThemedText style={styles.confirmButtonText}>Confirm & Place Order</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.changeDeliveryButton, { marginBottom: 10 }]}
+              onPress={() => {
+                setVehicleModalVisible(false);
+                setPendingOrder(false);
+                router.push('/map');
+              }}
+            >
+              <ThemedText style={styles.changeDeliveryButtonText}>Change Delivery Point</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.cancelButton}
@@ -561,5 +631,25 @@ const styles = StyleSheet.create({
     color: '#333',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  changeDeliveryButton: {
+    backgroundColor: '#FF9800',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    width: '100%',
+    alignItems: 'center',
+  },
+  changeDeliveryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  cautionHeading: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#D32F2F',
+    marginBottom: 12,
+    textAlign: 'center',
   },
 }); 

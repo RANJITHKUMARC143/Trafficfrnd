@@ -1,5 +1,5 @@
 import 'react-native-get-random-values';
-import { StyleSheet, TextInput, ScrollView, TouchableOpacity, View, Image, Alert, Platform, Linking, Dimensions, Animated, KeyboardAvoidingView, Text, Modal } from 'react-native';
+import { StyleSheet, TextInput, ScrollView, TouchableOpacity, View, Image, Alert, Platform, Linking, Dimensions, Animated, KeyboardAvoidingView, Text, Modal, FlatList, Keyboard } from 'react-native';
 import { ThemedText, ThemedView } from '@/components';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +13,10 @@ import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplet
 import MapViewDirections from 'react-native-maps-directions';
 import { menuService } from '@/services/menuService';
 import { MenuItem } from '@/types/menu';
+import LottieView from 'lottie-react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useMemo } from 'react';
+import { BlurView } from 'expo-blur';
 
 type Category = {
   id: number;
@@ -106,7 +110,7 @@ export default function HomeScreen() {
   const [deliveryRoute, setDeliveryRoute] = useState<DeliveryRoute | null>(null);
   const buttonAnimation = React.useRef(new Animated.Value(0)).current;
   const [isScrolling, setIsScrolling] = React.useState(false);
-  const scrollTimeout = React.useRef<NodeJS.Timeout>();
+  const scrollTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [appMode, setAppMode] = useState<'travel' | 'home'>('home');
   const [orderMode, setOrderMode] = useState<'drive' | 'home'>('drive');
   const [nearbyLocations, setNearbyLocations] = useState<TrafficLocation[]>([]);
@@ -122,6 +126,11 @@ export default function HomeScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [recommendedItems, setRecommendedItems] = useState<MenuItem[]>([]);
   const [loadingRecommended, setLoadingRecommended] = useState(true);
+  const [topRatedItems, setTopRatedItems] = useState<MenuItem[]>([]);
+  const [loadingTopRated, setLoadingTopRated] = useState(true);
+  const [cartCount, setCartCount] = useState(0);
+  const [searchSuggestions, setSearchSuggestions] = useState<MenuItem[]>([]);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   useEffect(() => {
     getCurrentLocation();
@@ -166,7 +175,6 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
     let mounted = true;
     setLoadingRecommended(true);
     // Fetch all menu items initially
@@ -177,7 +185,7 @@ export default function HomeScreen() {
       }
     });
     // Subscribe to real-time updates
-    unsubscribe = menuService.onMenuUpdate((items) => {
+    const unsubscribe = menuService.onMenuUpdate((items) => {
       if (mounted) {
         setRecommendedItems(items.filter(item => item.isAvailable));
       }
@@ -185,6 +193,32 @@ export default function HomeScreen() {
     return () => {
       mounted = false;
       if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoadingTopRated(true);
+    menuService.getAllMenuItems().then((items) => {
+      if (mounted) {
+        // Filter items with rating >= 4.5, or top 10 by rating
+        const sorted = [...items].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        const filtered = sorted.filter(item => (item.rating || 0) >= 4.5);
+        setTopRatedItems(filtered.length > 0 ? filtered.slice(0, 10) : sorted.slice(0, 10));
+        setLoadingTopRated(false);
+      }
+    });
+    // Subscribe to real-time updates
+    const unsubscribeTopRated = menuService.onMenuUpdate((items) => {
+      if (mounted) {
+        const sorted = [...items].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        const filtered = sorted.filter(item => (item.rating || 0) >= 4.5);
+        setTopRatedItems(filtered.length > 0 ? filtered.slice(0, 10) : sorted.slice(0, 10));
+      }
+    });
+    return () => {
+      mounted = false;
+      if (unsubscribeTopRated) unsubscribeTopRated();
     };
   }, []);
 
@@ -285,13 +319,13 @@ export default function HomeScreen() {
   ];
 
   const handleCategoryPress = (category: Category) => {
-    router.push({
-      pathname: `/category/${category.id}`,
-      params: {
-        id: category.id.toString(),
-        name: category.name
-      }
-    });
+    // Only allow navigation for the first 4 categories
+    if ([1, 2, 3, 4].includes(category.id)) {
+      router.push({
+        pathname: '/explore',
+        params: { category: category.name }
+      });
+    }
   };
 
   const handleItemPress = (item: RecommendedItem) => {
@@ -628,113 +662,132 @@ export default function HomeScreen() {
     loadSavedDestination();
   }, []);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchCartCount = async () => {
+        try {
+          const cartData = await AsyncStorage.getItem('cart');
+          const cartItems = cartData ? JSON.parse(cartData) : [];
+          setCartCount((cartItems as { quantity?: number }[]).reduce((sum: number, item: { quantity?: number }) => sum + (item.quantity || 1), 0));
+        } catch {
+          setCartCount(0);
+        }
+      };
+      fetchCartCount();
+      const interval = setInterval(fetchCartCount, 2000);
+      return () => clearInterval(interval);
+    }, [])
+  );
+
+  // Compute suggestions as user types
+  useEffect(() => {
+    if (searchQuery.trim().length === 0) {
+      setSearchSuggestions([]);
+      return;
+    }
+    // Find up to 5 menu items that match the query
+    const matches = recommendedItems
+      .filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      .slice(0, 5);
+    setSearchSuggestions(matches);
+  }, [searchQuery, recommendedItems]);
+
+  useEffect(() => {
+    const showSub1 = Keyboard.addListener('keyboardDidShow', () => setKeyboardOpen(true));
+    const hideSub1 = Keyboard.addListener('keyboardDidHide', () => setKeyboardOpen(false));
+    const showSub2 = Keyboard.addListener('keyboardWillShow', () => setKeyboardOpen(true));
+    const hideSub2 = Keyboard.addListener('keyboardWillHide', () => setKeyboardOpen(false));
+    return () => {
+      showSub1.remove();
+      hideSub1.remove();
+      showSub2.remove();
+      hideSub2.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    console.log('Keyboard open:', keyboardOpen);
+  }, [keyboardOpen]);
+
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={{ flex: 1 }}>
       <StatusBar style="auto" />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <ThemedText style={styles.headerTitle}>Traffic Frnd</ThemedText>
-        </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity 
-            style={styles.headerButton}
-            onPress={() => router.push('/search' as any)}
-          >
-            <Ionicons name="search" size={24} color="#333" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.headerButton}
-            onPress={() => router.push('/profile' as any)}
-          >
-            <Ionicons name="person" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Mode Toggle */}
-      <View style={styles.modeToggleContainer}>
-        <TouchableOpacity 
-          style={[
-            styles.modeToggleButton, 
-            orderMode === 'home' && styles.modeToggleButtonActive
-          ]}
-          onPress={toggleOrderMode}
-        >
-          <Ionicons 
-            name="home" 
-            size={20} 
-            color={orderMode === 'home' ? '#fff' : '#666'} 
-          />
-          <ThemedText 
-            style={[
-              styles.modeToggleText,
-              orderMode === 'home' && styles.modeToggleTextActive
-            ]}
-          >
-            Home
-          </ThemedText>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[
-            styles.modeToggleButton, 
-            orderMode === 'drive' && styles.modeToggleButtonActive
-          ]}
-          onPress={toggleOrderMode}
-        >
-          <Ionicons 
-            name="car" 
-            size={20} 
-            color={orderMode === 'drive' ? '#fff' : '#666'} 
-          />
-          <ThemedText 
-            style={[
-              styles.modeToggleText,
-              orderMode === 'drive' && styles.modeToggleTextActive
-            ]}
-          >
-            Drive & Order
-          </ThemedText>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView 
+      {/* Main Content Scrollable Area */}
+      <ScrollView
         style={[
           styles.scrollView,
           { backgroundColor: orderMode === 'drive' ? '#f0f6f0' : '#f8f8f8' },
           { zIndex: 1 }
-        ]} 
-        showsVerticalScrollIndicator={false} 
-        onScroll={handleScroll} 
+        ]}
+        contentContainerStyle={{ paddingTop: 25, paddingBottom: 12 }}
+        showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Ionicons 
-              name="search" 
-              size={20} 
-              color="#666" 
-            />
+        {/* Unique Search Bar with Logo on Right */}
+        <View style={[styles.uniqueSearchBarWrapper, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}> 
+          <View style={[styles.uniqueSearchBarCard, { flex: 1, marginRight: 10 }]}> 
+            <Ionicons name="search" size={24} color="#4CAF50" style={{ marginLeft: 12, marginRight: 8 }} />
             <TextInput
-              style={styles.searchInput}
-              placeholder="Search for items..."
+              style={styles.uniqueSearchInput}
+              placeholder="Search for anything..."
               value={searchQuery}
               onChangeText={setSearchQuery}
               onSubmitEditing={handleSearch}
-              placeholderTextColor="#666"
+              placeholderTextColor="#888"
+              returnKeyType="search"
             />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchSuggestions([]); }} style={{ padding: 6, marginRight: 6 }}>
+                <Ionicons name="close-circle" size={22} color="#888" />
+              </TouchableOpacity>
+            )}
           </View>
+          <Image source={require('../../assets/images/icon.png')} style={styles.logo} resizeMode="contain" />
         </View>
 
-        {/* Order Now Button */}
-        <View style={styles.orderButtonContainer}>
-          <TouchableOpacity style={styles.orderButton} onPress={handleOrderNow}>
-            <ThemedText style={styles.orderButtonText}>Order Now</ThemedText>
-          </TouchableOpacity>
-        </View>
+        {/* Suggestions Dropdown (unchanged) */}
+        {searchSuggestions.length > 0 && (
+          <BlurView intensity={30} tint="light" style={styles.suggestionsDropdown}>
+            {searchSuggestions.map((item, idx) => {
+              const matchIdx = item.name.toLowerCase().indexOf(searchQuery.toLowerCase());
+              const before = item.name.slice(0, matchIdx);
+              const match = item.name.slice(matchIdx, matchIdx + searchQuery.length);
+              const after = item.name.slice(matchIdx + searchQuery.length);
+              return (
+                <TouchableOpacity
+                  key={item._id + idx}
+                  style={styles.suggestionItem}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    setSearchQuery(item.name);
+                    setSearchSuggestions([]);
+                    handleSearch();
+                  }}
+                >
+                  {item.image ? (
+                    <Image source={{ uri: item.image }} style={styles.suggestionImage} />
+                  ) : (
+                    <View style={styles.suggestionImagePlaceholder} />
+                  )}
+                  <View style={styles.suggestionTextBlock}>
+                    <Text style={styles.suggestionText} numberOfLines={1}>
+                      {before}
+                      <Text style={styles.suggestionTextHighlight}>{match}</Text>
+                      {after}
+                    </Text>
+                    {item.category && (
+                      <Text style={styles.suggestionCategory}>{item.category}</Text>
+                    )}
+                  </View>
+                  <Ionicons name="arrow-forward" size={18} color="#bbb" style={{ marginLeft: 8 }} />
+                </TouchableOpacity>
+              );
+            })}
+          </BlurView>
+        )}
 
         {/* Categories */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesContainer}>
@@ -755,55 +808,188 @@ export default function HomeScreen() {
 
         {/* Promotion Banner */}
         <TouchableOpacity 
-          style={styles.promotionBanner}
+          style={[styles.promotionBanner, { backgroundColor: '#fffbe6', borderColor: '#FFD700', borderWidth: 1, paddingVertical: 8, paddingHorizontal: 10 }]}
           onPress={() => router.push('/promotions' as any)}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
-          <ThemedText style={styles.promotionText}>
-            🔥 Fastest Delivery in Your Jam Zone!
-          </ThemedText>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <LottieView
+              source={require('../../assets/animations/delivery-walk.json')}
+              autoPlay
+              loop
+              style={{ width: 80, height: 80, marginRight: 8 }}
+            />
+            <View style={{ flexShrink: 1, maxWidth: '80%' }}>
+              <ThemedText style={[styles.promotionText, { color: '#222', fontWeight: 'bold', flexShrink: 1, flexWrap: 'wrap' }]}>We don't wait for the traffic to clear — <ThemedText style={{ color: '#4CAF50', fontWeight: 'bold' }}>we deliver through it.</ThemedText></ThemedText>
+            </View>
+          </View>
         </TouchableOpacity>
 
         {/* Recommended Section */}
-        <View style={styles.recommendedSection}>
+        <View style={[styles.recommendedSection, { backgroundColor: 'transparent', paddingVertical: 30 }]}> 
           <ThemedText style={styles.sectionTitle}>Recommended</ThemedText>
-          <View style={styles.recommendedGrid}>
-            {loadingRecommended ? (
-              <ThemedText>Loading recommended items...</ThemedText>
-            ) : recommendedItems.length === 0 ? (
-              <ThemedText>No recommended items available.</ThemedText>
-            ) : (
-              recommendedItems.slice(0, 10).map((item) => (
-                <TouchableOpacity 
-                  key={item._id} 
-                  style={styles.recommendedItem}
-                  onPress={() => handleItemPress({
-                    id: item._id,
-                    name: item.name,
-                    image: { uri: item.image },
-                    price: `₹${item.price}`,
-                    time: item.preparationTime ? `${item.preparationTime} min` : 'N/A',
-                    type: 'S-scoter', // You can adjust this if you have a type field
-                  })}
-                  activeOpacity={0.8}
+          {loadingRecommended ? (
+            <View style={{ alignItems: 'center', justifyContent: 'center', height: 220 }}>
+              <LottieView
+                source={require('../../assets/animations/car-delivery.json')}
+                autoPlay
+                loop
+                style={{ width: 120, height: 120 }}
+              />
+              <ThemedText style={{ marginTop: 12, color: '#4CAF50' }}>Loading recommended...</ThemedText>
+            </View>
+          ) : recommendedItems.length === 0 ? (
+            <ThemedText>No recommended items available.</ThemedText>
+          ) : (
+            <FlatList
+              data={recommendedItems.slice(0, 10)}
+              keyExtractor={item => item._id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={260}
+              decelerationRate="fast"
+              contentContainerStyle={{ paddingHorizontal: 16 }}
+              renderItem={({ item }: { item: MenuItem }) => (
+                <TouchableOpacity
+                  style={styles.recommendedCard}
+                  activeOpacity={0.9}
+                  onPress={() => router.push({ pathname: '/item/[id]', params: { id: item._id } })}
                 >
-                  <Image source={{ uri: item.image }} style={styles.itemImage} />
-                  <ThemedText style={styles.itemName}>{item.name}</ThemedText>
-                  <ThemedText style={styles.itemPrice}>{`₹${item.price}`}</ThemedText>
-                  <View style={styles.itemInfoContainer}>
-                    <View style={styles.itemTimeContainer}>
-                      <Ionicons name="time-outline" size={14} color="#666" />
-                      <ThemedText style={styles.itemTime}>{item.preparationTime ? `${item.preparationTime} min` : 'N/A'}</ThemedText>
+                  <Image
+                    source={{ uri: item.image || 'https://via.placeholder.com/300' }}
+                    style={styles.recommendedImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.recommendedCardContent}>
+                    <ThemedText style={styles.recommendedName}>{item.name}</ThemedText>
+                    <ThemedText style={styles.recommendedPrice}>₹{item.price}</ThemedText>
+                    {item.description ? (
+                      <ThemedText style={styles.recommendedDescription} numberOfLines={2}>{item.description}</ThemedText>
+                    ) : null}
+                    <View style={styles.recommendedInfoRow}>
+                      <Ionicons name="time-outline" size={16} color="#666" />
+                      <ThemedText style={styles.recommendedTime}>{item.preparationTime ? `${item.preparationTime} min` : 'N/A'}</ThemedText>
                     </View>
-                    <View style={styles.itemTypeContainer}>
-                      <Ionicons name={'bicycle'} size={14} color="#666" />
-                      <ThemedText style={styles.itemType}>S-scoter</ThemedText>
-                    </View>
+                    <TouchableOpacity
+                      style={styles.recommendedAddButton}
+                      onPress={async () => {
+                        // Add to cart logic (same as in item details)
+                        try {
+                          const cartData = await AsyncStorage.getItem('cart');
+                          let cartItems = cartData ? JSON.parse(cartData) : [];
+                          const existingItemIndex = cartItems.findIndex((i: any) => i.id === item._id);
+                          if (existingItemIndex !== -1) {
+                            cartItems[existingItemIndex].quantity += 1;
+                          } else {
+                            cartItems.push({
+                              id: item._id,
+                              name: item.name,
+                              price: item.price,
+                              quantity: 1,
+                              imageUrl: item.image,
+                              vendorId: item.vendorId,
+                            });
+                          }
+                          await AsyncStorage.setItem('cart', JSON.stringify(cartItems));
+                          Alert.alert('Added to Cart', `${item.name} has been added to your cart.`);
+                        } catch (error) {
+                          Alert.alert('Error', 'Failed to add item to cart');
+                        }
+                      }}
+                    >
+                      <Ionicons name="cart-outline" size={20} color="#fff" />
+                      <ThemedText style={styles.recommendedAddButtonText}>Add to Cart</ThemedText>
+                    </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
-              ))
-            )}
-          </View>
+              )}
+            />
+          )}
+        </View>
+
+        {/* Top Rated Section */}
+        <View style={[styles.recommendedSection, { backgroundColor: 'transparent', paddingVertical: 10 }]}> 
+          <ThemedText style={styles.sectionTitle}>Top Rated</ThemedText>
+          {loadingTopRated ? (
+            <View style={{ alignItems: 'center', justifyContent: 'center', height: 180 }}>
+              <LottieView
+                source={require('../../assets/animations/car-delivery.json')}
+                autoPlay
+                loop
+                style={{ width: 100, height: 100 }}
+              />
+              <ThemedText style={{ marginTop: 10, color: '#4CAF50' }}>Loading top rated...</ThemedText>
+            </View>
+          ) : topRatedItems.length === 0 ? (
+            <ThemedText>No top rated items available.</ThemedText>
+          ) : (
+            <FlatList
+              data={topRatedItems}
+              keyExtractor={item => item._id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={260}
+              decelerationRate="fast"
+              contentContainerStyle={{ paddingHorizontal: 16 }}
+              renderItem={({ item }: { item: MenuItem }) => (
+                <TouchableOpacity
+                  style={styles.recommendedCard}
+                  activeOpacity={0.9}
+                  onPress={() => router.push({ pathname: '/item/[id]', params: { id: item._id } })}
+                >
+                  <Image
+                    source={{ uri: item.image || 'https://via.placeholder.com/300' }}
+                    style={styles.recommendedImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.recommendedCardContent}>
+                    <ThemedText style={styles.recommendedName}>{item.name}</ThemedText>
+                    <ThemedText style={styles.recommendedPrice}>₹{item.price}</ThemedText>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                      <Ionicons name="star" size={15} color="#FFD700" />
+                      <ThemedText style={{ fontSize: 13, color: '#333', marginLeft: 4 }}>{item.rating ? item.rating.toFixed(1) : 'N/A'}</ThemedText>
+                    </View>
+                    {item.description ? (
+                      <ThemedText style={styles.recommendedDescription} numberOfLines={2}>{item.description}</ThemedText>
+                    ) : null}
+                    <View style={styles.recommendedInfoRow}>
+                      <Ionicons name="time-outline" size={16} color="#666" />
+                      <ThemedText style={styles.recommendedTime}>{item.preparationTime ? `${item.preparationTime} min` : 'N/A'}</ThemedText>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.recommendedAddButton}
+                      onPress={async () => {
+                        try {
+                          const cartData = await AsyncStorage.getItem('cart');
+                          let cartItems = cartData ? JSON.parse(cartData) : [];
+                          const existingItemIndex = cartItems.findIndex((i: any) => i.id === item._id);
+                          if (existingItemIndex !== -1) {
+                            cartItems[existingItemIndex].quantity += 1;
+                          } else {
+                            cartItems.push({
+                              id: item._id,
+                              name: item.name,
+                              price: item.price,
+                              quantity: 1,
+                              imageUrl: item.image,
+                              vendorId: item.vendorId,
+                            });
+                          }
+                          await AsyncStorage.setItem('cart', JSON.stringify(cartItems));
+                          Alert.alert('Added to Cart', `${item.name} has been added to your cart.`);
+                        } catch (error) {
+                          Alert.alert('Error', 'Failed to add item to cart');
+                        }
+                      }}
+                    >
+                      <Ionicons name="cart-outline" size={20} color="#fff" />
+                      <ThemedText style={styles.recommendedAddButtonText}>Add to Cart</ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              )}
+            />
+          )}
         </View>
 
         {/* Delivery Info */}
@@ -902,26 +1088,35 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      <Animated.View
-        style={[
-          styles.orderButtonContainer,
-          {
-            transform: [{ translateY: buttonAnimation }],
-          },
-        ]}
-      >
-        <TouchableOpacity
-          style={[
-            styles.orderButton,
-            { backgroundColor: orderMode === 'drive' ? '#4CAF50' : '#1a1a1a' }
-          ]}
-          onPress={handleOrderNow}
-        >
-          <ThemedText style={styles.orderButtonText}>
-            {orderMode === 'drive' ? 'Order On-The-Go' : 'Order Now'}
-          </ThemedText>
-        </TouchableOpacity>
-      </Animated.View>
+      {/* Floating Order Now Button - always above nav bar, only hides when keyboard is open */}
+      {!keyboardOpen && orderMode === 'drive' && (
+        <View style={styles.fabOrderContainer} pointerEvents="box-none">
+          <TouchableOpacity style={styles.fabOrderButton} onPress={handleOrderNow}>
+            <LottieView
+              source={require('../../assets/animations/animation.json')}
+              autoPlay
+              loop
+              style={{ width: 50, height: 50, marginRight: 8 }}
+            />
+            <ThemedText style={styles.fabOrderButtonText}>Order On-The-Go</ThemedText>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Navigation Bar - always fixed at bottom, never moves with keyboard */}
+      {!keyboardOpen && (
+        <View style={styles.bottomNavBar} pointerEvents="box-none">
+          {/* Other nav icons in flex row */}
+          <View style={styles.navBarContent}>
+            <TouchableOpacity onPress={() => router.push('/explore')} style={styles.navBarButton}>
+              <Ionicons name="search" size={24} color="#222" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/profile')} style={styles.navBarButton}>
+              <Ionicons name="person" size={24} color="#222" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {selectedLocation && (
         <TouchableOpacity 
@@ -1033,6 +1228,22 @@ export default function HomeScreen() {
           </View>
         </Modal>
       )}
+
+      {/* Floating Cart Button */}
+      <View style={styles.fabCartContainer} pointerEvents="box-none">
+        <TouchableOpacity
+          style={styles.fabCart}
+          onPress={() => router.push('/cart')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="cart-outline" size={28} color="#fff" />
+          {cartCount > 0 && (
+            <View style={styles.fabCartBadge}>
+              <ThemedText style={styles.fabCartBadgeText}>{cartCount}</ThemedText>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
     </ThemedView>
   );
 }
@@ -1041,57 +1252,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 10,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerButton: {
-    padding: 5,
-  },
-  modeToggleContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 10,
-  },
-  modeToggleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 4,
-  },
-  modeToggleButtonActive: {
-    backgroundColor: '#4CAF50',
-  },
-  modeToggleText: {
-    color: '#666',
-    fontSize: 14,
-    fontWeight: '500',
-    marginLeft: 6,
-  },
-  modeToggleTextActive: {
-    color: '#fff',
   },
   scrollView: {
     flex: 1,
@@ -1158,7 +1318,7 @@ const styles = StyleSheet.create({
   },
   promotionBanner: {
     marginHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 1,
     padding: 15,
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -1174,8 +1334,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   recommendedSection: {
-    padding: 20,
-    backgroundColor: '#fff',
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 22,
@@ -1183,69 +1342,72 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     color: '#333',
   },
-  recommendedGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  recommendedItem: {
-    width: '48%',
+  recommendedCard: {
+    width: 240,
+    marginRight: 20,
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 15,
+    borderRadius: 18,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 6,
+    overflow: 'hidden',
   },
-  itemName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#333',
-  },
-  itemPrice: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#4CAF50',
-    marginBottom: 12,
-  },
-  itemInfoContainer: {
-    backgroundColor: '#f8f8f8',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 8,
-    borderRadius: 6,
-  },
-  itemTimeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  itemTypeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  itemTime: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '400',
-  },
-  itemType: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '400',
-  },
-  itemImage: {
+  recommendedImage: {
     width: '100%',
-    height: 120,
-    borderRadius: 8,
-    marginBottom: 8,
-    resizeMode: 'cover',
+    height: 140,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    backgroundColor: '#eee',
+  },
+  recommendedCardContent: {
+    padding: 10,
+  },
+  recommendedName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#222',
+    marginBottom: 2,
+  },
+  recommendedPrice: {
+    fontSize: 15,
+    color: '#4CAF50',
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  recommendedDescription: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 4,
+    marginTop: 1,
+  },
+  recommendedInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 6,
+  },
+  recommendedTime: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 4,
+  },
+  recommendedAddButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  recommendedAddButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 6,
   },
   deliveryInfo: {
     backgroundColor: '#fff',
@@ -1377,7 +1539,7 @@ const styles = StyleSheet.create({
   },
   orderButtonContainer: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 90,
     left: 20,
     right: 20,
     alignItems: 'center',
@@ -1543,5 +1705,190 @@ const styles = StyleSheet.create({
   closeButtonText: {
     color: '#333',
     fontWeight: '600',
+  },
+  fabCartContainer: {
+    position: 'absolute',
+    bottom: 90,
+    right: 24,
+    zIndex: 2000,
+    elevation: 20,
+  },
+  fabCart: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#4CAF50',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  fabCartBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: '#FF5252',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  fabCartBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  suggestionsDropdown: {
+    position: 'relative',
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    elevation: 12,
+    zIndex: 100,
+    marginTop: 6,
+    paddingRight: 40,
+    maxHeight: 260,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  suggestionImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: '#f0f0f0',
+  },
+  suggestionImagePlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: '#f0f0f0',
+  },
+  suggestionTextBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  suggestionText: {
+    fontSize: 16,
+    color: '#222',
+    fontWeight: 'bold',
+  },
+  suggestionTextHighlight: {
+    color: '#111',
+    backgroundColor: '#e0e7ef',
+    borderRadius: 3,
+    paddingHorizontal: 1,
+  },
+  suggestionCategory: {
+    fontSize: 13,
+    color: '#888',
+    marginTop: 2,
+  },
+  fabOrderContainer: {
+    position: 'absolute',
+    left: 20,
+    right: undefined,
+    bottom: 90, // above nav bar
+    zIndex: 3000,
+    elevation: 30,
+  },
+  fabOrderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  fabOrderButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  bottomNavBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 50,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    zIndex: 2000,
+    elevation: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 0,
+  },
+  navBarContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
+  },
+  navBarButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logo: {
+    width: 80,
+    height: 80,
+  },
+  uniqueSearchBarWrapper: {
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 10,
+    width: '100%',
+  },
+  uniqueSearchBarCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
+    width: '92%',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    marginBottom: 2,
+  },
+  uniqueSearchInput: {
+    flex: 1,
+    fontSize: 18,
+    color: '#222',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    backgroundColor: 'transparent',
+    borderRadius: 30,
   },
 });

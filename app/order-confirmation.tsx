@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, Modal } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import LottieView from 'lottie-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { Linking } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
 
 export default function OrderConfirmationScreen() {
   const params = useLocalSearchParams();
@@ -16,12 +17,32 @@ export default function OrderConfirmationScreen() {
   const [showLetsGoModal, setShowLetsGoModal] = useState(false);
   const [loadingCheckpoint, setLoadingCheckpoint] = useState(false);
   const [checkpointError, setCheckpointError] = useState('');
+  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [deliveryPoint, setDeliveryPoint] = useState<{ latitude: number; longitude: number; name: string } | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowLetsGoModal(true);
     }, 5000);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    // Fetch current location and delivery point for map
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          setCurrentLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+        }
+        const dp = await AsyncStorage.getItem('selectedDeliveryPoint');
+        if (dp) {
+          const parsed = JSON.parse(dp);
+          setDeliveryPoint({ latitude: parsed.latitude, longitude: parsed.longitude, name: parsed.name });
+        }
+      } catch {}
+    })();
   }, []);
 
   const handleLetsGo = async () => {
@@ -56,22 +77,41 @@ export default function OrderConfirmationScreen() {
     }
   };
 
-  const handleContinueShopping = () => {
+  const handleContinueShopping = async () => {
+    await AsyncStorage.removeItem('selectedDeliveryPoint');
     router.push('/(tabs)');
   };
 
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.content}>
-        <View style={styles.iconContainer}>
-          <LottieView
-            source={require('../assets/animations/order-success.json')}
-            autoPlay
-            loop={false}
-            style={{ width: 140, height: 140 }}
-          />
-        </View>
-        
+      <ScrollView contentContainerStyle={styles.content}>
+        {/* Small Map showing current and destination */}
+        {currentLocation && deliveryPoint && (
+          <View style={{ width: '100%', height: 180, borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
+            <MapView
+              style={{ flex: 1 }}
+              initialRegion={{
+                latitude: (currentLocation.latitude + deliveryPoint.latitude) / 2,
+                longitude: (currentLocation.longitude + deliveryPoint.longitude) / 2,
+                latitudeDelta: Math.abs(currentLocation.latitude - deliveryPoint.latitude) * 2 + 0.02,
+                longitudeDelta: Math.abs(currentLocation.longitude - deliveryPoint.longitude) * 2 + 0.02,
+              }}
+              pointerEvents="none"
+            >
+              <Marker
+                coordinate={currentLocation}
+                title="Your Location"
+                pinColor="#4CAF50"
+              />
+              <Marker
+                coordinate={deliveryPoint}
+                title={deliveryPoint.name || 'Delivery Point'}
+                pinColor="#D32F2F"
+              />
+            </MapView>
+          </View>
+        )}
+
         <ThemedText style={styles.title}>Order Placed Successfully!</ThemedText>
         <ThemedText style={styles.subtitle}>
           Thank you for your order. Your items will be delivered soon.
@@ -104,7 +144,7 @@ export default function OrderConfirmationScreen() {
         >
           <ThemedText style={styles.continueButtonText}>Continue Shopping</ThemedText>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
       <Modal
         visible={showLetsGoModal}
         transparent
@@ -117,6 +157,12 @@ export default function OrderConfirmationScreen() {
             <ThemedText style={styles.subtitle}>Let's go to the checkpoint</ThemedText>
             <TouchableOpacity style={styles.continueButton} onPress={handleLetsGo}>
               <ThemedText style={styles.continueButtonText}>Let's Go</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.continueButton, { backgroundColor: '#FF9800', marginTop: 10 }]}
+              onPress={() => setShowLetsGoModal(false)}
+            >
+              <ThemedText style={styles.continueButtonText}>Close</ThemedText>
             </TouchableOpacity>
             {loadingCheckpoint && (
               <ThemedText style={styles.subtitle}>Loading checkpoint...</ThemedText>

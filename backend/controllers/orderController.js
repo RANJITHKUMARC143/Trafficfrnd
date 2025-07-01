@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Vendor = require('../models/Vendor');
 const fetch = require('node-fetch');
 const Earnings = require('../models/Earnings');
+const Alert = require('../models/Alert');
 
 // Utility function to get address from coordinates
 async function getAddressFromCoordinates(latitude, longitude) {
@@ -116,6 +117,14 @@ const updateOrderStatus = async (req, res) => {
         { orderId: order._id, status }
       );
     }
+
+    // Create alert for user about order update
+    await Alert.create({
+      title: 'Order Update',
+      message: `Your order status is now: ${status}`,
+      type: 'order-update',
+      userId: order.user,
+    });
 
     // Create Earnings record if order is completed and not already present
     if (status === 'completed' && order.deliveryBoyId) {

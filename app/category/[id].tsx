@@ -7,12 +7,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MenuItem } from '@/types/menu';
 import { LinearGradient } from 'expo-linear-gradient';
 import LottieView from 'lottie-react-native';
+import { menuService } from '@/services/menuService';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width, height } = Dimensions.get('window');
 const IMAGE_HEIGHT = height * 0.4;
 
 export default function CategoryScreen() {
-  const { id, name, locationId, locationType, locationName, allMenuItems } = useLocalSearchParams();
+  const { id, name, locationId, locationType, locationName } = useLocalSearchParams();
   const categoryName = Array.isArray(name) ? name[0] : name || 'Category';
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,24 +24,39 @@ export default function CategoryScreen() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [loadingFavorite, setLoadingFavorite] = useState(false);
   const [showCarAnimation, setShowCarAnimation] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
 
   useEffect(() => {
-    if (allMenuItems) {
-      try {
-        const parsedItems: MenuItem[] = JSON.parse(allMenuItems as string);
-        const itemsForCategory = parsedItems.filter(item => item.category === categoryName);
+    setLoading(true);
+    setError(null);
+    menuService.getAllMenuItems()
+      .then((items: MenuItem[]) => {
+        const itemsForCategory = items.filter(item => item.category === categoryName);
         setFilteredItems(itemsForCategory);
         setLoading(false);
-      } catch (e) {
-        console.error("CategoryScreen: Error parsing menu items from params:", e);
-        setError("Failed to load menu items. Invalid data.");
+      })
+      .catch((e) => {
+        setError('Failed to load menu items.');
         setLoading(false);
-      }
-    } else {
-      setError("No menu items provided for this category.");
-      setLoading(false);
-    }
-  }, [allMenuItems, categoryName]);
+      });
+  }, [categoryName]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchCartCount = async () => {
+        try {
+          const cartData = await AsyncStorage.getItem('cart');
+          const cartItems = cartData ? JSON.parse(cartData) : [];
+          setCartCount((cartItems as { quantity?: number }[]).reduce((sum: number, item: { quantity?: number }) => sum + (item.quantity || 1), 0));
+        } catch {
+          setCartCount(0);
+        }
+      };
+      fetchCartCount();
+      const interval = setInterval(fetchCartCount, 2000);
+      return () => clearInterval(interval);
+    }, [])
+  );
 
   // Favorite logic
   const checkFavoriteStatus = async (itemId: string) => {
@@ -123,7 +140,13 @@ export default function CategoryScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <LottieView
+          source={require('../../assets/animations/car-delivery.json')}
+          autoPlay
+          loop
+          style={{ width: 200, height: 200 }}
+        />
+        <ThemedText style={{ marginTop: 16, fontSize: 16, color: '#4CAF50' }}>Loading items...</ThemedText>
       </View>
     );
   }
@@ -139,11 +162,15 @@ export default function CategoryScreen() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-          <ThemedText style={styles.headerTitle}>{categoryName}</ThemedText>
+      <View style={styles.headerContainer}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color="#222" />
         </TouchableOpacity>
+        <ThemedText style={styles.headerTitle} numberOfLines={1}>{categoryName}</ThemedText>
       </View>
       
       {locationId && locationName && (
@@ -273,6 +300,21 @@ export default function CategoryScreen() {
           <ThemedText style={{ color: '#fff', fontSize: 18, marginTop: 20 }}>Your order is on the way!</ThemedText>
         </View>
       </Modal>
+      {/* Floating Cart Button */}
+      <View style={styles.fabCartContainer} pointerEvents="box-none">
+        <TouchableOpacity
+          style={styles.fabCart}
+          onPress={() => router.push('/cart')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="cart-outline" size={28} color="#fff" />
+          {cartCount > 0 && (
+            <View style={styles.fabCartBadge}>
+              <ThemedText style={styles.fabCartBadgeText}>{cartCount}</ThemedText>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -287,21 +329,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  header: {
+  headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingTop: 36,
+    paddingBottom: 18,
+    paddingHorizontal: 18,
+    backgroundColor: '#fff',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    zIndex: 10,
   },
   backButton: {
-    flexDirection: 'row',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f4f4f4',
     alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginLeft: 8,
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#222',
+    flex: 1,
   },
   locationBanner: {
     flexDirection: 'row',
@@ -463,5 +523,42 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 16,
     right: 16,
+  },
+  fabCartContainer: {
+    position: 'absolute',
+    bottom: 30,
+    right: 24,
+    zIndex: 2000,
+    elevation: 20,
+  },
+  fabCart: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#4CAF50',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  fabCartBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: '#FF5252',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  fabCartBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 }); 

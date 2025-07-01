@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const userAuth = require('../controllers/userAuth');
 const auth = require('../middleware/auth');
+const { saveDeliveryPoint } = require('../controllers/userAuth');
 
 // Public routes
 router.post('/register', userAuth.register);
@@ -25,6 +26,14 @@ router.get('/', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Error fetching users', error: error.message });
   }
+});
+
+// List all users (admin only)
+const User = require('../models/User');
+router.get('/', auth, async (req, res) => {
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+  const users = await User.find({}, 'name username email role').sort({ name: 1 });
+  res.json(users);
 });
 
 // Delete user by ID
@@ -87,5 +96,13 @@ router.post('/', auth, async (req, res) => {
     res.status(500).json({ message: 'Error adding user', error: error.message });
   }
 });
+
+// Specific delivery point route FIRST
+router.post('/users/delivery-point', saveDeliveryPoint);
+// Generic user by ID route LAST
+router.get('/users/:id', userAuth.getUserById);
+
+// Add POST /users/login route
+router.post('/users/login', userAuth.login);
 
 module.exports = router; 

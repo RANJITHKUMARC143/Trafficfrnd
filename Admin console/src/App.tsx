@@ -30,6 +30,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Orders from './pages/Orders';
 import DeliveryPoints from './pages/DeliveryPoints';
+import Alerts from './pages/Alerts';
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -75,6 +76,7 @@ function App() {
             <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
             <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
             <Route path="/delivery-points" element={<ProtectedRoute><DeliveryPoints /></ProtectedRoute>} />
+            <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </AnimatePresence>

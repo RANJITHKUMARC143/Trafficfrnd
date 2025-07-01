@@ -23,4 +23,6 @@ export interface MenuItem {
   allergens?: string[];
   createdAt: string;
   updatedAt: string;
+  rating?: number;
+  vendorId?: string;
 } 

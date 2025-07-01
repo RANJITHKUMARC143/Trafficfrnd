@@ -68,6 +68,44 @@ type TrafficPoint = {
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const MAX_SHEET_HEIGHT = SCREEN_HEIGHT * 0.6;
 
+// Replace <your-backend> with your actual backend IP and port
+const BACKEND_URL = 'http://192.168.4.176:3000'; // <-- UPDATED TO MATCH YOUR BACKEND
+
+async function saveDeliveryPointToBackend(destination, deliveryPoint) {
+  const token = await AsyncStorage.getItem('token');
+  const userId = await AsyncStorage.getItem('userId');
+  const payload = { userId, destination, deliveryPoint };
+  console.log('Saving delivery point to backend:', payload);
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/users/delivery-point`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    console.log('Backend response for delivery point save:', data);
+    if (!res.ok) throw new Error(data.message || 'Failed to save delivery point');
+    return data;
+  } catch (error) {
+    console.error('Error saving delivery point to backend:', error);
+    throw error;
+  }
+}
+
+async function fetchLatestDeliveryPoint(destination) {
+  const token = await AsyncStorage.getItem('token');
+  const userId = await AsyncStorage.getItem('userId');
+  const res = await fetch(`${BACKEND_URL}/api/users/${userId}/delivery-point?destination=${encodeURIComponent(destination)}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error('No delivery point found');
+  const data = await res.json();
+  return data.deliveryPoint;
+}
+
 export default function MapScreen() {
   const [locationCoords, setLocationCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [destination, setDestination] = useState<RoutePoint | null>(null);
@@ -1141,47 +1179,42 @@ export default function MapScreen() {
     const normalizedDeliveryPoint = {
       id: selectedLocation.id,
       name: selectedLocation.name,
-      address: selectedLocation.name, // or selectedLocation.address if available
+      address: selectedLocation.address || selectedLocation.name,
       latitude: selectedLocation.location.latitude,
       longitude: selectedLocation.location.longitude,
       type: selectedLocation.type,
     };
+    console.log('Saving delivery point to AsyncStorage:', normalizedDeliveryPoint);
+    // Save to AsyncStorage for use in the order process
+    await AsyncStorage.setItem('selectedDeliveryPoint', JSON.stringify(normalizedDeliveryPoint));
+    let destinationAddress = null;
     try {
-      await AsyncStorage.setItem('selectedDeliveryPoint', JSON.stringify(normalizedDeliveryPoint));
-      console.log('Selected delivery point saved:', normalizedDeliveryPoint);
-    } catch (error) {
-      console.error('Error saving selected delivery point:', error);
+      const destinationStr = await AsyncStorage.getItem('destination');
+      if (destinationStr) {
+        const parsedDestination = JSON.parse(destinationStr);
+        destinationAddress = parsedDestination.address;
+      }
+    } catch {}
+    if (destinationAddress) {
+      try {
+        await saveDeliveryPointToBackend(destinationAddress, normalizedDeliveryPoint);
+        console.log('Delivery point saved successfully.');
+      } catch (e) {
+        console.error('Failed to save delivery point:', e);
+      }
+    } else {
+      console.warn('No destination address found when trying to save delivery point.');
     }
-
-    // Navigate to explore page after selecting delivery point
-    router.push('/explore');
-
-    // Create a new destination object
-    const newDestination = {
-      latitude: selectedLocation.location.latitude,
-      longitude: selectedLocation.location.longitude,
-      address: selectedLocation.name
-    };
-
-    // Save destination to AsyncStorage
-    try {
-      console.log('Saving destination to AsyncStorage:', newDestination);
-      await AsyncStorage.setItem('destination', JSON.stringify(newDestination));
-      console.log('Destination saved successfully');
-      setDestination(newDestination);
-    } catch (error) {
-      console.error('Error saving destination:', error);
-    }
-
-    // Animate map to show the route and selected point
-    if (mapRef.current && locationCoords && newDestination) {
-      mapRef.current.animateToRegion({
-        latitude: newDestination.latitude,
-        longitude: newDestination.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }, 1000);
-    }
+    // Show confirmation dialog at the end
+    console.log('Showing Alert for delivery point selection.');
+    Alert.alert(
+      'Delivery Point Selected',
+      'Do you want to explore items now?',
+      [
+        { text: 'No', style: 'cancel' },
+        { text: 'Yes', onPress: () => router.push('/explore') }
+      ]
+    );
   };
 
   const findNearbyLocations = async () => {
@@ -1552,6 +1585,8 @@ export default function MapScreen() {
                   setDestination(newDestination);
                   setShowDestinationInput(false);
                   AsyncStorage.setItem('destination', JSON.stringify(newDestination));
+                  // Clear selected delivery point when destination changes
+                  AsyncStorage.removeItem('selectedDeliveryPoint');
                   if (locationCoords) {
                     // Generate and show high traffic points immediately after destination selection
                     const highTrafficPoints = generateHighTrafficPoints(locationCoords, {

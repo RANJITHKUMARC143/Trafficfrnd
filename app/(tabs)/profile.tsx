@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, SafeAreaView, Modal, Pressable } from 'react-native';
+import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, SafeAreaView, Modal, Pressable, Text, Dimensions } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,9 @@ import { router } from 'expo-router';
 import { API_URL } from '@src/config';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 
 type User = {
   id: string;
@@ -32,6 +35,8 @@ type AuthState = {
 // Lazy load the LocationPicker component
 const LocationPicker = lazy(() => import('../components/LocationPicker'));
 
+const { width } = Dimensions.get('window');
+
 export default function ProfileScreen() {
   const [authState, setAuthState] = useState<AuthState>({
     isAuthenticated: false,
@@ -53,6 +58,8 @@ export default function ProfileScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     const initializeProfile = async () => {
@@ -77,7 +84,10 @@ export default function ProfileScreen() {
   const checkAuthStatus = async () => {
     try {
       const userData = await AsyncStorage.getItem('user');
-      if (userData) {
+      const token = await AsyncStorage.getItem('token');
+      console.log('checkAuthStatus: user from storage:', userData);
+      console.log('checkAuthStatus: token from storage:', token);
+      if (userData && token) {
         const parsedUser = JSON.parse(userData);
         // Fetch complete user details
         const response = await fetch(`${API_URL}/api/users/${parsedUser.id}`, {
@@ -85,23 +95,15 @@ export default function ProfileScreen() {
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'Authorization': `Bearer ${await AsyncStorage.getItem('token')}`
+            'Authorization': `Bearer ${token}`
           }
         });
-
         if (!response.ok) {
+          Alert.alert('Error', 'Failed to fetch user details. Please log in again.');
           throw new Error('Failed to fetch user details');
         }
-
         const userDetails = await response.json();
         const profileImageUrl = getProfileImageUrl(userDetails.profileImage);
-        
-        console.log('Fetched user details:', {
-          userId: parsedUser.id,
-          hasProfileImage: !!profileImageUrl,
-          profileImageUrl
-        });
-
         setAuthState({
           isAuthenticated: true,
           user: {
@@ -121,6 +123,7 @@ export default function ProfileScreen() {
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
+      Alert.alert('Error', 'Failed to check authentication status. Please try again.');
       setAuthState({
         isAuthenticated: false,
         user: null,
@@ -134,11 +137,7 @@ export default function ProfileScreen() {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
-
     try {
-      console.log('Starting login process...');
-      console.log('Attempting login with email:', formData.email);
-      
       const response = await fetch(`${API_URL}/api/users/login`, {
         method: 'POST',
         headers: {
@@ -149,9 +148,6 @@ export default function ProfileScreen() {
           password: formData.password,
         }),
       });
-
-      console.log('Login response status:', response.status);
-      // Read response as text first
       const rawText = await response.text();
       let data;
       try {
@@ -161,31 +157,22 @@ export default function ProfileScreen() {
         Alert.alert('Raw response', rawText);
         throw new Error('Server did not return valid JSON. See log for details.');
       }
-      console.log('Login response data:', JSON.stringify(data, null, 2));
-
       if (!response.ok) {
         throw new Error(data.message || 'Failed to login');
       }
-
       if (!data.token || !data.user) {
         console.error('Invalid login response format:', data);
         throw new Error('Invalid server response format');
       }
-
-      console.log('Login successful, storing token and user data...');
-      
-      try {
-        await AsyncStorage.setItem('token', data.token);
-        console.log('Token stored successfully');
-        
-        await AsyncStorage.setItem('user', JSON.stringify(data.user));
-        console.log('User data stored successfully');
-      } catch (storageError) {
-        console.error('Error storing auth data:', storageError);
-        throw new Error('Failed to store authentication data');
-      }
-
-      console.log('Fetching complete user details...');
+      await AsyncStorage.setItem('token', data.token);
+      await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.setItem('userId', data.user.id || data.user._id);
+      // Debug: Log what is stored
+      const storedToken = await AsyncStorage.getItem('token');
+      const storedUser = await AsyncStorage.getItem('user');
+      console.log('After login: stored token:', storedToken);
+      console.log('After login: stored user:', storedUser);
+      // Fetch user details
       try {
         const userResponse = await fetch(`${API_URL}/api/users/${data.user.id}`, {
           method: 'GET',
@@ -195,18 +182,11 @@ export default function ProfileScreen() {
             'Authorization': `Bearer ${data.token}`
           }
         });
-
         if (!userResponse.ok) {
-          console.error('Failed to fetch user details:', userResponse.status);
           throw new Error('Failed to fetch user details');
         }
-
         const userDetails = await userResponse.json();
-        console.log('User details fetched successfully:', JSON.stringify(userDetails, null, 2));
-
         const profileImageUrl = getProfileImageUrl(userDetails.profileImage);
-        console.log('Profile image URL:', profileImageUrl);
-
         setAuthState({
           isAuthenticated: true,
           user: {
@@ -217,10 +197,7 @@ export default function ProfileScreen() {
           },
           isLoading: false,
         });
-        console.log('Auth state updated successfully');
       } catch (userDetailsError) {
-        console.error('Error fetching user details:', userDetailsError);
-        // Continue with basic user data if detailed fetch fails
         setAuthState({
           isAuthenticated: true,
           user: {
@@ -230,8 +207,6 @@ export default function ProfileScreen() {
           isLoading: false,
         });
       }
-
-      // Clear form
       setFormData({
         username: '',
         name: '',
@@ -243,11 +218,7 @@ export default function ProfileScreen() {
       });
     } catch (error) {
       console.error('Login error details:', error);
-      if (error instanceof Error) {
-        Alert.alert('Error', error.message || 'Failed to log in. Please try again.');
-      } else {
-        Alert.alert('Error', 'Network error. Please check your connection and try again.');
-      }
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to log in. Please try again.');
     }
   };
 
@@ -375,116 +346,6 @@ export default function ProfileScreen() {
     router.push('/edit-profile');
   };
 
-  // Upload profile photo
-  const handleUploadPhoto = async () => {
-    try {
-      console.log('Starting photo upload process...');
-      
-      // Request permission
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      console.log('Media library permission status:', status);
-      
-      if (status !== 'granted') {
-        console.log('Permission not granted');
-        Alert.alert('Permission required', 'Please grant permission to access your photos');
-        return;
-      }
-
-      // Pick the image
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      console.log('Image picker result:', {
-        canceled: result.canceled,
-        uri: result.assets?.[0]?.uri,
-        width: result.assets?.[0]?.width,
-        height: result.assets?.[0]?.height,
-        type: result.assets?.[0]?.type,
-        fileName: result.assets?.[0]?.fileName,
-      });
-
-      if (result.canceled) {
-        console.log('Image picker was canceled');
-        return;
-      }
-
-      if (!result.assets?.[0]?.uri) {
-        console.log('No image selected');
-        return;
-      }
-
-      const imageUri = result.assets[0].uri;
-      const filename = imageUri.split('/').pop() || 'profile.jpg';
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
-
-      console.log('Preparing upload with:', {
-        userId: authState.user?.id,
-        uploadUrl: `${API_URL}/api/users/${authState.user?.id}/profile-photo`,
-        hasToken: !!AsyncStorage.getItem('token'),
-        filename,
-        type,
-      });
-
-      const formData = new FormData();
-      formData.append('profileImage', {
-        uri: imageUri,
-        name: filename,
-        type,
-      } as any);
-
-      console.log('Sending upload request...');
-      const response = await fetch(`${API_URL}/api/users/${authState.user?.id}/profile-photo`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${AsyncStorage.getItem('token')}`,
-          'Content-Type': 'multipart/form-data',
-        },
-        body: formData,
-      });
-
-      console.log('Upload response status:', response.status);
-      const data = await response.json();
-      console.log('Upload response data:', data);
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to upload photo');
-      }
-
-      console.log('Upload successful, updating profile image in state');
-      setAuthState((prev) => prev.user ? {
-        ...prev,
-        user: { ...prev.user, profileImage: getProfileImageUrl(data.profileImage) }
-      } : prev);
-      console.log('Profile image updated successfully');
-    } catch (error) {
-      console.error('Error uploading photo:', error);
-      Alert.alert('Error', 'Failed to upload photo. Please try again.');
-    }
-  };
-
-  // Delete profile photo
-  const handleDeletePhoto = async () => {
-    try {
-      const userId = authState.user?.id;
-      const response = await fetch(`${API_URL}/api/users/${userId}/profile-photo`, {
-        method: 'DELETE',
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to delete photo');
-      setAuthState((prev) => prev.user ? {
-        ...prev,
-        user: { ...prev.user, profileImage: '' }
-      } : prev);
-    } catch (error) {
-      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to delete photo');
-    }
-  };
-
   // Add a function to safely load the location picker
   const handleLocationSectionPress = () => {
     if (!showLocationPicker) {
@@ -523,198 +384,96 @@ export default function ProfileScreen() {
 
   if (authState.isAuthenticated && authState.user) {
     return (
-      <ThemedView style={styles.container}>
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          <View style={styles.profileHeader}>
-            <View style={styles.coverPhoto}>
-              <View style={styles.profileImageWrapper}>
-                <TouchableOpacity onPress={() => setShowPhotoMenu(true)} activeOpacity={0.7}>
-                  {authState.user.profileImage ? (
-                    <Image
-                      source={{ uri: authState.user.profileImage }}
-                      style={styles.profileImage}
-                      onError={(e) => {
-                        console.error('Error loading profile image:', e.nativeEvent.error);
-                        // If image fails to load, show default profile image
-                        setAuthState(prev => ({
-                          ...prev,
-                          user: prev.user ? {
-                            ...prev.user,
-                            profileImage: undefined
-                          } : null
-                        }));
-                      }}
-                      onLoad={() => console.log('Profile image loaded successfully')}
-                      defaultSource={require('../../assets/images/icon.png')}
-                    />
-                  ) : (
-                    <View style={[styles.profileImage, styles.defaultProfileImage]}>
-                      <Ionicons name="person" size={40} color="#666" />
-                    </View>
-                  )}
-                </TouchableOpacity>
+      <ThemedView style={{ flex: 1, backgroundColor: '#f7f8fa' }}>
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+          {/* Hero Section */}
+          <LinearGradient
+            colors={["#4CAF50", "#43e97b"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.hero, { paddingTop: insets.top + 40 }]}
+          >
+            <View style={styles.avatarWrapper}>
+              <View style={styles.avatarShadow}>
+                <View style={styles.avatarCircle}>
+                  <Ionicons name="person" size={60} color="#fff" />
+                </View>
               </View>
-              {/* Popup menu for photo actions */}
-              <Modal
-                visible={showPhotoMenu}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setShowPhotoMenu(false)}
-              >
-                <Pressable style={styles.photoMenuOverlay} onPress={() => setShowPhotoMenu(false)}>
-                  <View style={styles.photoMenuContainer}>
-                    <TouchableOpacity onPress={() => { setShowPhotoMenu(false); handleUploadPhoto(); }} style={styles.photoMenuButton}>
-                      <ThemedText style={styles.photoMenuText}>Upload Photo</ThemedText>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => { setShowPhotoMenu(false); handleDeletePhoto(); }} style={styles.photoMenuButton}>
-                      <ThemedText style={[styles.photoMenuText, { color: '#ff6b6b' }]}>Delete Photo</ThemedText>
-                    </TouchableOpacity>
+            </View>
+            <Text style={styles.name}>{authState.user.name || authState.user.username || 'User'}</Text>
+            <Text style={styles.email}>{authState.user.email}</Text>
+            <View style={styles.roleBadge}>
+              <Ionicons name="star" size={14} color="#fff" />
+              <Text style={styles.roleText}>{authState.user.role ? authState.user.role.toUpperCase() : 'USER'}</Text>
+            </View>
+          </LinearGradient>
+
+          {/* Stats Row */}
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Ionicons name="cart-outline" size={28} color="#4CAF50" />
+              <Text style={styles.statNumber}>24</Text>
+              <Text style={styles.statLabel}>Orders</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Ionicons name="checkmark-done-outline" size={28} color="#43e97b" />
+              <Text style={styles.statNumber}>12</Text>
+              <Text style={styles.statLabel}>Completed</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Ionicons name="star-outline" size={28} color="#FFD700" />
+              <Text style={styles.statNumber}>4.8</Text>
+              <Text style={styles.statLabel}>Rating</Text>
+            </View>
+          </View>
+
+          {/* Personal Info Card */}
+          <View style={styles.infoCardWrapper}>
+            <BlurView intensity={40} tint="light" style={styles.infoCardGlass}>
+              <View style={styles.infoAccentBar} />
+              <View style={styles.infoCardContent}>
+                <Text style={styles.infoTitle}>Personal Information</Text>
+                <TouchableOpacity activeOpacity={0.85} style={styles.infoRowGlass}>
+                  <Ionicons name="person-circle" size={28} color="#4CAF50" style={styles.infoIconGlass} />
+                  <View style={styles.infoTextBlock}>
+                    <Text style={styles.infoLabelGlass}>Username</Text>
+                    <Text style={styles.infoValueGlass}>{authState.user.username}</Text>
                   </View>
-                </Pressable>
-              </Modal>
-            </View>
-            <View style={styles.profileInfo}>
-              <ThemedText style={styles.userName}>{authState.user.name || authState.user.username}</ThemedText>
-              <ThemedText style={styles.userEmail}>{authState.user.email}</ThemedText>
-            </View>
-          </View>
-
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <ThemedText style={styles.statNumber}>24</ThemedText>
-              <ThemedText style={styles.statLabel}>Orders</ThemedText>
-            </View>
-            <View style={[styles.statItem, styles.statBorder]}>
-              <ThemedText style={styles.statNumber}>12</ThemedText>
-              <ThemedText style={styles.statLabel}>Completed</ThemedText>
-            </View>
-            <View style={styles.statItem}>
-              <ThemedText style={styles.statNumber}>4.8</ThemedText>
-              <ThemedText style={styles.statLabel}>Rating</ThemedText>
-            </View>
-          </View>
-
-          <View style={styles.infoSection}>
-            <View style={styles.sectionHeader}>
-              <ThemedText style={styles.sectionTitle}>Personal Information</ThemedText>
-              <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
-                <Ionicons name="create-outline" size={20} color="#4CAF50" />
-                <ThemedText style={styles.editButtonText}>Edit</ThemedText>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.infoCard}>
-              <View style={styles.infoItem}>
-                <View style={styles.infoIconContainer}>
-                  <Ionicons name="person-outline" size={20} color="#4CAF50" />
-                </View>
-                <View style={styles.infoContent}>
-                  <ThemedText style={styles.infoLabel}>Username</ThemedText>
-                  <ThemedText style={styles.infoValue}>{authState.user.username}</ThemedText>
-                </View>
-              </View>
-
-              <View style={styles.infoDivider} />
-
-              <View style={styles.infoItem}>
-                <View style={styles.infoIconContainer}>
-                  <Ionicons name="call-outline" size={20} color="#4CAF50" />
-                </View>
-                <View style={styles.infoContent}>
-                  <ThemedText style={styles.infoLabel}>Phone Number</ThemedText>
-                  <ThemedText style={styles.infoValue}>{authState.user.phone || 'Not provided'}</ThemedText>
-                </View>
-              </View>
-
-              <View style={styles.infoDivider} />
-
-              <View style={styles.infoItem}>
-                <View style={styles.infoIconContainer}>
-                  <Ionicons name="location-outline" size={20} color="#4CAF50" />
-                </View>
-                <View style={styles.infoContent}>
-                  <ThemedText style={styles.infoLabel}>Address</ThemedText>
-                  <ThemedText style={styles.infoValue}>{authState.user.address || 'Not provided'}</ThemedText>
-                </View>
-              </View>
-
-              <View style={styles.infoDivider} />
-
-              <View style={styles.infoItem}>
-                <View style={styles.infoIconContainer}>
-                  <Ionicons name="mail-outline" size={20} color="#4CAF50" />
-                </View>
-                <View style={styles.infoContent}>
-                  <ThemedText style={styles.infoLabel}>Email</ThemedText>
-                  <ThemedText style={styles.infoValue}>{authState.user.email}</ThemedText>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.infoSection}>
-              <View style={styles.sectionHeader}>
-                <ThemedText style={styles.sectionTitle}>Location</ThemedText>
-                <TouchableOpacity 
-                  style={styles.editButton} 
-                  onPress={handleLocationSectionPress}
-                >
-                  <Ionicons name="refresh-outline" size={20} color="#4CAF50" />
-                  <ThemedText style={styles.editButtonText}>
-                    {showLocationPicker ? 'Hide Map' : 'Show Map'}
-                  </ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity activeOpacity={0.85} style={styles.infoRowGlass}>
+                  <Ionicons name="call" size={28} color="#43e97b" style={styles.infoIconGlass} />
+                  <View style={styles.infoTextBlock}>
+                    <Text style={styles.infoLabelGlass}>Phone</Text>
+                    <Text style={styles.infoValueGlass}>{authState.user.phone || 'Not provided'}</Text>
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity activeOpacity={0.85} style={styles.infoRowGlass}>
+                  <Ionicons name="location" size={28} color="#FFD700" style={styles.infoIconGlass} />
+                  <View style={styles.infoTextBlock}>
+                    <Text style={styles.infoLabelGlass}>Address</Text>
+                    <Text style={styles.infoValueGlass}>{authState.user.address || 'Not provided'}</Text>
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity activeOpacity={0.85} style={styles.infoRowGlass}>
+                  <Ionicons name="mail" size={28} color="#4CAF50" style={styles.infoIconGlass} />
+                  <View style={styles.infoTextBlock}>
+                    <Text style={styles.infoLabelGlass}>Email</Text>
+                    <Text style={styles.infoValueGlass}>{authState.user.email}</Text>
+                  </View>
                 </TouchableOpacity>
               </View>
-              <View style={styles.locationPickerContainer}>
-                {showLocationPicker && authState.user.id && (
-                  <Suspense fallback={
-                    <View style={[styles.locationPickerContainer, styles.loadingContainer]}>
-                      <ActivityIndicator size="large" color="#4CAF50" />
-                      <ThemedText style={styles.loadingText}>Loading map...</ThemedText>
-                    </View>
-                  }>
-                    <LocationPicker
-                      onLocationSelected={(location) => {
-                        console.log('Location selected:', location);
-                        // Update user location in state
-                        setAuthState(prev => ({
-                          ...prev,
-                          user: prev.user ? {
-                            ...prev.user,
-                            location: {
-                              latitude: location.latitude,
-                              longitude: location.longitude
-                            }
-                          } : null
-                        }));
-                      }}
-                      initialLocation={authState.user?.location ? {
-                        latitude: authState.user.location.latitude,
-                        longitude: authState.user.location.longitude
-                      } : undefined}
-                    />
-                  </Suspense>
-                )}
-                {!showLocationPicker && (
-                  <TouchableOpacity 
-                    style={styles.locationPlaceholder}
-                    onPress={handleLocationSectionPress}
-                  >
-                    <Ionicons name="map-outline" size={24} color="#4CAF50" />
-                    <ThemedText style={styles.locationPlaceholderText}>
-                      {authState.user?.location 
-                        ? 'Tap to view or update location'
-                        : 'Tap to set your location'}
-                    </ThemedText>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={22} color="#fff" />
-              <ThemedText style={styles.logoutButtonText}>Sign Out</ThemedText>
-            </TouchableOpacity>
+            </BlurView>
           </View>
+
+          {/* Action Buttons */}
+          <TouchableOpacity style={styles.editBtn} onPress={handleEditProfile}>
+            <Ionicons name="create-outline" size={20} color="#fff" />
+            <Text style={styles.editBtnText}>Edit Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={20} color="#fff" />
+            <Text style={styles.logoutBtnText}>Sign Out</Text>
+          </TouchableOpacity>
         </ScrollView>
       </ThemedView>
     );
@@ -978,50 +737,61 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     fontSize: 16,
   },
-  infoCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 15,
+  infoCardWrapper: {
+    marginHorizontal: 18,
+    marginTop: 18,
+    borderRadius: 24,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  infoItem: {
+  infoCardGlass: {
+    flexDirection: 'row',
+    borderRadius: 24,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.55)',
+  },
+  infoAccentBar: {
+    width: 7,
+    backgroundColor: 'linear-gradient(180deg, #4CAF50 0%, #43e97b 100%)',
+    borderTopLeftRadius: 24,
+    borderBottomLeftRadius: 24,
+  },
+  infoCardContent: {
+    flex: 1,
+    padding: 20,
+  },
+  infoRowGlass: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 16,
+    marginBottom: 12,
     paddingVertical: 12,
+    paddingHorizontal: 10,
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
   },
-  infoDivider: {
-    height: 1,
-    backgroundColor: '#f0f0f0',
-    marginVertical: 8,
+  infoIconGlass: {
+    marginRight: 14,
   },
-  infoIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#f0f7f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  infoContent: {
+  infoTextBlock: {
     flex: 1,
   },
-  infoLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
+  infoLabelGlass: {
+    fontSize: 13,
+    color: '#4CAF50',
+    fontWeight: 'bold',
+    marginBottom: 2,
   },
-  infoValue: {
+  infoValueGlass: {
     fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
+    color: '#222',
+    fontWeight: '600',
   },
   logoutButton: {
     backgroundColor: '#ff6b6b',
@@ -1110,33 +880,6 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontSize: 14,
   },
-  photoMenuOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  photoMenuContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    minWidth: 180,
-  },
-  photoMenuButton: {
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  photoMenuText: {
-    fontSize: 16,
-    color: '#4CAF50',
-    fontWeight: 'bold',
-  },
   defaultProfileImage: {
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
@@ -1194,5 +937,131 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     color: '#666',
     fontSize: 16,
+  },
+  hero: {
+    width: '100%',
+    alignItems: 'center',
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+    paddingBottom: 30,
+  },
+  avatarWrapper: {
+    marginBottom: 10,
+  },
+  avatarShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 8,
+    borderRadius: 60,
+  },
+  avatarCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#43e97b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 4,
+    borderColor: '#fff',
+  },
+  name: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  email: {
+    fontSize: 15,
+    color: '#e0ffe7',
+    marginTop: 2,
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: '#4CAF50',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    marginTop: 4,
+  },
+  roleText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: -30,
+    marginBottom: 20,
+    paddingHorizontal: 10,
+  },
+  statCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    alignItems: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 18,
+    width: width / 3.3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  infoTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#222',
+    marginBottom: 12,
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    borderRadius: 24,
+    marginHorizontal: 40,
+    marginTop: 28,
+    paddingVertical: 14,
+    justifyContent: 'center',
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  editBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ff6b6b',
+    borderRadius: 24,
+    marginHorizontal: 40,
+    marginTop: 16,
+    paddingVertical: 14,
+    justifyContent: 'center',
+    shadowColor: '#ff6b6b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  logoutBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginLeft: 8,
   },
 }); 

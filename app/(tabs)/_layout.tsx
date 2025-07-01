@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
-import React, { useEffect } from 'react';
-import { Platform } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Platform, View, Text, Animated, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
@@ -11,9 +11,11 @@ import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { updatePushToken } from '../services/orderService';
+import { fetchAlerts } from '../services/alertService';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     async function registerForPushNotificationsAsync() {
@@ -49,37 +51,54 @@ export default function TabLayout() {
     return () => subscription.remove();
   }, []);
 
+  // Poll unread alerts count every 10s
+  useEffect(() => {
+    let mounted = true;
+    const fetchUnread = async () => {
+      try {
+        const alerts = await fetchAlerts();
+        const unread = alerts.filter((a: any) => !a.read).length;
+        if (mounted) setUnreadCount(unread);
+      } catch {}
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 10000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, []);
+
   return (
     <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        tabBarInactiveTintColor: '#666',
+      screenOptions={({ route }) => ({
         headerShown: false,
         tabBarButton: (props) => <HapticTab {...props} />,
         tabBarBackground: () => <TabBarBackground />,
-        tabBarStyle: Platform.select({
-          ios: {
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 88,
-            paddingBottom: 30,
-            paddingTop: 10,
-          },
-          default: {
-            height: 60,
-            paddingBottom: 10,
-            paddingTop: 10,
-          },
-        }),
-      }}>
+        tabBarStyle: {
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 48,
+          borderRadius: 0,
+          backgroundColor: 'transparent',
+          shadowColor: 'transparent',
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0,
+          shadowRadius: 0,
+          elevation: 0,
+          borderTopWidth: 0,
+        },
+        tabBarShowLabel: false,
+      })}
+    >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="home" size={focused ? 32 : 26} color={focused ? '#111' : '#bbb'} style={{ opacity: focused ? 1 : 0.7, transform: [{ scale: focused ? 1.15 : 1 }] }} />
+              {focused && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#111', marginTop: 4 }} />}
+            </View>
           ),
         }}
       />
@@ -87,8 +106,11 @@ export default function TabLayout() {
         name="map"
         options={{
           title: 'Map',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="map" size={size} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="map" size={focused ? 32 : 26} color={focused ? '#111' : '#bbb'} style={{ opacity: focused ? 1 : 0.7, transform: [{ scale: focused ? 1.15 : 1 }] }} />
+              {focused && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#111', marginTop: 4 }} />}
+            </View>
           ),
         }}
       />
@@ -96,8 +118,11 @@ export default function TabLayout() {
         name="explore"
         options={{
           title: 'Explore',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="compass" size={size} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="compass" size={focused ? 32 : 26} color={focused ? '#111' : '#bbb'} style={{ opacity: focused ? 1 : 0.7, transform: [{ scale: focused ? 1.15 : 1 }] }} />
+              {focused && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#111', marginTop: 4 }} />}
+            </View>
           ),
         }}
       />
@@ -105,8 +130,28 @@ export default function TabLayout() {
         name="alerts"
         options={{
           title: 'Alerts',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications" size={size} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="notifications" size={focused ? 32 : 26} color={focused ? '#111' : '#bbb'} style={{ opacity: focused ? 1 : 0.7, transform: [{ scale: focused ? 1.15 : 1 }] }} />
+              {unreadCount > 0 && (
+                <View style={{
+                  position: 'absolute',
+                  top: -4,
+                  right: -10,
+                  backgroundColor: '#FF5252',
+                  borderRadius: 10,
+                  minWidth: 18,
+                  height: 18,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  paddingHorizontal: 4,
+                  zIndex: 10,
+                }}>
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>{unreadCount}</Text>
+                </View>
+              )}
+              {focused && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#111', marginTop: 4 }} />}
+            </View>
           ),
         }}
       />
@@ -114,8 +159,11 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="person" size={focused ? 32 : 26} color={focused ? '#111' : '#bbb'} style={{ opacity: focused ? 1 : 0.7, transform: [{ scale: focused ? 1.15 : 1 }] }} />
+              {focused && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#111', marginTop: 4 }} />}
+            </View>
           ),
         }}
       />

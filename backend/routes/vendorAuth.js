@@ -313,13 +313,9 @@ router.put('/push-token', auth, async (req, res) => {
 
 // Get all vendors (admin)
 router.get('/', auth, async (req, res) => {
-  try {
-    const vendors = await Vendor.find({}, '-password');
-    const vendorsWithId = vendors.map(vendor => ({ ...vendor.toObject(), id: vendor._id }));
-    res.json(vendorsWithId);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching vendors', error: error.message });
-  }
+  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+  const vendors = await Vendor.find({}, 'businessName email').sort({ businessName: 1 });
+  res.json(vendors);
 });
 
 // Add vendor (admin)

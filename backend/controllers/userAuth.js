@@ -304,4 +304,59 @@ exports.updatePushToken = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Error updating push token', error: error.message });
   }
+};
+
+// Get user by ID
+exports.getUserById = async (req, res) => {
+  try {
+    console.log('Looking for user with id:', req.params.id);
+    const user = await User.findById(req.params.id).select('-password');
+    console.log('User found:', user);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json({
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      name: user.name,
+      phone: user.phone,
+      address: user.address,
+      profileImage: user.profileImage,
+      role: user.role,
+      location: user.location
+    });
+  } catch (error) {
+    console.error('Error in getUserById:', error);
+    res.status(500).json({ message: 'Error fetching user', error: error.message });
+  }
+};
+
+// Save delivery point
+exports.saveDeliveryPoint = async (req, res) => {
+  console.log('Received delivery point:', req.body);
+  // TODO: Add logic to save delivery point to the user in the database
+  res.json({ message: 'Delivery point saved!' });
+};
+
+exports.loginUser = async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required' });
+  }
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+    // TODO: Replace with real password check (e.g., bcrypt.compare)
+    if (user.password !== password) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+    // TODO: Replace with real JWT secret
+    const token = jwt.sign({ id: user._id }, 'your_jwt_secret', { expiresIn: '7d' });
+    res.json({ token, user: { id: user._id, email: user.email, name: user.name } });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
 }; 
