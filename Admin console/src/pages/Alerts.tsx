@@ -20,7 +20,7 @@ const RECIPIENT_TYPES = [
   { value: 'delivery', label: 'Delivery Boy' },
 ];
 
-const API_URL = 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000';
 
 function getInitials(name) {
   if (!name) return '?';
@@ -71,26 +71,42 @@ export default function AlertsAdmin() {
   const [alerts, setAlerts] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showAll, setShowAll] = useState(false);
 
   const fetchAlerts = async () => {
     try {
       setLoading(true);
       setError('');
       const token = localStorage.getItem('token');
+      console.log('Fetching alerts from:', `${API_URL}/api/alerts`);
+      console.log('Token:', token ? 'Present' : 'Missing');
+      
       const res = await fetch(`${API_URL}/api/alerts`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error('Failed to fetch alerts');
+      
+      console.log('Response status:', res.status);
+      console.log('Response headers:', res.headers);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Response error text:', errorText);
+        throw new Error(`Failed to fetch alerts: ${res.status} ${errorText}`);
+      }
+      
       const data = await res.json();
+      console.log('Alerts data received:', data);
       setAlerts(data);
     } catch (err) {
-      setError('Failed to fetch alerts');
+      console.error('Error fetching alerts:', err);
+      setError(`Failed to fetch alerts: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    console.log('Alerts component mounted, API_URL:', API_URL);
     fetchAlerts();
   }, []);
 
@@ -103,7 +119,7 @@ export default function AlertsAdmin() {
       setLoadingRecipients(true);
       const token = localStorage.getItem('token');
       let url = '';
-      if (recipientType === 'user') url = `${API_URL}/api/users`;
+      if (recipientType === 'user') url = `${API_URL}/api`;
       if (recipientType === 'vendor') url = `${API_URL}/api/vendors`;
       if (recipientType === 'delivery') url = `${API_URL}/api/delivery`;
       if (!url) return;
@@ -185,9 +201,27 @@ export default function AlertsAdmin() {
     }
   };
 
+  const testConnection = async () => {
+    try {
+      console.log('Testing connection to:', API_URL);
+      const res = await fetch(`${API_URL}/api/test`);
+      const data = await res.json();
+      console.log('Test response:', data);
+      alert('Connection test successful!');
+    } catch (err) {
+      console.error('Connection test failed:', err);
+      alert(`Connection test failed: ${err.message}`);
+    }
+  };
+
   return (
     <div>
       <PageHeader title="Alerts" description="Create and manage system alerts" />
+      <div className="mb-4">
+        <Button onClick={testConnection} variant="secondary" size="sm">
+          Test Backend Connection
+        </Button>
+      </div>
       <Card>
         <form onSubmit={handleSubmit} className="space-y-4 p-4">
           <div>
@@ -250,16 +284,28 @@ export default function AlertsAdmin() {
           ) : alerts.length === 0 ? (
             <div className="text-gray-500">No alerts found.</div>
           ) : (
-            <ul className="divide-y divide-gray-200">
-              {alerts.slice(0, 10).map((alert) => (
-                <li key={alert._id} className="py-2">
-                  <div className="font-medium">{alert.title}</div>
-                  <div className="text-sm text-gray-600">{alert.message}</div>
-                  <div className="text-xs text-gray-400">{alert.type} | {new Date(alert.createdAt).toLocaleString()}</div>
-                  {alert.userId && <div className="text-xs text-blue-500">User: {alert.userId}</div>}
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="divide-y divide-gray-200">
+                {(showAll ? alerts : alerts.slice(0, 10)).map((alert) => (
+                  <li key={alert._id} className="py-2">
+                    <div className="font-medium">{alert.title}</div>
+                    <div className="text-sm text-gray-600">{alert.message}</div>
+                    <div className="text-xs text-gray-400">{alert.type} | {new Date(alert.createdAt).toLocaleString()}</div>
+                    {alert.userId && <div className="text-xs text-blue-500">User: {alert.userId}</div>}
+                  </li>
+                ))}
+              </ul>
+              {alerts.length > 10 && (
+                <div className="flex justify-center mt-2">
+                  <button
+                    className="text-blue-600 hover:underline text-sm"
+                    onClick={() => setShowAll((prev) => !prev)}
+                  >
+                    {showAll ? "See Less" : "See More"}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </Card>

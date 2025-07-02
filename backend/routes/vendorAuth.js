@@ -258,6 +258,41 @@ router.patch('/toggle-status', auth, async (req, res) => {
   }
 });
 
+// Get all vendors (admin) - MUST come before /public route
+router.get('/', auth, async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+    const vendors = await Vendor.find({}).sort({ businessName: 1 });
+    // Map _id to id for consistency and ensure all fields are present
+    const vendorsWithId = vendors.map(vendor => {
+      const vendorObj = vendor.toObject();
+      return {
+        id: vendorObj._id.toString(),
+        _id: vendorObj._id.toString(),
+        businessName: vendorObj.businessName || '',
+        ownerName: vendorObj.ownerName || '',
+        email: vendorObj.email || '',
+        phone: vendorObj.phone || '',
+        role: vendorObj.role || 'vendor',
+        isVerified: vendorObj.isVerified || false,
+        status: vendorObj.status || 'active',
+        isOpen: vendorObj.isOpen || false,
+        location: vendorObj.location || {},
+        address: vendorObj.address || {},
+        businessHours: vendorObj.businessHours || {},
+        rating: vendorObj.rating || 0,
+        totalRatings: vendorObj.totalRatings || 0,
+        createdAt: vendorObj.createdAt,
+        updatedAt: vendorObj.updatedAt,
+        expoPushToken: vendorObj.expoPushToken || ''
+      };
+    });
+    res.json(vendorsWithId);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching vendors', error: error.message });
+  }
+});
+
 // Public route: Get all active vendors
 router.get('/public', async (req, res) => {
   try {
@@ -311,12 +346,7 @@ router.put('/push-token', auth, async (req, res) => {
   }
 });
 
-// Get all vendors (admin)
-router.get('/', auth, async (req, res) => {
-  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
-  const vendors = await Vendor.find({}, 'businessName email').sort({ businessName: 1 });
-  res.json(vendors);
-});
+
 
 // Add vendor (admin)
 router.post('/', auth, async (req, res) => {
@@ -345,7 +375,14 @@ router.post('/', auth, async (req, res) => {
       expoPushToken: expoPushToken || ''
     });
     await vendor.save();
-    res.status(201).json({ vendor: vendor.getPublicProfile() });
+    const vendorObj = vendor.toObject();
+    res.status(201).json({ 
+      vendor: {
+        ...vendorObj,
+        id: vendorObj._id.toString(),
+        _id: vendorObj._id.toString()
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error adding vendor', error: error.message });
   }
@@ -364,7 +401,12 @@ router.put('/:id', auth, async (req, res) => {
     if (!vendor) {
       return res.status(404).json({ message: 'Vendor not found' });
     }
-    res.json(vendor.getPublicProfile());
+    const vendorObj = vendor.toObject();
+    res.json({
+      ...vendorObj,
+      id: vendorObj._id.toString(),
+      _id: vendorObj._id.toString()
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error updating vendor', error: error.message });
   }

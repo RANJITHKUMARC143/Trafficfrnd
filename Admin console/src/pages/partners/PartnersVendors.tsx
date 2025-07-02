@@ -341,7 +341,7 @@ const PartnersVendors: React.FC = () => {
   };
   
   const columns = [
-    { key: 'id', header: 'ID', sortable: true, render: (v: string) => <span className="font-mono text-xs text-gray-500">{v.slice(-8)}</span> },
+    { key: 'id', header: 'ID', sortable: true, render: (v: string) => <span className="font-mono text-xs text-gray-500">{v ? v.slice(-8) : 'N/A'}</span> },
     { 
       key: 'businessName', 
       header: 'Vendor', 
@@ -349,11 +349,11 @@ const PartnersVendors: React.FC = () => {
       render: (v: string, row: Vendor) => (
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-            {v.charAt(0).toUpperCase()}
+            {v ? v.charAt(0).toUpperCase() : 'V'}
           </div>
           <div>
-            <div className="font-semibold text-gray-900">{v}</div>
-            <div className="text-sm text-gray-500">{row.email}</div>
+            <div className="font-semibold text-gray-900">{v || 'N/A'}</div>
+            <div className="text-sm text-gray-500">{row.email || 'N/A'}</div>
           </div>
         </div>
       )
@@ -365,7 +365,7 @@ const PartnersVendors: React.FC = () => {
       render: (v: string) => (
         <div className="flex items-center space-x-2">
           <Users className="w-4 h-4 text-gray-400" />
-          <span className="font-medium">{v}</span>
+          <span className="font-medium">{v || 'N/A'}</span>
         </div>
       )
     },
@@ -376,7 +376,7 @@ const PartnersVendors: React.FC = () => {
       render: (v: string) => (
         <div className="flex items-center space-x-2">
           <Phone className="w-4 h-4 text-gray-400" />
-          <span className="font-mono text-sm">{v}</span>
+          <span className="font-mono text-sm">{v || 'N/A'}</span>
         </div>
       )
     },
@@ -390,7 +390,12 @@ const PartnersVendors: React.FC = () => {
           inactive: { icon: XCircle, color: 'text-gray-600', bg: 'bg-gray-100', label: 'Inactive' },
           suspended: { icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-100', label: 'Suspended' }
         };
-        const config = statusConfig[v as keyof typeof statusConfig];
+        const config = statusConfig[v as keyof typeof statusConfig] || { 
+          icon: AlertCircle, 
+          color: 'text-gray-600', 
+          bg: 'bg-gray-100', 
+          label: v || 'Unknown' 
+        };
         const Icon = config.icon;
         return (
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.color}`}>

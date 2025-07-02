@@ -5,13 +5,22 @@ const User = require('../models/User');
 exports.getAlerts = async (req, res) => {
   try {
     const userId = req.user?._id;
-    const alerts = await Alert.find({
-      $or: [
-        { userId: null },
-        { userId: userId }
-      ]
-    }).sort({ createdAt: -1 });
-    res.json(alerts);
+    const userRole = req.user?.role;
+    
+    // If user is admin, return all alerts
+    if (userRole === 'admin') {
+      const alerts = await Alert.find({}).sort({ createdAt: -1 });
+      res.json(alerts);
+    } else {
+      // For regular users, return only global alerts and their own alerts
+      const alerts = await Alert.find({
+        $or: [
+          { userId: null },
+          { userId: userId }
+        ]
+      }).sort({ createdAt: -1 });
+      res.json(alerts);
+    }
   } catch (error) {
     res.status(500).json({ message: 'Error fetching alerts' });
   }

@@ -43,6 +43,34 @@ function DataTable<T extends Record<string, any>>({
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   
+  // Validate data
+  if (!Array.isArray(data)) {
+    console.error('DataTable: data prop must be an array');
+    return (
+      <Card className="h-full">
+        <CardContent className="p-12">
+          <div className="text-center">
+            <p className="text-red-600">Invalid data format</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Validate columns
+  if (!Array.isArray(columns) || columns.length === 0) {
+    console.error('DataTable: columns prop must be a non-empty array');
+    return (
+      <Card className="h-full">
+        <CardContent className="p-12">
+          <div className="text-center">
+            <p className="text-red-600">Invalid columns configuration</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
   // Filtering logic
   const filteredData = searchTerm
     ? data.filter(item => 
@@ -158,13 +186,16 @@ function DataTable<T extends Record<string, any>>({
               {currentPageData.length > 0 ? (
                 currentPageData.map((row, rowIndex) => (
                   <tr key={rowIndex} className="hover:bg-gray-50 transition-colors">
-                    {columns.map((column) => (
-                      <td key={`${rowIndex}-${column.key}`} className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {column.render
-                          ? column.render(row[column.key], row)
-                          : row[column.key]}
-                      </td>
-                    ))}
+                    {columns.map((column) => {
+                      const cellValue = row[column.key];
+                      return (
+                        <td key={`${rowIndex}-${column.key}`} className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                          {column.render
+                            ? column.render(cellValue, row)
+                            : (cellValue !== undefined && cellValue !== null ? String(cellValue) : 'N/A')}
+                        </td>
+                      );
+                    })}
                     {rowActions && (
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                         {rowActions(row)}

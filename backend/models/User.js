@@ -39,6 +39,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: 'user',
   },
+  status: {
+    type: String,
+    enum: ['active', 'inactive', 'pending'],
+    default: 'active',
+  },
   location: {
     latitude: {
       type: Number,

@@ -14,26 +14,38 @@ router.put('/profile', auth, userAuth.updateProfile);
 router.put('/location', auth, userAuth.updateLocation);
 router.put('/push-token', auth, userAuth.updatePushToken);
 
-router.get('/', async (req, res) => {
+// List all users (admin only)
+const User = require('../models/User');
+router.get('/', auth, async (req, res) => {
   try {
-    const users = await require('../models/User').find({}, '-password');
-    // Map _id to id for consistency
-    const usersWithId = users.map(user => ({
-      ...user.toObject(),
-      id: user._id
-    }));
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+    const users = await User.find({}, '-password');
+    // Map _id to id for consistency and ensure all fields are present
+    const usersWithId = users.map(user => {
+      const userObj = user.toObject();
+      return {
+        id: userObj._id.toString(),
+        _id: userObj._id.toString(),
+        username: userObj.username || '',
+        name: userObj.name || '',
+        email: userObj.email || '',
+        phone: userObj.phone || '',
+        address: userObj.address || '',
+        profileImage: userObj.profileImage || '',
+        expoPushToken: userObj.expoPushToken || '',
+        role: userObj.role || 'user',
+        status: userObj.status || 'active',
+        location: userObj.location || {},
+        createdAt: userObj.createdAt,
+        lastActive: userObj.lastActive,
+        registrationDate: userObj.createdAt,
+        lastActivity: userObj.lastActive
+      };
+    });
     res.json(usersWithId);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching users', error: error.message });
   }
-});
-
-// List all users (admin only)
-const User = require('../models/User');
-router.get('/', auth, async (req, res) => {
-  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
-  const users = await User.find({}, 'name username email role').sort({ name: 1 });
-  res.json(users);
 });
 
 // Delete user by ID
@@ -62,7 +74,12 @@ router.put('/:id', auth, async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.json(user);
+    const userObj = user.toObject();
+    res.json({
+      ...userObj,
+      id: userObj._id.toString(),
+      _id: userObj._id.toString()
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error updating user', error: error.message });
   }
@@ -91,7 +108,15 @@ router.post('/', auth, async (req, res) => {
       address: address || '',
       role: role || 'user'
     });
-    res.status(201).json({ user: { ...user.toObject(), password: undefined } });
+    const userObj = user.toObject();
+    res.status(201).json({ 
+      user: { 
+        ...userObj, 
+        password: undefined,
+        id: userObj._id.toString(),
+        _id: userObj._id.toString()
+      } 
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error adding user', error: error.message });
   }

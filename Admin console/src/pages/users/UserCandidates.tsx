@@ -88,7 +88,7 @@ const UserCandidates: React.FC = () => {
       setError('');
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/users`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api`, {
           headers: { 'Authorization': token ? `Bearer ${token}` : '' }
         });
         const data = await res.json();
@@ -104,7 +104,7 @@ const UserCandidates: React.FC = () => {
   }, []);
   
   const columns = [
-    { key: 'id', header: 'ID', sortable: true, render: (v: string) => <span className="font-mono text-xs text-gray-500">{v.slice(-8)}</span> },
+    { key: 'id', header: 'ID', sortable: true, render: (v: string) => <span className="font-mono text-xs text-gray-500">{v ? v.slice(-8) : 'N/A'}</span> },
     { 
       key: 'name', 
       header: 'User', 
@@ -116,7 +116,7 @@ const UserCandidates: React.FC = () => {
           </div>
           <div>
             <div className="font-semibold text-gray-900">{v || 'N/A'}</div>
-            <div className="text-sm text-gray-500">{row.email}</div>
+            <div className="text-sm text-gray-500">{row.email || 'N/A'}</div>
           </div>
         </div>
       )
@@ -259,7 +259,7 @@ const UserCandidates: React.FC = () => {
     if (!window.confirm(`Are you sure you want to delete user ${user.name}?`)) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/users/${user.id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/${user.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
@@ -296,7 +296,7 @@ const UserCandidates: React.FC = () => {
     setFormError('');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/users/${form.id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/${form.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
         body: JSON.stringify(form)
@@ -318,7 +318,7 @@ const UserCandidates: React.FC = () => {
     setFormError('');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/users`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
         body: JSON.stringify(form)

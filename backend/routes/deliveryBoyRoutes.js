@@ -36,9 +36,43 @@ router.post('/earnings/summary/cashout', auth, deliveryBoyController.requestCash
 // List all delivery boys (admin only)
 const DeliveryBoy = require('../models/DeliveryBoy');
 router.get('/', auth, async (req, res) => {
-  if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
-  const deliveryBoys = await DeliveryBoy.find({}, 'fullName email').sort({ fullName: 1 });
-  res.json(deliveryBoys);
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+    const deliveryBoys = await DeliveryBoy.find({}).sort({ fullName: 1 });
+    // Map _id to id for consistency and ensure all fields are present
+    const deliveryBoysWithId = deliveryBoys.map(deliveryBoy => {
+      const deliveryBoyObj = deliveryBoy.toObject();
+      return {
+        id: deliveryBoyObj._id.toString(),
+        _id: deliveryBoyObj._id.toString(),
+        fullName: deliveryBoyObj.fullName || '',
+        email: deliveryBoyObj.email || '',
+        phone: deliveryBoyObj.phone || '',
+        role: deliveryBoyObj.role || 'delivery',
+        vehicleType: deliveryBoyObj.vehicleType || '',
+        vehicleNumber: deliveryBoyObj.vehicleNumber || '',
+        isActive: deliveryBoyObj.isActive !== undefined ? deliveryBoyObj.isActive : true,
+        status: deliveryBoyObj.status || 'active',
+        rating: deliveryBoyObj.rating || 0,
+        totalDeliveries: deliveryBoyObj.totalDeliveries || 0,
+        onTimeRate: deliveryBoyObj.onTimeRate || 0,
+        acceptanceRate: deliveryBoyObj.acceptanceRate || 0,
+        cancellationRate: deliveryBoyObj.cancellationRate || 0,
+        currentLocation: deliveryBoyObj.currentLocation || {},
+        address: deliveryBoyObj.address || {},
+        documents: deliveryBoyObj.documents || {},
+        bankDetails: deliveryBoyObj.bankDetails || {},
+        preferences: deliveryBoyObj.preferences || {},
+        earnings: deliveryBoyObj.earnings || {},
+        activityLog: deliveryBoyObj.activityLog || [],
+        createdAt: deliveryBoyObj.createdAt,
+        updatedAt: deliveryBoyObj.updatedAt
+      };
+    });
+    res.json(deliveryBoysWithId);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching delivery partners', error: error.message });
+  }
 });
 
 // Add a delivery partner
@@ -66,7 +100,14 @@ router.post('/', auth, async (req, res) => {
       role: 'delivery'
     });
     await deliveryBoy.save();
-    res.status(201).json({ deliveryBoy: deliveryBoy.getPublicProfile() });
+    const deliveryBoyObj = deliveryBoy.toObject();
+    res.status(201).json({ 
+      deliveryBoy: {
+        ...deliveryBoyObj,
+        id: deliveryBoyObj._id.toString(),
+        _id: deliveryBoyObj._id.toString()
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error adding delivery partner', error: error.message });
   }
@@ -89,7 +130,8 @@ router.get('/test/:id', async (req, res) => {
 
     const response = {
       ...deliveryBoy.toObject(),
-      id: deliveryBoy._id,
+      id: deliveryBoy._id.toString(),
+      _id: deliveryBoy._id.toString(),
       message: 'Test route working'
     };
 
@@ -134,7 +176,8 @@ router.get('/:id', auth, async (req, res) => {
 
     const response = {
       ...deliveryBoy.toObject(),
-      id: deliveryBoy._id,
+      id: deliveryBoy._id.toString(),
+      _id: deliveryBoy._id.toString(),
       totalDeliveries: totalOrders,
       onTimeRate: totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0,
       cancellationRate: totalOrders > 0 ? Math.round((cancelledOrders / totalOrders) * 100) : 0,
@@ -163,13 +206,14 @@ router.get('/:id/orders', auth, async (req, res) => {
 
     const ordersWithId = orders.map(order => ({
       ...order,
-      id: order._id,
+      id: order._id.toString(),
+      _id: order._id.toString(),
       vendorId: order.vendorId
-        ? { ...order.vendorId, id: order.vendorId._id }
-        : { businessName: 'Unknown', ownerName: '', id: '', phone: '', address: '' },
+        ? { ...order.vendorId, id: order.vendorId._id.toString(), _id: order.vendorId._id.toString() }
+        : { businessName: 'Unknown', ownerName: '', id: '', _id: '', phone: '', address: '' },
       user: order.user
-        ? order.user
-        : { fullName: 'Unknown', email: '', phone: '' }
+        ? { ...order.user, id: order.user._id ? order.user._id.toString() : '', _id: order.user._id ? order.user._id.toString() : '' }
+        : { fullName: 'Unknown', email: '', phone: '', id: '', _id: '' }
     }));
 
     res.json(ordersWithId);
@@ -194,7 +238,8 @@ router.get('/:id/vendors', auth, async (req, res) => {
 
     const vendorsWithId = vendors.map(vendor => ({
       ...vendor,
-      id: vendor._id
+      id: vendor._id.toString(),
+      _id: vendor._id.toString()
     }));
 
     res.json(vendorsWithId);
@@ -242,7 +287,12 @@ router.put('/:id', auth, async (req, res) => {
     if (!deliveryBoy) {
       return res.status(404).json({ message: 'Delivery partner not found' });
     }
-    res.json(deliveryBoy.getPublicProfile());
+    const deliveryBoyObj = deliveryBoy.toObject();
+    res.json({
+      ...deliveryBoyObj,
+      id: deliveryBoyObj._id.toString(),
+      _id: deliveryBoyObj._id.toString()
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error updating delivery partner', error: error.message });
   }
