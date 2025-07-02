@@ -5,6 +5,7 @@ import PageHeader from '../components/ui/PageHeader';
 import { GoogleMap, Marker, useJsApiLoader, Autocomplete } from '@react-google-maps/api';
 import { toast } from 'react-toastify';
 import axios from 'axios';
+import { Share2, Copy, ExternalLink } from 'lucide-react';
 
 interface DeliveryPoint {
   _id?: string;
@@ -33,6 +34,8 @@ const DeliveryPoints: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [selectedPoint, setSelectedPoint] = useState<DeliveryPoint | null>(null);
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
@@ -167,6 +170,35 @@ const DeliveryPoints: React.FC = () => {
     }
   };
 
+  const handleShare = (point: DeliveryPoint) => {
+    setSelectedPoint(point);
+    setShareModalOpen(true);
+  };
+
+  const generateShareLink = (point: DeliveryPoint) => {
+    const baseUrl = window.location.origin;
+    const shareUrl = `${baseUrl}/delivery-point/${point._id}`;
+    return shareUrl;
+  };
+
+  const generateMapLink = (point: DeliveryPoint) => {
+    return `https://www.google.com/maps?q=${point.latitude},${point.longitude}`;
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Link copied to clipboard!');
+    } catch (err) {
+      toast.error('Failed to copy link');
+    }
+  };
+
+  const closeShareModal = () => {
+    setShareModalOpen(false);
+    setSelectedPoint(null);
+  };
+
   const onLoadAutocomplete = (ac: google.maps.places.Autocomplete) => {
     setAutocomplete(ac);
   };
@@ -189,51 +221,67 @@ const DeliveryPoints: React.FC = () => {
   return (
     <div>
       <PageHeader title="Delivery Points" description="Manage delivery checkpoints for routes." />
-      <div className="flex flex-col md:flex-row gap-6">
-        <Card className="flex-1">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">All Delivery Points</h2>
-            <Button onClick={() => openModal()} variant="primary">+ Add Delivery Point</Button>
-          </div>
-          <div className="overflow-x-auto">
-            {loading ? (
-              <div className="text-center text-blue-600 py-4">Loading...</div>
-            ) : error ? (
-              <div className="text-center text-red-600 py-4">{error}</div>
-            ) : (
-              <table className="w-full text-left">
-                <thead>
-                  <tr>
-                    <th className="py-2">Name</th>
-                    <th>Latitude</th>
-                    <th>Longitude</th>
-                    <th>Address</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {deliveryPoints.map(point => (
-                    <tr key={point._id} className="border-t">
-                      <td className="py-2 font-medium">{point.name}</td>
-                      <td>{point.latitude}</td>
-                      <td>{point.longitude}</td>
-                      <td className="truncate max-w-xs">{point.address}</td>
-                      <td>
-                        <Button size="sm" onClick={() => handleEdit(point)} className="mr-2">Edit</Button>
+      <Card>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold">All Delivery Points</h2>
+          <Button onClick={() => openModal()} variant="primary">+ Add Delivery Point</Button>
+        </div>
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="text-center text-blue-600 py-4">Loading...</div>
+          ) : error ? (
+            <div className="text-center text-red-600 py-4">{error}</div>
+          ) : (
+            <table className="w-full text-left">
+              <thead>
+                <tr>
+                  <th className="py-2">Name</th>
+                  <th>Latitude</th>
+                  <th>Longitude</th>
+                  <th>Address</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deliveryPoints.map(point => (
+                  <tr key={point._id} className="border-t">
+                    <td className="py-2 font-medium">{point.name}</td>
+                    <td>{point.latitude}</td>
+                    <td>{point.longitude}</td>
+                    <td className="truncate max-w-xs">{point.address}</td>
+                    <td>
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          onClick={() => handleShare(point)} 
+                          className="flex items-center gap-1"
+                          variant="secondary"
+                        >
+                          <Share2 size={14} />
+                          Share
+                        </Button>
+                        <Button size="sm" onClick={() => handleEdit(point)}>Edit</Button>
                         <Button size="sm" variant="danger" onClick={() => handleDelete(point._id!)}>Delete</Button>
-                      </td>
-                    </tr>
-                  ))}
-                  {deliveryPoints.length === 0 && !loading && !error && (
-                    <tr><td colSpan={5} className="text-center text-gray-400 py-4">No delivery points yet.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {deliveryPoints.length === 0 && !loading && !error && (
+                  <tr><td colSpan={5} className="text-center text-gray-400 py-4">No delivery points yet.</td></tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+        
+        {/* Map Section */}
+        <div className="mt-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">Map View</h3>
+            <div className="text-sm text-gray-500">
+              Click on markers to share delivery points
+            </div>
           </div>
-        </Card>
-        <Card className="flex-1">
-          <h2 className="text-lg font-semibold mb-4">Map View</h2>
           <div style={{ height: 400, width: '100%' }}>
             {isLoaded && (
               <GoogleMap
@@ -246,13 +294,15 @@ const DeliveryPoints: React.FC = () => {
                     key={point._id}
                     position={{ lat: point.latitude, lng: point.longitude }}
                     label={point.name}
+                    onClick={() => handleShare(point)}
+                    cursor="pointer"
                   />
                 ))}
               </GoogleMap>
             )}
           </div>
-        </Card>
-      </div>
+        </div>
+      </Card>
       {/* Modal for Add/Edit */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
@@ -317,6 +367,97 @@ const DeliveryPoints: React.FC = () => {
                 <Button type="submit" variant="primary">{editingId ? 'Update' : 'Add'}</Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Share Modal */}
+      {shareModalOpen && selectedPoint && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative animate-fadeIn">
+            <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-700" onClick={closeShareModal}>&times;</button>
+            <h2 className="text-xl font-bold mb-4">Share Delivery Point</h2>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold text-lg mb-2">{selectedPoint.name}</h3>
+                <p className="text-gray-600 text-sm mb-4">{selectedPoint.address}</p>
+              </div>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Direct Link</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={generateShareLink(selectedPoint)}
+                      readOnly
+                      className="flex-1 border p-2 rounded text-sm bg-gray-50"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => copyToClipboard(generateShareLink(selectedPoint))}
+                      className="flex items-center gap-1"
+                    >
+                      <Copy size={14} />
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Google Maps Link</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={generateMapLink(selectedPoint)}
+                      readOnly
+                      className="flex-1 border p-2 rounded text-sm bg-gray-50"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => copyToClipboard(generateMapLink(selectedPoint))}
+                      className="flex items-center gap-1"
+                    >
+                      <Copy size={14} />
+                      Copy
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => window.open(generateMapLink(selectedPoint), '_blank')}
+                      className="flex items-center gap-1"
+                    >
+                      <ExternalLink size={14} />
+                      Open
+                    </Button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Coordinates</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={`${selectedPoint.latitude}, ${selectedPoint.longitude}`}
+                      readOnly
+                      className="flex-1 border p-2 rounded text-sm bg-gray-50"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => copyToClipboard(`${selectedPoint.latitude}, ${selectedPoint.longitude}`)}
+                      className="flex items-center gap-1"
+                    >
+                      <Copy size={14} />
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button onClick={closeShareModal} variant="secondary">Close</Button>
+              </div>
+            </div>
           </div>
         </div>
       )}

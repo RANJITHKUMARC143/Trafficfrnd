@@ -1,7 +1,8 @@
+console.log('[DEBUG] orderRoutes.js loaded');
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const { getOrders, getOrderById, updateOrderStatus, getOrdersByStatus } = require('../controllers/orderController');
+const { getOrders, getOrderById, updateOrderStatus, getOrdersByStatus, createOrder, getAvailableOrders } = require('../controllers/orderController');
 const Order = require('../models/Order');
 const User = require('../models/User');
 const Vendor = require('../models/Vendor');
@@ -76,14 +77,34 @@ router.delete('/admin/:orderId', auth, async (req, res) => {
 // Get all orders for the authenticated vendor
 router.get('/', auth, getOrders);
 
-// Get a specific order by ID
-router.get('/:orderId', auth, getOrderById);
-
 // Update order status
-router.patch('/:orderId/status', auth, updateOrderStatus);
+router.patch('/:orderId/status', auth, (req, res, next) => {
+  console.log('[BACKEND] PATCH /api/orders/:orderId/status called for orderId:', req.params.orderId, 'by user:', req.user && req.user._id);
+  next();
+}, updateOrderStatus);
 
 // Get orders by status
 router.get('/status/:status', auth, getOrdersByStatus);
+
+// Get available (unassigned, pending) orders for delivery boys
+router.get('/available', auth, (req, res, next) => {
+  console.log('HIT /orders/available');
+  next();
+}, getAvailableOrders);
+
+// Get a specific order by ID
+router.get('/:orderId', auth, async (req, res) => {
+  console.log('HIT /orders/:orderId', req.params.orderId);
+  try {
+    const order = await Order.findById(req.params.orderId);
+    console.log('Order found:', order);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    res.json(order);
+  } catch (err) {
+    console.error('Error fetching order by ID:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
 
 // Get detailed order information (admin)
 router.get('/admin/:orderId/details', auth, async (req, res) => {
@@ -105,5 +126,8 @@ router.get('/admin/:orderId/details', auth, async (req, res) => {
     res.status(500).json({ message: 'Error fetching order details', error: error.message });
   }
 });
+
+// Create a new order
+router.post('/', auth, createOrder);
 
 module.exports = router; 

@@ -712,7 +712,7 @@ export default function HomeScreen() {
   return (
     <ThemedView style={{ flex: 1 }}>
       <StatusBar style="auto" />
-      
+
       {/* Main Content Scrollable Area */}
       <ScrollView
         style={[
@@ -749,45 +749,45 @@ export default function HomeScreen() {
         </View>
 
         {/* Suggestions Dropdown (unchanged) */}
-        {searchSuggestions.length > 0 && (
-          <BlurView intensity={30} tint="light" style={styles.suggestionsDropdown}>
-            {searchSuggestions.map((item, idx) => {
-              const matchIdx = item.name.toLowerCase().indexOf(searchQuery.toLowerCase());
-              const before = item.name.slice(0, matchIdx);
-              const match = item.name.slice(matchIdx, matchIdx + searchQuery.length);
-              const after = item.name.slice(matchIdx + searchQuery.length);
-              return (
-                <TouchableOpacity
-                  key={item._id + idx}
-                  style={styles.suggestionItem}
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    setSearchQuery(item.name);
-                    setSearchSuggestions([]);
-                    handleSearch();
-                  }}
-                >
-                  {item.image ? (
-                    <Image source={{ uri: item.image }} style={styles.suggestionImage} />
-                  ) : (
-                    <View style={styles.suggestionImagePlaceholder} />
-                  )}
-                  <View style={styles.suggestionTextBlock}>
-                    <Text style={styles.suggestionText} numberOfLines={1}>
-                      {before}
-                      <Text style={styles.suggestionTextHighlight}>{match}</Text>
-                      {after}
-                    </Text>
-                    {item.category && (
-                      <Text style={styles.suggestionCategory}>{item.category}</Text>
+          {searchSuggestions.length > 0 && (
+            <BlurView intensity={30} tint="light" style={styles.suggestionsDropdown}>
+              {searchSuggestions.map((item, idx) => {
+                const matchIdx = item.name.toLowerCase().indexOf(searchQuery.toLowerCase());
+                const before = item.name.slice(0, matchIdx);
+                const match = item.name.slice(matchIdx, matchIdx + searchQuery.length);
+                const after = item.name.slice(matchIdx + searchQuery.length);
+                return (
+                  <TouchableOpacity
+                    key={item._id + idx}
+                    style={styles.suggestionItem}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      setSearchQuery(item.name);
+                      setSearchSuggestions([]);
+                      handleSearch();
+                    }}
+                  >
+                    {item.image ? (
+                      <Image source={{ uri: item.image }} style={styles.suggestionImage} />
+                    ) : (
+                      <View style={styles.suggestionImagePlaceholder} />
                     )}
-                  </View>
-                  <Ionicons name="arrow-forward" size={18} color="#bbb" style={{ marginLeft: 8 }} />
-                </TouchableOpacity>
-              );
-            })}
-          </BlurView>
-        )}
+                    <View style={styles.suggestionTextBlock}>
+                      <Text style={styles.suggestionText} numberOfLines={1}>
+                        {before}
+                        <Text style={styles.suggestionTextHighlight}>{match}</Text>
+                        {after}
+                      </Text>
+                      {item.category && (
+                        <Text style={styles.suggestionCategory}>{item.category}</Text>
+                      )}
+                    </View>
+                    <Ionicons name="arrow-forward" size={18} color="#bbb" style={{ marginLeft: 8 }} />
+                  </TouchableOpacity>
+                );
+              })}
+            </BlurView>
+          )}
 
         {/* Categories */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesContainer}>
@@ -1105,17 +1105,17 @@ export default function HomeScreen() {
 
       {/* Navigation Bar - always fixed at bottom, never moves with keyboard */}
       {!keyboardOpen && (
-        <View style={styles.bottomNavBar} pointerEvents="box-none">
-          {/* Other nav icons in flex row */}
-          <View style={styles.navBarContent}>
-            <TouchableOpacity onPress={() => router.push('/explore')} style={styles.navBarButton}>
-              <Ionicons name="search" size={24} color="#222" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/profile')} style={styles.navBarButton}>
-              <Ionicons name="person" size={24} color="#222" />
-            </TouchableOpacity>
-          </View>
+      <View style={styles.bottomNavBar} pointerEvents="box-none">
+        {/* Other nav icons in flex row */}
+        <View style={styles.navBarContent}>
+          <TouchableOpacity onPress={() => router.push('/explore')} style={styles.navBarButton}>
+            <Ionicons name="search" size={24} color="#222" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/profile')} style={styles.navBarButton}>
+            <Ionicons name="person" size={24} color="#222" />
+          </TouchableOpacity>
         </View>
+      </View>
       )}
 
       {selectedLocation && (

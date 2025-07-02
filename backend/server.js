@@ -18,6 +18,7 @@ const journeyRoutes = require('./routes/journeyRoutes');
 const routeSessionRoutes = require('./routes/routeSessionRoutes');
 const userOrderRoutes = require('./routes/userOrderRoutes');
 const rateLimit = require('express-rate-limit');
+const DeliveryBoy = require('./models/DeliveryBoy');
 
 // Load environment variables
 dotenv.config();
@@ -100,7 +101,8 @@ app.use('/api/routes', routeRoutes);
 app.use('/api/users/journey', journeyRoutes);
 app.use('/api/users/route-session', routeSessionRoutes);
 app.use('/api', userAuthRoutes);
-app.use('/api/orders', userOrderRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/user/orders', userOrderRoutes);
 
 // Add delivery points route for admin console
 app.use('/api/delivery-points', require('./routes/deliveryPointRoutes'));
@@ -122,6 +124,12 @@ app.use((req, res) => {
 // WebSocket connection handling
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
+  console.log('Socket handshake auth:', socket.handshake.auth);
+  // If the client is a delivery boy, join the deliveryBoys room
+  if (socket.handshake.auth && socket.handshake.auth.role === 'delivery') {
+    socket.join('deliveryBoys');
+    console.log('Socket', socket.id, 'joined deliveryBoys room');
+  }
 
   // Handle delivery boy location updates
   socket.on('updateLocation', async (data) => {

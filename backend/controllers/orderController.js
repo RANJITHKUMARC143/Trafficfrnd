@@ -64,18 +64,22 @@ const getOrders = async (req, res) => {
 // Get a specific order by ID
 const getOrderById = async (req, res) => {
   try {
-    console.log('[BACKEND] getOrderById called with orderId:', req.params.orderId, 'vendorId:', req.user && req.user._id);
+    console.log('[BACKEND] getOrderById called with orderId:', req.params.orderId, 'userId:', req.user && req.user._id, 'role:', req.user && req.user.role);
     if (!req.user || !req.user._id) {
-      console.error('No vendor user found on request!');
-      return res.status(401).json({ message: 'Unauthorized: No vendor user found' });
+      console.error('No user found on request!');
+      return res.status(401).json({ message: 'Unauthorized: No user found' });
     }
+    // Allow vendor or delivery boy to fetch their order
     const order = await Order.findOne({
       _id: req.params.orderId,
-      vendorId: req.user._id
+      $or: [
+        { vendorId: req.user._id },
+        { deliveryBoyId: req.user._id }
+      ]
     });
 
     if (!order) {
-      console.log('[BACKEND] Order not found for orderId:', req.params.orderId, 'vendorId:', req.user._id);
+      console.log('[BACKEND] Order not found for orderId:', req.params.orderId, 'userId:', req.user._id);
       return res.status(404).json({ message: 'Order not found' });
     }
 
@@ -90,60 +94,47 @@ const getOrderById = async (req, res) => {
 // Update order status
 const updateOrderStatus = async (req, res) => {
   try {
-    if (!req.user || !req.user._id) {
-      console.error('No vendor user found on request!');
-      return res.status(401).json({ message: 'Unauthorized: No vendor user found' });
-    }
+    const { orderId } = req.params;
     const { status } = req.body;
-    const order = await Order.findOneAndUpdate(
-      { _id: req.params.orderId, vendorId: req.user._id },
-      { status, updatedAt: Date.now() },
-      { new: true }
-    );
-
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Unauthorized: No user found' });
+    }
+    // Find the order first
+    let order = await Order.findById(orderId);
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
-
-    // Emit real-time update
-    req.app.get('io').to(req.user._id.toString()).emit('orderStatusUpdate', order);
-
-    // Notify user
-    const user = await User.findById(order.user);
-    if (user && user.expoPushToken) {
-      await sendExpoPushNotification(
-        user.expoPushToken,
-        { title: 'Order Update', body: `Your order status is now: ${status}` },
-        { orderId: order._id, status }
-      );
-    }
-
-    // Create alert for user about order update
-    await Alert.create({
-      title: 'Order Update',
-      message: `Your order status is now: ${status}`,
-      type: 'order-update',
-      userId: order.user,
-    });
-
-    // Create Earnings record if order is completed and not already present
-    if (status === 'completed' && order.deliveryBoyId) {
-      const existingEarning = await Earnings.findOne({ orderId: order._id });
-      if (!existingEarning) {
-        await Earnings.create({
-          deliveryBoyId: order.deliveryBoyId,
-          orderId: order._id,
-          amount: order.totalAmount,
-          hours: 1, // You may want to calculate actual hours
-          date: new Date(),
-          status: 'completed',
-        });
+    // If order is pending, has no deliveryBoyId, and user is a delivery boy, allow claim
+    if (
+      order.status === 'pending' &&
+      !order.deliveryBoyId &&
+      req.user.role === 'delivery' &&
+      status === 'confirmed'
+    ) {
+      order.deliveryBoyId = req.user._id;
+      order.status = 'confirmed';
+      order.updatedAt = Date.now();
+      await order.save();
+      // Emit real-time update to all delivery boys
+      const io = req.app.get('io');
+      if (io) {
+        console.log('[SOCKET] Emitting orderClaimed to deliveryBoys:', order._id);
+        io.to('deliveryBoys').emit('orderClaimed', order);
       }
+      return res.json({ success: true, order });
     }
-
-    res.json(order);
+    // Otherwise, only allow vendor or assigned delivery boy to update
+    if (
+      order.vendorId.toString() !== req.user._id.toString() &&
+      order.deliveryBoyId?.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({ message: 'Forbidden: Not your order' });
+    }
+    order.status = status;
+    order.updatedAt = Date.now();
+    await order.save();
+    res.json({ success: true, order });
   } catch (error) {
-    console.error('Error updating order status:', error);
     res.status(500).json({ message: 'Error updating order status', error: error.message });
   }
 };
@@ -254,6 +245,13 @@ const createOrder = async (req, res) => {
       );
     }
 
+    // Emit socket event for new order
+    const io = req.app.get('io');
+    if (io) {
+      console.log('[SOCKET] Emitting orderCreated to deliveryBoys:', order);
+      io.to('deliveryBoys').emit('orderCreated', order);
+    }
+
     res.status(201).json(order);
   } catch (error) {
     console.error('Error creating order:', error);
@@ -311,6 +309,23 @@ const updateDeliveryBoyLocation = async (req, res) => {
   }
 };
 
+// Get available (unassigned, pending) orders for delivery boys
+const getAvailableOrders = async (req, res) => {
+  try {
+    const orders = await Order.find({
+      status: 'pending',
+      $or: [
+        { deliveryBoyId: { $exists: false } },
+        { deliveryBoyId: null }
+      ]
+    }).sort({ timestamp: -1 });
+    res.json(orders);
+  } catch (error) {
+    console.error('Error fetching available orders:', error);
+    res.status(500).json({ message: 'Error fetching available orders', error: error.message });
+  }
+};
+
 module.exports = {
   getOrders,
   getOrderById,
@@ -319,4 +334,5 @@ module.exports = {
   createOrder,
   getUserOrders,
   updateDeliveryBoyLocation,
+  getAvailableOrders,
 }; 
