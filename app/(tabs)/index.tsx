@@ -180,14 +180,17 @@ export default function HomeScreen() {
     // Fetch all menu items initially
     menuService.getAllMenuItems().then((items) => {
       if (mounted) {
-        setRecommendedItems(items.filter(item => item.isAvailable));
+        // Recommend the last added (newest) products
+        const sortedByDate = [...items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setRecommendedItems(sortedByDate.slice(0, 10));
         setLoadingRecommended(false);
       }
     });
     // Subscribe to real-time updates
     const unsubscribe = menuService.onMenuUpdate((items) => {
       if (mounted) {
-        setRecommendedItems(items.filter(item => item.isAvailable));
+        const sortedByDate = [...items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setRecommendedItems(sortedByDate.slice(0, 10));
       }
     });
     return () => {
@@ -201,19 +204,17 @@ export default function HomeScreen() {
     setLoadingTopRated(true);
     menuService.getAllMenuItems().then((items) => {
       if (mounted) {
-        // Filter items with rating >= 4.5, or top 10 by rating
-        const sorted = [...items].sort((a, b) => (b.rating || 0) - (a.rating || 0));
-        const filtered = sorted.filter(item => (item.rating || 0) >= 4.5);
-        setTopRatedItems(filtered.length > 0 ? filtered.slice(0, 10) : sorted.slice(0, 10));
+        // Top Rated: show 10 most popular items (by orderCount), then by rating
+        const sorted = [...items].sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0) || (b.rating || 0) - (a.rating || 0));
+        setTopRatedItems(sorted.slice(0, 10));
         setLoadingTopRated(false);
       }
     });
     // Subscribe to real-time updates
     const unsubscribeTopRated = menuService.onMenuUpdate((items) => {
       if (mounted) {
-        const sorted = [...items].sort((a, b) => (b.rating || 0) - (a.rating || 0));
-        const filtered = sorted.filter(item => (item.rating || 0) >= 4.5);
-        setTopRatedItems(filtered.length > 0 ? filtered.slice(0, 10) : sorted.slice(0, 10));
+        const sorted = [...items].sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0) || (b.rating || 0) - (a.rating || 0));
+        setTopRatedItems(sorted.slice(0, 10));
       }
     });
     return () => {

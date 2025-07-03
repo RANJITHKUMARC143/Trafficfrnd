@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../theme/theme';
 import { Order } from '../types/order';
 import { orderService } from '../services/orderService';
+import { stopAlert } from '../utils/soundPlayer';
 
 export const OrderDetailsScreen = () => {
   const navigation = useNavigation();
@@ -43,6 +44,9 @@ export const OrderDetailsScreen = () => {
     setLoading(true);
     setError(null);
     try {
+      if (status === 'confirmed') {
+        await stopAlert();
+      }
       await orderService.updateOrderStatus(orderId, status);
       await fetchOrderDetails();
     } catch (err: any) {
@@ -137,12 +141,14 @@ export const OrderDetailsScreen = () => {
         </View>
       </View>
       <View style={styles.actions}>
-        {order.status === 'pending' && (
+        {/* Only show Confirm Order if order is pending and no delivery boy has accepted */}
+        {order.status === 'pending' && !order.deliveryBoyId && (
           <TouchableOpacity style={styles.acceptButton} onPress={() => handleStatusUpdate('confirmed')}>
             <Text style={styles.buttonText}>Confirm Order</Text>
           </TouchableOpacity>
         )}
-        {order.status === 'confirmed' && (
+        {/* Only show Start Preparing if order is confirmed and delivery boy has accepted */}
+        {order.status === 'confirmed' && order.deliveryBoyId && (
           <TouchableOpacity style={styles.acceptButton} onPress={() => handleStatusUpdate('preparing')}>
             <Text style={styles.buttonText}>Start Preparing</Text>
           </TouchableOpacity>

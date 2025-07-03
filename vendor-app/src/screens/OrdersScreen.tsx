@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { theme } from '../theme/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,7 @@ import { orderService } from '../services/orderService';
 import { orderNotificationService } from '../services/orderNotificationService';
 import { Order } from '../types/order';
 import { showOrderNotificationWithSound, showOrderStatusNotificationWithSound } from '../services/notificationBridge';
+import { playAlertLoop, stopAlert } from '../utils/soundPlayer';
 
 const mockOrders: Order[] = [
   {
@@ -147,6 +149,18 @@ const OrderCard = ({ order, onStatusUpdate }: { order: Order; onStatusUpdate: ()
         >
           <Text style={styles.outlineButtonText}>View Details</Text>
         </TouchableOpacity>
+        {/* Show Start Preparing if order is confirmed and deliveryBoyId is set */}
+        {order.status === 'confirmed' && order.deliveryBoyId && (
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.primaryButton]} 
+            onPress={async () => {
+              await orderService.updateOrderStatus(order._id, 'preparing');
+              onStatusUpdate();
+            }}
+          >
+            <Text style={styles.primaryButtonText}>Start Preparing</Text>
+          </TouchableOpacity>
+        )}
         {order.status === 'pending' && (
           <TouchableOpacity 
             style={[styles.actionButton, styles.primaryButton]} 
@@ -192,11 +206,28 @@ export const OrdersScreen = () => {
       });
     });
 
-    orderNotificationService.onNewOrder((newOrder) => {
+    orderNotificationService.onNewOrder(async (newOrder) => {
       setOrders(currentOrders => [newOrder, ...currentOrders]);
-      showOrderNotificationWithSound(newOrder, () => {
-        navigation.navigate('OrderDetails', { orderId: newOrder._id });
-      });
+      await playAlertLoop();
+      Alert.alert(
+        'New Order Received',
+        `Order #${newOrder.orderId} from ${newOrder.customerName}\nTotal: ₹${newOrder.totalAmount}`,
+        [
+          {
+            text: 'View Details',
+            onPress: () => {
+              stopAlert();
+              navigation.navigate('OrderDetails', { orderId: newOrder.orderId });
+            },
+          },
+          {
+            text: 'Dismiss',
+            style: 'cancel',
+            onPress: stopAlert,
+          },
+        ],
+        { cancelable: true }
+      );
     });
 
     orderNotificationService.onOrderCancelled((orderId) => {

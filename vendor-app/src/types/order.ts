@@ -16,4 +16,5 @@ export interface Order {
   updatedAt: string;
   deliveryAddress?: string;
   specialInstructions?: string;
+  deliveryBoyId?: string;
 } 

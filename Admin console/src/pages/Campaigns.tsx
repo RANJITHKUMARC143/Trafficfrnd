@@ -22,107 +22,13 @@ interface Campaign {
 const Campaigns: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'active' | 'scheduled' | 'completed' | 'all'>('active');
   
-  const campaigns: Campaign[] = [
-    {
-      id: 'CAM001',
-      name: 'Summer Job Fair 2023',
-      status: 'active',
-      type: 'event',
-      startDate: '2023-06-01',
-      endDate: '2023-06-30',
-      budget: 5000,
-      reach: 15000,
-      conversion: 12.5,
-      roi: 2.8
-    },
-    {
-      id: 'CAM002',
-      name: 'Graduate Recruitment Campaign',
-      status: 'active',
-      type: 'advertisement',
-      startDate: '2023-05-15',
-      endDate: '2023-07-15',
-      budget: 8000,
-      reach: 25000,
-      conversion: 8.2,
-      roi: 1.9
-    },
-    {
-      id: 'CAM003',
-      name: 'Tech Talent Attraction',
-      status: 'scheduled',
-      type: 'social',
-      startDate: '2023-07-01',
-      endDate: '2023-08-31',
-      budget: 6000,
-      reach: 0,
-      conversion: 0
-    },
-    {
-      id: 'CAM004',
-      name: 'Healthcare Professionals Recruitment',
-      status: 'completed',
-      type: 'email',
-      startDate: '2023-03-01',
-      endDate: '2023-04-30',
-      budget: 3500,
-      reach: 12000,
-      conversion: 10.8,
-      roi: 2.4
-    },
-    {
-      id: 'CAM005',
-      name: 'Remote Work Opportunities',
-      status: 'draft',
-      type: 'advertisement',
-      startDate: '',
-      endDate: '',
-      reach: 0,
-      conversion: 0
-    },
-    {
-      id: 'CAM006',
-      name: 'Seasonal Hiring Promotion',
-      status: 'scheduled',
-      type: 'promotion',
-      startDate: '2023-08-15',
-      endDate: '2023-10-15',
-      budget: 4500,
-      reach: 0,
-      conversion: 0
-    },
-  ];
+  // TODO: Fetch campaigns from backend API
+  const campaigns: Campaign[] = [];
   
-  const filteredCampaigns = activeTab === 'all'
-    ? campaigns
-    : campaigns.filter(campaign => campaign.status === activeTab);
+  const filteredCampaigns = [];
   
-  const campaignStats = [
-    { 
-      label: 'Active Campaigns', 
-      value: campaigns.filter(c => c.status === 'active').length,
-      icon: <Megaphone size={18} />,
-      color: 'bg-blue-100 text-blue-600' 
-    },
-    { 
-      label: 'Total Reach', 
-      value: campaigns.reduce((sum, campaign) => sum + campaign.reach, 0).toLocaleString(),
-      icon: <TrendingUp size={18} />,
-      color: 'bg-emerald-100 text-emerald-600' 
-    },
-    { 
-      label: 'Avg. Conversion', 
-      value: `${(campaigns.filter(c => c.conversion > 0).reduce((sum, campaign) => sum + campaign.conversion, 0) / campaigns.filter(c => c.conversion > 0).length).toFixed(2)}%`,
-      icon: <BarChart3 size={18} />,
-      color: 'bg-purple-100 text-purple-600' 
-    },
-    { 
-      label: 'Upcoming Campaigns', 
-      value: campaigns.filter(c => c.status === 'scheduled').length,
-      icon: <CalendarDays size={18} />,
-      color: 'bg-amber-100 text-amber-600' 
-    },
-  ];
+  // TODO: Fetch campaign stats from backend API
+  const campaignStats: any[] = [];
   
   const getCampaignStatusColor = (status: Campaign['status']) => {
     switch (status) {

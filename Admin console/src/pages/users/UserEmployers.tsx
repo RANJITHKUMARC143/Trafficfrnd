@@ -21,18 +21,8 @@ interface Employer {
 const UserEmployers: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   
-  // Mock data
-  const employers: Employer[] = Array.from({ length: 45 }).map((_, index) => ({
-    id: `EMP${1000 + index}`,
-    name: `Company ${index + 1} ${index % 3 === 0 ? 'Technologies' : index % 4 === 0 ? 'Solutions' : 'Inc'}`,
-    industry: ['Technology', 'Healthcare', 'Finance', 'Education', 'Manufacturing', 'Retail'][index % 6],
-    location: ['New York', 'San Francisco', 'Chicago', 'Austin', 'Seattle', 'Boston'][index % 6],
-    size: ['1-10', '11-50', '51-200', '201-500', '501-1000', '1000+'][index % 6],
-    status: index % 7 === 0 ? 'pending' : (index % 11 === 0 ? 'suspended' : 'active'),
-    jobsPosted: Math.floor(Math.random() * 20),
-    joinDate: new Date(2022, Math.floor(index / 8), (index % 28) + 1).toISOString().split('T')[0],
-    lastActive: new Date(2023, Math.floor(index / 4), (index % 28) + 1).toISOString().split('T')[0],
-  }));
+  // TODO: Fetch employers from backend API
+  const employers: Employer[] = [];
   
   const columns = [
     {

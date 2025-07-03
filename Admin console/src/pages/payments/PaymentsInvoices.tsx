@@ -28,62 +28,8 @@ interface Invoice {
 const PaymentsInvoices: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   
-  // Mock data
-  const invoices: Invoice[] = Array.from({ length: 50 }).map((_, index) => {
-    const issueDateObj = new Date(2023, 5, 30 - (index % 30));
-    const dueDate = new Date(issueDateObj);
-    dueDate.setDate(dueDate.getDate() + 30);
-    
-    const amount = Math.floor(Math.random() * 5000) + 200;
-    
-    let status: Invoice['status'];
-    if (index % 12 === 0) status = 'cancelled';
-    else if (index % 7 === 0) status = 'overdue';
-    else if (index % 3 === 0) status = 'pending';
-    else status = 'paid';
-    
-    const customerType: Invoice['customerType'] = 
-      index % 5 === 0 ? 'vendor' : (index % 3 === 0 ? 'candidate' : 'employer');
-    
-    const paymentMethod = status === 'paid' ? 
-      ['Credit Card', 'PayPal', 'Bank Transfer', 'Check'][index % 4] : undefined;
-    
-    const paymentDate = status === 'paid' ? 
-      new Date(dueDate.getTime() - Math.floor(Math.random() * 15) * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : 
-      undefined;
-    
-    return {
-      id: `INV-${2023}-${1000 + index}`,
-      customerName: `${customerType === 'employer' ? 'Company' : 'Customer'} ${1000 + index}`,
-      customerType,
-      amount,
-      issueDate: issueDateObj.toISOString().split('T')[0],
-      dueDate: dueDate.toISOString().split('T')[0],
-      status,
-      paymentMethod,
-      paymentDate,
-      items: [
-        {
-          description: 'Job Posting - Premium',
-          quantity: 1,
-          unitPrice: Math.floor(amount * 0.6),
-          total: Math.floor(amount * 0.6)
-        },
-        {
-          description: 'Featured Listing',
-          quantity: 1,
-          unitPrice: Math.floor(amount * 0.3),
-          total: Math.floor(amount * 0.3)
-        },
-        {
-          description: 'Resume Database Access',
-          quantity: 1,
-          unitPrice: Math.floor(amount * 0.1),
-          total: Math.floor(amount * 0.1)
-        }
-      ]
-    };
-  });
+  // TODO: Fetch invoices from backend API
+  const invoices: Invoice[] = [];
   
   const columns = [
     {

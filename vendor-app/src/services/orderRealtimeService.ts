@@ -1,5 +1,6 @@
 import { Alert } from 'react-native';
 import { socketService } from './socketService';
+import { playAlertLoop } from '../utils/soundPlayer';
 
 export interface OrderNotification {
   orderId: string;
@@ -25,7 +26,10 @@ class OrderNotificationService {
 
   // Real-time event listeners
   onNewOrder(callback: (order: any) => void) {
-    socketService.on('newOrder', callback);
+    socketService.on('newOrder', async (order: any) => {
+      await playAlertLoop();
+      callback(order);
+    });
   }
 
   onOrderStatusUpdate(callback: (order: any) => void) {

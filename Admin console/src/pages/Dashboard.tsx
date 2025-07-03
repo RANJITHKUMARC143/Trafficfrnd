@@ -62,16 +62,6 @@ const Dashboard: React.FC = () => {
           <div className="space-y-4">
             <div>
               <div className="flex justify-between mb-1">
-                <span className="text-sm font-medium text-gray-700">Employers</span>
-                <span className="text-sm text-gray-500">45%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-blue-600 h-2 rounded-full" style={{ width: '45%' }}></div>
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex justify-between mb-1">
                 <span className="text-sm font-medium text-gray-700">Candidates</span>
                 <span className="text-sm text-gray-500">35%</span>
               </div>
@@ -79,7 +69,6 @@ const Dashboard: React.FC = () => {
                 <div className="bg-teal-500 h-2 rounded-full" style={{ width: '35%' }}></div>
               </div>
             </div>
-            
             <div>
               <div className="flex justify-between mb-1">
                 <span className="text-sm font-medium text-gray-700">Vendors</span>
@@ -87,16 +76,6 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div className="bg-purple-500 h-2 rounded-full" style={{ width: '15%' }}></div>
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-sm font-medium text-gray-700">Administrators</span>
-                <span className="text-sm text-gray-500">5%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-amber-500 h-2 rounded-full" style={{ width: '5%' }}></div>
               </div>
             </div>
           </div>

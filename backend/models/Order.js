@@ -139,9 +139,28 @@ const orderSchema = new mongoose.Schema({
 
 // Update the updatedAt timestamp before saving
 orderSchema.pre('save', function(next) {
+  if (this.status === 'preparing' && !this.deliveryBoyId) {
+    return next(new Error('Cannot set status to preparing without a delivery boy assigned.'));
+  }
   this.updatedAt = Date.now();
   next();
 });
+
+function checkPreparing(next) {
+  if (this.getUpdate) {
+    const update = this.getUpdate();
+    const status = update.status || (update.$set && update.$set.status);
+    const deliveryBoyId = update.deliveryBoyId || (update.$set && update.$set.deliveryBoyId);
+    if (status === 'preparing' && !deliveryBoyId) {
+      return next(new Error('Cannot set status to preparing without a delivery boy assigned.'));
+    }
+  }
+  next();
+}
+
+orderSchema.pre('findOneAndUpdate', checkPreparing);
+orderSchema.pre('updateOne', checkPreparing);
+orderSchema.pre('updateMany', checkPreparing);
 
 const Order = mongoose.model('Order', orderSchema);
 

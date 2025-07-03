@@ -25,30 +25,8 @@ interface Transaction {
 const PaymentsTransactions: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   
-  // Mock data
-  const transactions: Transaction[] = Array.from({ length: 50 }).map((_, index) => ({
-    id: `TRX${10000 + index}`,
-    description: [
-      'Premium Job Posting',
-      'Resume Database Access - 1 Month',
-      'Featured Employer Package',
-      'Candidate Spotlight',
-      'Background Check Service',
-      'Profile Verification',
-      'Job Boost - 7 Days',
-    ][index % 7],
-    type: index % 10 === 0 ? 'refund' : (index % 3 === 0 ? 'subscription' : 'one-time'),
-    amount: index % 10 === 0 ? -(Math.floor(Math.random() * 200) + 50) : (Math.floor(Math.random() * 500) + 50),
-    currency: 'USD',
-    date: new Date(2023, 5, 30 - (index % 30)).toISOString().split('T')[0],
-    customer: {
-      id: `CUS${1000 + Math.floor(index / 2)}`,
-      name: `Customer ${1000 + Math.floor(index / 2)}`,
-      email: `customer${1000 + Math.floor(index / 2)}@example.com`,
-    },
-    paymentMethod: ['Credit Card', 'PayPal', 'Bank Transfer', 'Apple Pay'][index % 4],
-    status: index % 15 === 0 ? 'failed' : (index % 10 === 0 ? 'refunded' : (index % 7 === 0 ? 'pending' : 'completed')),
-  }));
+  // TODO: Fetch transactions from backend API
+  const transactions: Transaction[] = [];
   
   const columns = [
     {
@@ -152,39 +130,8 @@ const PaymentsTransactions: React.FC = () => {
     </div>
   );
   
-  // Calculate statistics
-  const totalAmount = transactions
-    .filter(t => t.status === 'completed' || t.status === 'refunded')
-    .reduce((sum, t) => sum + t.amount, 0);
-    
-  const pendingAmount = transactions
-    .filter(t => t.status === 'pending')
-    .reduce((sum, t) => sum + t.amount, 0);
-    
-  const failedAmount = transactions
-    .filter(t => t.status === 'failed')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-  
-  const stats = [
-    {
-      label: 'Total Processed',
-      value: `$${totalAmount.toFixed(2)}`,
-      icon: <DollarSign size={18} />,
-      color: 'bg-blue-100 text-blue-600'
-    },
-    {
-      label: 'Pending',
-      value: `$${pendingAmount.toFixed(2)}`,
-      icon: <ArrowRight size={18} />,
-      color: 'bg-yellow-100 text-yellow-600'
-    },
-    {
-      label: 'Failed',
-      value: `$${failedAmount.toFixed(2)}`,
-      icon: <CreditCard size={18} />,
-      color: 'bg-red-100 text-red-600'
-    }
-  ];
+  // TODO: Fetch transaction stats from backend API
+  const stats: any[] = [];
   
   return (
     <div>

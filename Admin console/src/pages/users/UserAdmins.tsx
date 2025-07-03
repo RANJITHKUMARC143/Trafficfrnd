@@ -20,27 +20,8 @@ interface Admin {
 const UserAdmins: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   
-  // Mock data
-  const admins: Admin[] = Array.from({ length: 24 }).map((_, index) => ({
-    id: `A${100 + index}`,
-    name: `Admin ${index + 1}`,
-    email: `admin${index + 1}@example.com`,
-    role: index === 0 ? 'super_admin' : (
-      index < 5 ? 'admin' : (index < 15 ? 'moderator' : 'analyst')
-    ) as Admin['role'],
-    status: index % 7 === 0 ? 'inactive' : 'active',
-    lastLogin: index === 0 ? 'Currently active' : 
-               new Date(2023, 5, 30 - (index % 30)).toISOString().split('T')[0],
-    createdAt: new Date(2022, Math.floor(index / 10), (index % 28) + 1).toISOString().split('T')[0],
-    permissions: [
-      'user_management',
-      'content_moderation',
-      'payment_processing',
-      'reports_access',
-      'system_settings',
-      'api_access'
-    ].sort(() => 0.5 - Math.random()).slice(0, Math.floor(Math.random() * 3) + 2)
-  }));
+  // TODO: Fetch admins from backend API
+  const admins: Admin[] = [];
   
   const columns = [
     {

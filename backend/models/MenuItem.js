@@ -59,6 +59,11 @@ const menuItemSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  orderCount: {
+    type: Number,
+    default: 0,
+    min: 0
   }
 });
 

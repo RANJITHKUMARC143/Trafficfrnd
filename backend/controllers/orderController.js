@@ -5,6 +5,7 @@ const Vendor = require('../models/Vendor');
 const fetch = require('node-fetch');
 const Earnings = require('../models/Earnings');
 const Alert = require('../models/Alert');
+const MenuItem = require('../models/MenuItem');
 
 // Utility function to get address from coordinates
 async function getAddressFromCoordinates(latitude, longitude) {
@@ -104,9 +105,19 @@ const updateOrderStatus = async (req, res) => {
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
-    // If order is pending, has no deliveryBoyId, and user is a delivery boy, allow claim
+    // If vendor is accepting and wants to confirm
+    if (req.user.role === 'vendor' && status === 'confirmed') {
+      order.vendorConfirmed = true;
+      if (!order.status || order.status === 'pending') {
+        order.status = 'confirmed';
+      }
+      order.updatedAt = Date.now();
+      await order.save();
+      return res.json({ success: true, order });
+    }
+    // If delivery boy is accepting
     if (
-      order.status === 'pending' &&
+      (order.status === 'pending' || order.status === 'confirmed' || order.status === 'preparing') &&
       !order.deliveryBoyId &&
       req.user.role === 'delivery' &&
       status === 'confirmed'
@@ -123,6 +134,10 @@ const updateOrderStatus = async (req, res) => {
       }
       return res.json({ success: true, order });
     }
+    // Prevent moving to 'preparing' unless a delivery boy is assigned
+    if (status === 'preparing' && !order.deliveryBoyId) {
+      return res.status(400).json({ message: 'Cannot move to preparing before a delivery boy is assigned.' });
+    }
     // Otherwise, only allow vendor or assigned delivery boy to update
     if (
       order.vendorId.toString() !== req.user._id.toString() &&
@@ -133,6 +148,8 @@ const updateOrderStatus = async (req, res) => {
     order.status = status;
     order.updatedAt = Date.now();
     await order.save();
+    // Debug log for status transitions
+    console.log('updateOrderStatus:', { orderId, currentStatus: order.status, requestedStatus: status, deliveryBoyId: order.deliveryBoyId, user: req.user._id, role: req.user.role });
     res.json({ success: true, order });
   } catch (error) {
     res.status(500).json({ message: 'Error updating order status', error: error.message });
@@ -235,6 +252,16 @@ const createOrder = async (req, res) => {
 
     await order.save();
     console.log('Order created with locations:', order);
+
+    // Increment orderCount for each menu item in the order
+    if (Array.isArray(items)) {
+      for (const item of items) {
+        await MenuItem.updateOne(
+          { name: item.name, vendorId: vendorObjectId },
+          { $inc: { orderCount: item.quantity || 1 } }
+        );
+      }
+    }
 
     // Notify vendor
     if (vendor.expoPushToken) {

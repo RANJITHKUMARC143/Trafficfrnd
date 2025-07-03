@@ -10,86 +10,11 @@ const PaymentsReports: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'weekly' | 'monthly' | 'quarterly' | 'yearly'>('monthly');
   const [selectedReport, setSelectedReport] = useState<'revenue' | 'transactions' | 'invoices'>('revenue');
   
-  // Mock data for charts
-  const getMonthName = (month: number): string => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return months[month];
-  };
-  
-  // Generate revenue data for the chart
-  const revenueData = Array.from({ length: 6 }).map((_, i) => {
-    const month = (new Date().getMonth() - 5 + i + 12) % 12;
-    return {
-      month: getMonthName(month),
-      total: Math.floor(Math.random() * 50000) + 20000,
-      growth: (Math.random() * 20 - 5).toFixed(1)
-    };
-  });
-  
-  const transactionData = [
-    { type: 'Employer Subscriptions', percentage: 45, value: 452000 },
-    { type: 'Job Postings', percentage: 30, value: 301500 },
-    { type: 'Resume Access', percentage: 15, value: 150750 },
-    { type: 'Premium Services', percentage: 10, value: 100500 }
-  ];
-  
-  const summaryMetrics = [
-    {
-      title: 'Total Revenue',
-      value: '$1,004,750',
-      change: '+12.3%',
-      changeType: 'positive'
-    },
-    {
-      title: 'Average Transaction',
-      value: '$532',
-      change: '+5.8%',
-      changeType: 'positive'
-    },
-    {
-      title: 'Payment Success Rate',
-      value: '98.2%',
-      change: '+1.5%',
-      changeType: 'positive'
-    },
-    {
-      title: 'Refund Rate',
-      value: '1.3%',
-      change: '-0.4%',
-      changeType: 'positive'
-    }
-  ];
-  
-  const availableReports = [
-    {
-      id: 'revenue',
-      title: 'Revenue Report',
-      description: 'Overview of all revenue streams with trends and growth analysis',
-      icon: <DollarSign size={20} />,
-      color: 'bg-blue-50 text-blue-600'
-    },
-    {
-      id: 'transactions',
-      title: 'Transaction Report',
-      description: 'Detailed breakdown of all financial transactions',
-      icon: <BarChart2 size={20} />,
-      color: 'bg-purple-50 text-purple-600'
-    },
-    {
-      id: 'invoices',
-      title: 'Invoice Report',
-      description: 'Analysis of invoicing status, payment times, and outstanding amounts',
-      icon: <FileText size={20} />,
-      color: 'bg-emerald-50 text-emerald-600'
-    },
-    {
-      id: 'trends',
-      title: 'Trend Analysis',
-      description: 'Comparative analysis of payment and revenue trends over time',
-      icon: <TrendingUp size={20} />,
-      color: 'bg-amber-50 text-amber-600'
-    }
-  ];
+  // TODO: Fetch report data from backend API
+  const revenueData: any[] = [];
+  const transactionData: any[] = [];
+  const summaryMetrics: any[] = [];
+  const availableReports: any[] = [];
   
   return (
     <div>

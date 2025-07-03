@@ -10,6 +10,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Button } from '../components/Button';
 import { theme } from '../theme/theme';
@@ -48,7 +49,7 @@ export const LoginScreen = ({ navigation }: any) => {
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Ionicons name="restaurant" size={80} color={theme.colors.primary} />
+          <Image source={require('../../../assets/images/logo.png')} style={{ width: 160, height: 160, resizeMode: 'contain', marginBottom: 16 }} />
           <Text style={styles.title}>Traffic Friend</Text>
           <Text style={styles.subtitle}>Vendor Portal</Text>
         </View>
