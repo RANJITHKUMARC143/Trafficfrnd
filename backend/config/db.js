@@ -2,8 +2,10 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    // Using the main Trafficfrnd database
-    const conn = await mongoose.connect('mongodb://localhost:27017/Trafficfrnd', {
+    // Use environment variable for MongoDB URI, fallback to local database
+    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/Trafficfrnd';
+    
+    const conn = await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
