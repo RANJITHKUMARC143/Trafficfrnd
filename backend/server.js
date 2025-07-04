@@ -115,6 +115,11 @@ app.get('/api/test', (req, res) => {
   res.json({ message: 'API is working!' });
 });
 
+// Add a root route for Render and browser visits
+app.get('/', (req, res) => {
+  res.send('Traffic Friend API is running!');
+});
+
 // 404 handler
 app.use((req, res) => {
   console.log('404 Not Found:', req.method, req.url);
