@@ -175,7 +175,7 @@ const VendorOrders: React.FC = () => {
   const fetchVendorOrders = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/vendors/orders/admin?vendorId=${vendorId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/vendors/orders/admin?vendorId=${vendorId}`, {
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
       
@@ -193,7 +193,7 @@ const VendorOrders: React.FC = () => {
   const fetchVendorDetails = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/vendors/${vendorId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/vendors/${vendorId}`, {
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
       
@@ -209,7 +209,7 @@ const VendorOrders: React.FC = () => {
   const fetchOrderDetails = async (orderId: string) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/vendors/orders/admin/${orderId}/details`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/vendors/orders/admin/${orderId}/details`, {
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
       

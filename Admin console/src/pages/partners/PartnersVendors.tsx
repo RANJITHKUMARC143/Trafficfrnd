@@ -135,7 +135,7 @@ const PartnersVendors: React.FC = () => {
       setError('');
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/vendors`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/vendors`, {
           headers: { 'Authorization': token ? `Bearer ${token}` : '' }
         });
         const data = await res.json();
@@ -217,7 +217,7 @@ const PartnersVendors: React.FC = () => {
     if (!window.confirm(`Are you sure you want to delete vendor ${vendor.businessName}?`)) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/vendors/${vendor.id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/vendors/${vendor.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
@@ -254,7 +254,7 @@ const PartnersVendors: React.FC = () => {
     setFormError('');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/vendors/${form.id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/vendors/${form.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
         body: JSON.stringify(form)
@@ -276,7 +276,7 @@ const PartnersVendors: React.FC = () => {
     setFormError('');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/vendors`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/vendors`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
         body: JSON.stringify(form)
@@ -299,17 +299,17 @@ const PartnersVendors: React.FC = () => {
       const token = localStorage.getItem('token');
       
       // Fetch vendor orders
-      const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/vendors/orders/admin?vendorId=${vendorId}`, {
+      const ordersRes = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/vendors/orders/admin?vendorId=${vendorId}`, {
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
       
       // Fetch vendor menu items
-      const menuRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/vendors/menu/vendor/${vendorId}`, {
+      const menuRes = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/vendors/menu/vendor/${vendorId}`, {
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
       
       // Fetch vendor activity
-      const activityRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.4.176:3000'}/api/vendors/${vendorId}/activity?limit=10`, {
+      const activityRes = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/vendors/${vendorId}/activity?limit=10`, {
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
       
