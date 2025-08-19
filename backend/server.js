@@ -17,6 +17,7 @@ const routeRoutes = require('./routes/routeRoutes');
 const journeyRoutes = require('./routes/journeyRoutes');
 const routeSessionRoutes = require('./routes/routeSessionRoutes');
 const userOrderRoutes = require('./routes/userOrderRoutes');
+const registrationRoutes = require('./routes/registrationRoutes');
 const rateLimit = require('express-rate-limit');
 const DeliveryBoy = require('./models/DeliveryBoy');
 
@@ -103,6 +104,8 @@ app.use('/api/users/route-session', routeSessionRoutes);
 app.use('/api', userAuthRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/user/orders', userOrderRoutes);
+// Registrations (admin)
+app.use('/api/registrations', registrationRoutes);
 
 // Add delivery points route for admin console
 app.use('/api/delivery-points', require('./routes/deliveryPointRoutes'));

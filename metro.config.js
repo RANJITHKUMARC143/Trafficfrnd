@@ -1,5 +1,5 @@
 // Learn more https://docs.expo.io/guides/customizing-metro
-const { getDefaultConfig } = require('@react-native/metro-config');
+const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
 
 const projectRoot = __dirname;
@@ -10,31 +10,24 @@ process.env.EXPO_ROUTER_APP_ROOT = path.resolve(projectRoot, 'app');
 
 const config = getDefaultConfig(projectRoot);
 
-// Enable require.context
-config.transformer = {
-  ...config.transformer,
-  unstable_allowRequireContext: true,
-  babelTransformerPath: require.resolve('react-native-svg-transformer'),
+// Add custom transformer for SVG
+config.transformer.babelTransformerPath = require.resolve('react-native-svg-transformer');
+
+// Add custom resolver configuration
+config.resolver.unstable_enablePackageExports = true;
+config.resolver.nodeModulesPaths = [
+  path.resolve(projectRoot, 'node_modules'),
+  path.resolve(workspaceRoot, 'node_modules'),
+];
+config.resolver.disableHierarchicalLookup = true;
+config.resolver.extraNodeModules = {
+  '@': path.resolve(projectRoot),
+};
+config.resolver.alias = {
+  '@': path.resolve(projectRoot, 'app'),
 };
 
-// Configure resolver
-config.resolver = {
-  ...config.resolver,
-  unstable_enablePackageExports: true,
-  nodeModulesPaths: [
-    path.resolve(projectRoot, 'node_modules'),
-    path.resolve(workspaceRoot, 'node_modules'),
-  ],
-  disableHierarchicalLookup: true,
-  extraNodeModules: {
-    '@': path.resolve(projectRoot),
-  },
-  alias: {
-    '@': path.resolve(projectRoot, 'app'),
-  },
-};
-
-// Watch all files within the monorepo
+// Add watch folders
 config.watchFolders = [workspaceRoot];
 
 module.exports = config; 

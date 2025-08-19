@@ -46,6 +46,25 @@ interface Vendor {
   createdAt?: string;
   updatedAt?: string;
   expoPushToken?: string;
+  // Registration-specific fields
+  contactNumber?: string;
+  storeAddress?: string;
+  pinCode?: string;
+  productType?: string;
+  bankAccountNumber?: string;
+  ifscCode?: string;
+  accountHolderName?: string;
+  aadhaarNumber?: string;
+  panNumber?: string;
+  employeeReferral?: string;
+  agreeToTerms?: boolean;
+  documents?: {
+    gstCertificate?: { fileUrl?: string; originalName?: string };
+    fssaiLicense?: { fileUrl?: string; originalName?: string };
+    agreement?: { fileUrl?: string; originalName?: string };
+    aadhaarCard?: { fileUrl?: string; originalName?: string };
+    panCard?: { fileUrl?: string; originalName?: string };
+  };
 }
 
 interface VendorOrder {
@@ -78,6 +97,7 @@ interface VendorActivity {
 
 const PartnersVendors: React.FC = () => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [isRegistrationSource, setIsRegistrationSource] = useState<boolean>(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -130,24 +150,56 @@ const PartnersVendors: React.FC = () => {
   };
 
   useEffect(() => {
-    const fetchVendors = async () => {
+    const fetchRegistrations = async () => {
       setLoading(true);
       setError('');
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/vendors`, {
+        const REG_BASE = (import.meta as any).env?.VITE_REG_API_URL || 'https://tarfficfrnd-vendor-patner.onrender.com';
+        const res = await fetch(`${REG_BASE}/api/registrations`, {
           headers: { 'Authorization': token ? `Bearer ${token}` : '' }
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Failed to fetch vendors');
-        setVendors(data);
+        if (!res.ok) throw new Error(data.message || 'Failed to fetch registrations');
+        const list = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+        const mapped: Vendor[] = list.map((r: any) => ({
+          id: r.id || r._id,
+          businessName: r.businessName || '',
+          ownerName: r.ownerName || '',
+          email: r.email || '',
+          phone: r.phone || r.contactNumber || '',
+          status: r.status || 'inactive',
+          isVerified: !!r.isVerified,
+          isOpen: !!r.isOpen,
+          address: r.address || { street: r.storeAddress, pinCode: r.pinCode },
+          businessHours: {},
+          rating: 0,
+          totalRatings: 0,
+          createdAt: r.createdAt,
+          updatedAt: r.updatedAt,
+          expoPushToken: '',
+          contactNumber: r.contactNumber,
+          storeAddress: r.storeAddress,
+          pinCode: r.pinCode,
+          productType: r.productType,
+          bankAccountNumber: r.bankAccountNumber,
+          ifscCode: r.ifscCode,
+          accountHolderName: r.accountHolderName,
+          aadhaarNumber: r.aadhaarNumber,
+          panNumber: r.panNumber,
+          employeeReferral: r.employeeReferral,
+          agreeToTerms: r.agreeToTerms,
+          documents: r.documents,
+        }));
+        setVendors(mapped);
+        setIsRegistrationSource(true);
       } catch (err: any) {
         setError(err.message);
       } finally {
         setLoading(false);
       }
     };
-    fetchVendors();
+    fetchRegistrations();
   }, []);
 
   // Filtering logic
@@ -373,13 +425,43 @@ const PartnersVendors: React.FC = () => {
       key: 'phone', 
       header: 'Contact', 
       sortable: true,
-      render: (v: string) => (
+      render: (v: string, row: Vendor) => (
         <div className="flex items-center space-x-2">
           <Phone className="w-4 h-4 text-gray-400" />
-          <span className="font-mono text-sm">{v || 'N/A'}</span>
+          <span className="font-mono text-sm">{v || row.contactNumber || 'N/A'}</span>
         </div>
       )
     },
+    // Registration-specific columns
+    { key: 'productType', header: 'Product Type', sortable: true },
+    { key: 'storeAddress', header: 'Store Address', sortable: false },
+    { key: 'pinCode', header: 'PIN', sortable: true },
+    { key: 'bankAccountNumber', header: 'Bank A/C', sortable: false },
+    { key: 'ifscCode', header: 'IFSC', sortable: true },
+    { key: 'accountHolderName', header: 'Account Holder', sortable: true },
+    { key: 'aadhaarNumber', header: 'Aadhaar', sortable: false },
+    { key: 'panNumber', header: 'PAN', sortable: false },
+    { key: 'employeeReferral', header: 'Referral', sortable: false },
+    { key: 'agreeToTerms', header: 'Agreed', sortable: true, render: (v: boolean) => (
+      <span className={`px-2 py-0.5 rounded text-xs ${v ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{v ? 'Yes' : 'No'}</span>
+    ) },
+    { key: 'documents', header: 'Documents', sortable: false, render: (docs: any, row: Vendor) => {
+      const REG_BASE = (import.meta as any).env?.VITE_REG_API_URL || 'https://tarfficfrnd-vendor-patner.onrender.com';
+      const normalize = (u?: string) => u ? (u.startsWith('http') ? u : `${REG_BASE}${u}`) : undefined;
+      const buildUrl = (docKey: string) => normalize(docs?.[docKey]?.fileUrl) || `${REG_BASE}/api/registrations/${row.id}/documents/${docKey}`;
+      const Link = ({ url, label }: { url?: string; label: string }) => (
+        url ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{label}</a> : <span className="text-gray-400">{label}</span>
+      );
+      return (
+        <div className="flex flex-col space-y-1">
+          <div><Link url={buildUrl('gstCertificate')} label={docs?.gstCertificate?.originalName || 'GST'} /></div>
+          <div><Link url={buildUrl('fssaiLicense')} label={docs?.fssaiLicense?.originalName || 'FSSAI'} /></div>
+          <div><Link url={buildUrl('agreement')} label={docs?.agreement?.originalName || 'Agreement'} /></div>
+          <div><Link url={buildUrl('aadhaarCard')} label={docs?.aadhaarCard?.originalName || 'Aadhaar'} /></div>
+          <div><Link url={buildUrl('panCard')} label={docs?.panCard?.originalName || 'PAN'} /></div>
+        </div>
+      );
+    } },
     { 
       key: 'status', 
       header: 'Status', 
@@ -528,15 +610,17 @@ const PartnersVendors: React.FC = () => {
             >
               Filters
             </Button>
-            <Button 
-              variant="primary"
-              size="md"
-              icon={<Plus size={16} />}
-              onClick={openAdd}
-              className="bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700"
-            >
-              Add Vendor
-            </Button>
+            {!isRegistrationSource && (
+              <Button 
+                variant="primary"
+                size="md"
+                icon={<Plus size={16} />}
+                onClick={openAdd}
+                className="bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700"
+              >
+                Add Vendor
+              </Button>
+            )}
           </div>
         }
       />
@@ -668,7 +752,7 @@ const PartnersVendors: React.FC = () => {
               subtitle=""
               data={filteredVendors}
               columns={columns}
-              rowActions={rowActions}
+              rowActions={isRegistrationSource ? undefined : rowActions}
               searchable={false}
               filterable={false}
               pagination={{

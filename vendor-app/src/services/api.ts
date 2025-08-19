@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-export const API_URL = 'http://192.168.4.176:3000'; // Updated backend API URL
+export const API_URL = 'https://trafficfrnd-2.onrender.com';
 
 console.log('Using API URL:', API_URL);
 
@@ -178,5 +178,5 @@ export const updateVendorPushToken = async (expoPushToken: string) => {
 export default api; 
 
 class SocketService {
-  private readonly SOCKET_URL = 'http://192.168.4.176:3000'; // Updated backend socket URL
+  private readonly SOCKET_URL = 'https://trafficfrnd-2.onrender.com'; // Updated backend socket URL
 } 

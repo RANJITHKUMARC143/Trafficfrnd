@@ -2,12 +2,12 @@
 export const API_CONFIG = {
   // Development
   development: {
-    baseUrl: 'http://192.168.4.176:3000/api',
+    baseUrl: 'https://trafficfrnd-2.onrender.com/api',
     timeout: 10000, // 10 seconds
   },
   // Production
   production: {
-    baseUrl: 'https://api.trafficfriend.com/api', // Replace with your production API URL
+    baseUrl: 'https://trafficfrnd-2.onrender.com/api',
     timeout: 15000, // 15 seconds
   }
 };
@@ -25,7 +25,7 @@ export const getApiConfig = () => {
 
 // Get base URL for API requests
 export const getBaseUrl = () => {
-  return __DEV__ ? 'http://192.168.4.176:3000/api' : 'https://api.trafficfriend.com/api';
+  return __DEV__ ? 'https://trafficfrnd-2.onrender.com/api' : 'https://trafficfrnd-2.onrender.com/api';
 };
 
 // Get timeout for API requests
@@ -33,8 +33,8 @@ export const getTimeout = () => {
   return getApiConfig().timeout;
 };
 
-const DEV_API_URL = 'http://192.168.4.176:3000/api';
-const PROD_API_URL = 'https://api.trafficfriend.com/api';
+const DEV_API_URL = 'https://trafficfrnd-2.onrender.com/api';
+const PROD_API_URL = 'https://trafficfrnd-2.onrender.com/api';
 
 export const API_ENDPOINTS = {
   AUTH: {

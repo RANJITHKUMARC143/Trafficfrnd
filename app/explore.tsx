@@ -4,7 +4,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { API_URL } from '@/src/config';
+const API_URL = 'https://trafficfrnd-2.onrender.com';
 
 type Vendor = {
   _id: string;

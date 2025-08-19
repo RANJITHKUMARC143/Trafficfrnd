@@ -18,7 +18,7 @@ export interface OrderNotification {
 async function playNotificationSound() {
   try {
     const { sound } = await Audio.Sound.createAsync(
-      require('../assets/notification.mp3')
+      require('../../assets/notification.mp3')
     );
     await sound.playAsync();
   } catch (e) {

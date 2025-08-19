@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_URL } from '../../src/config';
+const API_URL = 'https://trafficfrnd-2.onrender.com';
 
 export async function fetchAlerts() {
   const token = await AsyncStorage.getItem('token');

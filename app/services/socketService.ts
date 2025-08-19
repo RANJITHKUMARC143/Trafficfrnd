@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_URL, SOCKET_CONFIG } from '@src/config';
+const API_URL = 'https://trafficfrnd-2.onrender.com';
+import { API_URL as API_URL_CONFIG, SOCKET_CONFIG } from '@src/config';
 
 class SocketService {
   private static instance: SocketService;

@@ -12,7 +12,11 @@
     },
     "production": {
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease",
+        "env": {
+          "ANDROID_NDK_HOME": "/opt/android-ndk"
+        }
       }
     }
   },

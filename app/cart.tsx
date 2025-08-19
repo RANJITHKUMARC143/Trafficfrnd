@@ -26,7 +26,7 @@ type CartItem = {
 async function fetchLatestDeliveryPoint(destination) {
   const token = await AsyncStorage.getItem('token');
   const userId = await AsyncStorage.getItem('userId');
-  const res = await fetch(`http://<your-backend>/api/users/${userId}/delivery-point?destination=${encodeURIComponent(destination)}`, {
+  const res = await fetch(`https://trafficfrnd-2.onrender.com/api/users/${userId}/delivery-point?destination=${encodeURIComponent(destination)}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   if (!res.ok) throw new Error('No delivery point found');
@@ -136,7 +136,7 @@ export default function CartScreen() {
     setCheckpointError('');
     try {
       const token = await AsyncStorage.getItem('token');
-      const res = await fetch(`http://192.168.4.176:3000/api/routes/${routeId}/selected-checkpoint`, {
+      const res = await fetch(`https://trafficfrnd-2.onrender.com/api/routes/${routeId}/selected-checkpoint`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

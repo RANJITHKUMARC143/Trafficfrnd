@@ -69,7 +69,7 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 const MAX_SHEET_HEIGHT = SCREEN_HEIGHT * 0.6;
 
 // Replace <your-backend> with your actual backend IP and port
-const BACKEND_URL = 'http://192.168.4.176:3000'; // <-- UPDATED TO MATCH YOUR BACKEND
+const BACKEND_URL = 'https://trafficfrnd-2.onrender.com'; // <-- UPDATED TO MATCH YOUR BACKEND
 
 async function saveDeliveryPointToBackend(destination, deliveryPoint) {
   const token = await AsyncStorage.getItem('token');

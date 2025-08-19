@@ -1,6 +1,6 @@
 const fetch = require('node-fetch');
 
-const API_BASE = 'http://192.168.4.176:3000/api';
+const API_BASE = 'https://trafficfrnd-2.onrender.com/api';
 
 // Test the delivery partners list endpoint
 async function testDeliveryPartnersList() {

@@ -82,7 +82,7 @@ export const registerUser = async (userData: {
     
     // Transform the data to match backend expectations
     const registrationData = {
-      name: userData.fullName,
+      fullName: userData.fullName,
       email: userData.email,
       password: userData.password,
       phone: userData.phone,
