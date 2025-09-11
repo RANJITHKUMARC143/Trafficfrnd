@@ -124,6 +124,23 @@ router.post('/', auth, async (req, res) => {
 
 // Specific delivery point route FIRST
 router.post('/users/delivery-point', saveDeliveryPoint);
+
+// Admin: find user by phone (place BEFORE generic :id route)
+router.get('/users/by-phone/:phone', auth, async (req, res) => {
+  try {
+    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'super_admin')) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    const User = require('../models/User');
+    const user = await User.findOne({ phone: req.params.phone }).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    const obj = user.toObject();
+    res.json({ ...obj, id: obj._id.toString(), _id: obj._id.toString() });
+  } catch (e) {
+    res.status(500).json({ message: 'Error fetching user', error: e.message });
+  }
+});
+
 // Generic user by ID route LAST
 router.get('/users/:id', userAuth.getUserById);
 

@@ -162,6 +162,32 @@ router.get('/public/explore/all', async (req, res) => {
   }
 });
 
+// Public route: item suggestions by query string
+router.get('/public/search', async (req, res) => {
+  try {
+    const q = (req.query.q || '').toString().trim();
+    if (!q) return res.json([]);
+    const items = await MenuItem.find({
+      isAvailable: true,
+      $or: [
+        { name: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } },
+        { category: { $regex: q, $options: 'i' } }
+      ]
+    })
+      .select('name price image vendorId category')
+      .sort({ orderCount: -1, createdAt: -1 })
+      .limit(15)
+      .lean();
+
+    // Attach vendorName for convenience if populated later is not desired
+    res.json(items);
+  } catch (error) {
+    console.error('Error searching menu items:', error);
+    res.status(500).json({ message: 'Error searching items', error: error.message });
+  }
+});
+
 // Test route to create sample menu items
 router.post('/test/sample-items', async (req, res) => {
   try {

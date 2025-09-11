@@ -24,6 +24,27 @@ router.put('/profile', auth, deliveryBoyController.updateProfile);
 router.put('/location', auth, deliveryBoyController.updateLocation);
 router.put('/status', auth, deliveryBoyController.updateOnlineStatus);
 
+// Delivery boy toggles surge state
+router.put('/me/surge', auth, async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'delivery') return res.status(403).json({ message: 'Forbidden' });
+    const DeliveryBoy = require('../models/DeliveryBoy');
+    const { enabled } = req.body || {};
+    const updated = await DeliveryBoy.findByIdAndUpdate(
+      req.user._id,
+      { $set: { surge: { enabled: !!enabled, lastToggledAt: new Date() } } },
+      { new: true }
+    ).select('-password');
+    try {
+      const io = req.app.get('io');
+      if (io) io.to(`deliveryBoy:${String(req.user._id)}`).emit('deliveryProfileUpdated', updated);
+    } catch {}
+    return res.json({ success: true, surge: updated.surge });
+  } catch (e) {
+    return res.status(500).json({ message: 'Failed to update surge', error: e.message });
+  }
+});
+
 // --- ORDER ROUTES ---
 router.put('/orders/:orderId/location', auth, require('../controllers/orderController').updateDeliveryBoyLocation);
 
@@ -274,6 +295,7 @@ router.get('/:id/activity', auth, async (req, res) => {
 router.put('/:id', auth, async (req, res) => {
   try {
     const updates = req.body;
+    console.log('Admin updating delivery partner', req.params.id, 'with updates:', JSON.stringify(updates));
     delete updates.password; // Do not allow password update here
     const DeliveryBoy = require('../models/DeliveryBoy');
     const deliveryBoy = await DeliveryBoy.findByIdAndUpdate(
@@ -285,6 +307,19 @@ router.put('/:id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Delivery partner not found' });
     }
     const deliveryBoyObj = deliveryBoy.toObject();
+    console.log('Update successful. New bankDetails:', deliveryBoyObj.bankDetails);
+    // Emit socket event to notify the specific delivery boy client about profile updates (including bankDetails)
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`deliveryBoy:${req.params.id}`).emit('deliveryProfileUpdated', {
+          id: deliveryBoyObj._id.toString(),
+          bankDetails: deliveryBoyObj.bankDetails || {},
+          updatedAt: deliveryBoyObj.updatedAt,
+        });
+      }
+    } catch (e) {}
+
     res.json({
       ...deliveryBoyObj,
       id: deliveryBoyObj._id.toString(),

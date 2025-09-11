@@ -5,7 +5,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = 'https://trafficfrnd-2.onrender.com/api';
+const API_BASE_URL = 'http://192.168.31.107:3000/api';
 
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams();

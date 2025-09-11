@@ -18,7 +18,7 @@ export default function OrderDetailScreen() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { stopAlert } = useOrders();
+  const { stopAlert, setOrders } = useOrders();
 
   const fetchOrderDetails = async () => {
     try {
@@ -75,7 +75,22 @@ export default function OrderDetailScreen() {
         return;
       }
 
-      console.log('OrderDetailScreen - Updating order status:', orderId, 'to:', newStatus);
+      // Normalize client aliases to match backend
+      const aliasMap: Record<string, string> = {
+        out_for_delivery: 'enroute',
+        en_route: 'enroute',
+        on_the_way: 'enroute',
+        delivered: 'completed',
+      };
+      const normalized = (aliasMap[String(newStatus)] || String(newStatus)) as OrderStatus;
+
+      // Avoid duplicate no-op updates
+      if (order && order.status === normalized) {
+        console.log('OrderDetailScreen - Skipping status update, already at:', normalized);
+        return;
+      }
+
+      console.log('OrderDetailScreen - Updating order status:', orderId, 'to:', normalized);
 
       const response = await fetch(`${getBaseUrl()}/orders/${orderId}/status`, {
         method: 'PATCH',
@@ -83,7 +98,7 @@ export default function OrderDetailScreen() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: normalized }),
       });
 
       console.log('OrderDetailScreen - Status update response status:', response.status);
@@ -94,6 +109,8 @@ export default function OrderDetailScreen() {
         // Extract the order from the response
         const updatedOrder = responseData.order || responseData;
         setOrder(updatedOrder);
+        // Reflect change in global orders list so tabs update immediately
+        setOrders((prev) => prev.map((o) => (o._id === updatedOrder._id ? updatedOrder : o)));
         // Stop alert sound immediately after accepting
         if (newStatus === 'confirmed') {
           await stopAlert();

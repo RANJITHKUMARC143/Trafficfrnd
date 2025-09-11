@@ -2,8 +2,10 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    // Use environment variable for MongoDB URI, fallback to local database
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/Trafficfrnd';
+    // Use local MongoDB by default
+    const mongoURI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/Trafficfrnd';
+    
+    console.log(`Connecting to MongoDB: ${mongoURI}`);
     
     const conn = await mongoose.connect(mongoURI, {
       useNewUrlParser: true,
@@ -11,8 +13,10 @@ const connectDB = async () => {
     });
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);
+    console.log(`Database: ${conn.connection.name}`);
   } catch (error) {
-    console.error(`Error: ${error.message}`);
+    console.error(`MongoDB Connection Error: ${error.message}`);
+    console.error('Make sure MongoDB is running locally on port 27017');
     process.exit(1);
   }
 };

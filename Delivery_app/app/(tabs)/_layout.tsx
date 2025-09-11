@@ -1,11 +1,10 @@
 import { Tabs } from 'expo-router';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { COLORS, FONTS } from '@/constants/theme';
 import { FontAwesome } from '@expo/vector-icons';
 
 export default function TabLayout() {
   return (
-    <View style={styles.container}>
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: '#007AFF',
@@ -54,15 +53,10 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
-    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
   tabBar: {
     backgroundColor: COLORS.white,
     borderTopWidth: 1,

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, Stack } from 'expo-router';
+import { API_URL } from '@src/config';
 
 type User = {
   id: string;
@@ -51,12 +52,57 @@ export default function EditProfileScreen() {
         return;
       }
 
-      await AsyncStorage.setItem('user', JSON.stringify(formData));
-      Alert.alert('Success', 'Profile updated successfully', [
-        {
-          text: 'OK',
-          onPress: () => router.back(),
+      // Persist to backend
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        Alert.alert('Session expired', 'Please log in again.');
+        return;
+      }
+
+      let response = await fetch(`${API_URL}/api/users/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+        })
+      });
+
+      // Fallback to /api/users/:id if /profile not available
+      if (response.status === 404 && formData.id) {
+        response = await fetch(`${API_URL}/api/users/${formData.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
+            address: formData.address,
+          })
+        });
+      }
+
+      const updated = await response.json();
+      if (!response.ok) {
+        throw new Error(updated?.message || 'Failed to update profile');
+      }
+
+      // Sync local storage user
+      const storedUser = await AsyncStorage.getItem('user');
+      let base = storedUser ? JSON.parse(storedUser) : {};
+      const merged = { ...base, ...updated, id: updated.id || base.id };
+      await AsyncStorage.setItem('user', JSON.stringify(merged));
+
+      Alert.alert('Success', 'Profile updated successfully', [
+        { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (error) {
       console.error('Error saving profile:', error);
@@ -90,14 +136,9 @@ export default function EditProfileScreen() {
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.profileImageContainer}>
-          <Image
-            source={{ uri: formData.profileImage }}
-            style={styles.profileImage}
-          />
-          <TouchableOpacity style={styles.changePhotoButton}>
-            <Ionicons name="camera-outline" size={20} color="#fff" />
-            <ThemedText style={styles.changePhotoText}>Change Photo</ThemedText>
-          </TouchableOpacity>
+          <View style={styles.avatarCircle}>
+            <Ionicons name="person" size={56} color="#fff" />
+          </View>
         </View>
 
         <View style={styles.form}>
@@ -173,25 +214,15 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#f8f8f8',
   },
-  profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    marginBottom: 15,
-  },
-  changePhotoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  avatarCircle: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     backgroundColor: '#4CAF50',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  changePhotoText: {
-    color: '#fff',
-    marginLeft: 5,
-    fontSize: 14,
-    fontWeight: '500',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 4,
+    borderColor: '#fff',
   },
   form: {
     padding: 20,

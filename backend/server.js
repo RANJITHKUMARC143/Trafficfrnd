@@ -17,17 +17,20 @@ const routeRoutes = require('./routes/routeRoutes');
 const journeyRoutes = require('./routes/journeyRoutes');
 const routeSessionRoutes = require('./routes/routeSessionRoutes');
 const userOrderRoutes = require('./routes/userOrderRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 const registrationRoutes = require('./routes/registrationRoutes');
 const rateLimit = require('express-rate-limit');
 const DeliveryBoy = require('./models/DeliveryBoy');
+const authenticateToken = require('./middleware/auth');
+const User = require('./models/User');
 
 // Load environment variables
 dotenv.config();
 
 // Set default JWT secret if not in environment
 if (!process.env.JWT_SECRET) {
-  console.error('JWT_SECRET is not set in environment. Please set it in your .env file.');
-  process.exit(1);
+  console.log('JWT_SECRET not set in environment, using default for local development');
+  process.env.JWT_SECRET = 'curiospry';
 }
 
 // Initialize express app
@@ -104,6 +107,7 @@ app.use('/api/users/route-session', routeSessionRoutes);
 app.use('/api', userAuthRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/user/orders', userOrderRoutes);
+app.use('/api/payments', paymentRoutes);
 // Registrations (admin)
 app.use('/api/registrations', registrationRoutes);
 
@@ -113,6 +117,58 @@ app.use('/api/delivery-points', require('./routes/deliveryPointRoutes'));
 // Register alert routes
 app.use('/api/alerts', require('./routes/alertRoutes'));
 
+// Register settings routes
+app.use('/api/settings', require('./routes/settingsRoutes'));
+
+// Profile update endpoints (JSON only)
+app.put('/api/users/profile', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user && req.user._id ? req.user._id : null;
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    const updates = req.body || {};
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: updates },
+      { new: true, select: '-password' }
+    );
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    return res.json(user);
+  } catch (error) {
+    console.error('Profile update error (profile):', error);
+    return res.status(500).json({ message: 'Error updating profile' });
+  }
+});
+
+app.put('/api/users/:id', authenticateToken, async (req, res) => {
+  try {
+    // Trust authenticated user; update their own profile regardless of path param
+    const targetId = req.user && req.user._id ? req.user._id : null;
+    if (!targetId) return res.status(401).json({ message: 'Unauthorized' });
+    const updates = req.body || {};
+    const user = await User.findByIdAndUpdate(
+      targetId,
+      { $set: updates },
+      { new: true, select: '-password' }
+    );
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    return res.json(user);
+  } catch (error) {
+    console.error('Profile update error (by id):', error);
+    return res.status(500).json({ message: 'Error updating profile' });
+  }
+});
+
+// Guard old path to avoid ObjectId cast on "/api/orders/user"
+app.get('/api/orders/user', authenticateToken, (req, res) => {
+  return res.status(410).json({ message: 'Endpoint moved. Use /api/user/orders/user' });
+});
+
 // Test route
 app.get('/api/test', (req, res) => {
   res.json({ message: 'API is working!' });
@@ -120,7 +176,7 @@ app.get('/api/test', (req, res) => {
 
 // Add a root route for Render and browser visits
 app.get('/', (req, res) => {
-  res.send('Traffic Friend API is running!');
+  res.send('Traffic Frnd API is running!');
 });
 
 // 404 handler
@@ -133,19 +189,33 @@ app.use((req, res) => {
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
   console.log('Socket handshake auth:', socket.handshake.auth);
-  // If the client is a delivery boy, join the deliveryBoys room
+  // If the client is a delivery boy, join the deliveryBoys room and a personal room
   if (socket.handshake.auth && socket.handshake.auth.role === 'delivery') {
     socket.join('deliveryBoys');
-    console.log('Socket', socket.id, 'joined deliveryBoys room');
+    const auth = socket.handshake.auth || {};
+    const deliveryBoyId = String(auth.id || auth._id || '').trim();
+    if (deliveryBoyId) {
+      socket.join(`deliveryBoy:${deliveryBoyId}`);
+      console.log('Socket', socket.id, 'joined rooms deliveryBoys and', `deliveryBoy:${deliveryBoyId}`);
+    } else {
+      console.log('Socket', socket.id, 'joined deliveryBoys room (no personal id provided)');
+    }
   }
 
   // Handle delivery boy location updates
   socket.on('updateLocation', async (data) => {
     try {
       const { deliveryBoyId, location } = data;
-      // Update location in database
+      if (!deliveryBoyId || !location) return;
+      const { latitude, longitude } = location;
+      if (typeof latitude !== 'number' || typeof longitude !== 'number') return;
+      // Update GeoJSON currentLocation
       await DeliveryBoy.findByIdAndUpdate(deliveryBoyId, {
-        location: location
+        currentLocation: {
+          type: 'Point',
+          coordinates: [longitude, latitude],
+          lastUpdated: new Date()
+        }
       });
       // Broadcast to all clients
       io.emit('locationUpdated', { deliveryBoyId, location });
@@ -167,9 +237,18 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle new orders
+  // Handle new orders: emit only to the assigned deliveryBoy if present; otherwise to the pool
   socket.on('newOrder', (order) => {
-    io.emit('orderCreated', order);
+    try {
+      const assignedId = order && order.deliveryBoyId ? String(order.deliveryBoyId) : '';
+      if (assignedId) {
+        io.to(`deliveryBoy:${assignedId}`).emit('orderCreated', order);
+      } else {
+        io.to('deliveryBoys').emit('orderCreated', order);
+      }
+    } catch (e) {
+      console.error('Error emitting newOrder:', e);
+    }
   });
 
   // Handle delivery boy status updates

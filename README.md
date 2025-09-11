@@ -1,4 +1,4 @@
-# Traffic Friend
+# Traffic Frnd
 
 A comprehensive mobile and web platform built with React Native and React that helps users order food and services while on the go or at home. The system consists of multiple applications: User App, Vendor App, Delivery Boy App, and Admin Console.
 

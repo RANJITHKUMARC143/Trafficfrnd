@@ -29,9 +29,14 @@ const auth = async (req, res, next) => {
     } else if (decoded.id) {
       console.log('Auth middleware - Finding delivery boy:', decoded.id);
       user = await DeliveryBoy.findById(decoded.id);
-      if (user && user.status && user.status !== 'active' && user.status !== 'approved') {
-        console.log('Auth middleware - Delivery boy not active/approved:', user.status);
-        return res.status(403).json({ message: 'Account is not active or approved' });
+      if (user) {
+        // Treat these as acceptable/approved states
+        const allowedStatuses = new Set(['active', 'approved', 'online']);
+        const isApproved = user.isActive !== false && (allowedStatuses.has(String(user.status || '').toLowerCase()));
+        if (!isApproved) {
+          console.log('Auth middleware - Delivery boy not active/approved:', user.status);
+          return res.status(403).json({ message: 'Account is not active or approved' });
+        }
       }
     } else if (decoded.userId) {
       console.log('Auth middleware - Finding user:', decoded.userId);

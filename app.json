@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Traffic Friend",
+    "name": "Traffic Frnd",
     "slug": "traffic-frnd-new",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -20,7 +20,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.trafficfriend.app",
       "config": {
-        "googleMapsApiKey": "AIzaSyAJX6Yjwz2DiEHjWE_0HIBvEkiYpS5TXAU"
+        "googleMapsApiKey": "AIzaSyAW74HcfPLqNz7kmr7EK4LM6TTmCnJ3pXM"
       }
     },
     "android": {
@@ -30,9 +30,7 @@
         "backgroundColor": "#ffffff"
       },
       "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyAJX6Yjwz2DiEHjWE_0HIBvEkiYpS5TXAU"
-        }
+        "googleMapsApiKey": "AIzaSyAW74HcfPLqNz7kmr7EK4LM6TTmCnJ3pXM"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -46,7 +44,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow Traffic Friend to use your location to find nearby delivery buddies and improve delivery accuracy."
+          "locationAlwaysAndWhenInUsePermission": "Allow Traffic Frnd to use your location to find nearby delivery buddies and improve delivery accuracy."
         }
       ],
       "expo-router"

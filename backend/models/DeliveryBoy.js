@@ -142,6 +142,11 @@ const deliveryBoySchema = new mongoose.Schema({
       relationship: String
     }
   },
+  // Surge preference controlled by driver
+  surge: {
+    enabled: { type: Boolean, default: false },
+    lastToggledAt: { type: Date }
+  },
   earnings: {
     total: {
       type: Number,

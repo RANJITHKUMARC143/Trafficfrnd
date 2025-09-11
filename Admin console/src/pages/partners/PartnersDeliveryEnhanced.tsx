@@ -52,7 +52,7 @@ const PartnersDeliveryEnhanced: React.FC = () => {
   const fetchPartners = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/delivery`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/delivery`, {
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
       const data = await res.json();

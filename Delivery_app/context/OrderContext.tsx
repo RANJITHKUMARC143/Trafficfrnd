@@ -46,6 +46,22 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
         socket.on('orderClaimed', (claimedOrder: Order) => {
           console.log('[OrderContext] orderClaimed received:', claimedOrder);
           setOrders((prev) => prev.map(o => o._id === claimedOrder._id ? claimedOrder : o));
+          // If I claimed it, stop alert sound immediately
+          try {
+            const myId = user?.id ? String(user.id) : '';
+            const claimerId = (claimedOrder as any)?.deliveryBoyId ? String((claimedOrder as any).deliveryBoyId) : '';
+            if (myId && claimerId && myId === claimerId) {
+              stopAlert();
+            }
+          } catch {}
+        });
+        socket.on('orderStatusUpdated', ({ orderId, status }: { orderId: string; status: string }) => {
+          console.log('[OrderContext] orderStatusUpdated received:', { orderId, status });
+          setOrders((prev) => prev.map(o => o._id === orderId ? { ...o, status } as Order : o));
+          // If this order moved out of pending, stop alert
+          if (String(status).toLowerCase() !== 'pending') {
+            stopAlert();
+          }
         });
         socket.on('connect', () => {
           console.log('[OrderContext] Socket connected:', socket.id);
@@ -88,6 +104,7 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
         if (socket) {
           socket.off('orderCreated');
           socket.off('orderClaimed');
+          socket.off('orderStatusUpdated');
           socket.off('connect');
           socket.off('disconnect');
         }

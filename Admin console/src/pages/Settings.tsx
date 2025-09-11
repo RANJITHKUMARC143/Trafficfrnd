@@ -1,5 +1,5 @@
-import React from 'react';
-import { Settings as SettingsIcon, Bell, Lock, User, Globe, Database, Palette, Mail, Shield, Save } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings as SettingsIcon, Bell, Lock, User, Globe, Database, Palette, Mail, Shield, Save, Phone, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 import PageHeader from '../components/ui/PageHeader';
@@ -7,6 +7,76 @@ import Button from '../components/ui/Button';
 import Card, { CardHeader, CardContent } from '../components/ui/Card';
 
 const Settings: React.FC = () => {
+  const [restaurantPhoneNumber, setRestaurantPhoneNumber] = useState('+91-9876543210');
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [tempPhoneNumber, setTempPhoneNumber] = useState('');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+
+  // Function to mask phone number for display
+  const maskPhoneNumber = (phone: string) => {
+    if (phone.length <= 4) return phone;
+    const visible = phone.slice(0, 3);
+    const masked = 'X'.repeat(phone.length - 6);
+    const lastThree = phone.slice(-3);
+    return `${visible}-${masked}-${lastThree}`;
+  };
+
+  // Load phone number from backend on component mount
+  useEffect(() => {
+    loadRestaurantPhoneNumber();
+  }, []);
+
+  const loadRestaurantPhoneNumber = async () => {
+    try {
+      const response = await fetch('http://192.168.31.107:3000/api/settings/phone-number');
+      if (response.ok) {
+        const data = await response.json();
+        setRestaurantPhoneNumber(data.phoneNumber || '+91-9876543210');
+      }
+    } catch (error) {
+      console.error('Error loading phone number:', error);
+    }
+  };
+
+  const saveRestaurantPhoneNumber = async () => {
+    setSaveStatus('saving');
+    try {
+      const response = await fetch('http://192.168.31.107:3000/api/settings/phone-number', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phoneNumber: tempPhoneNumber
+        })
+      });
+
+      if (response.ok) {
+        setRestaurantPhoneNumber(tempPhoneNumber);
+        setIsEditingPhone(false);
+        setSaveStatus('success');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      } else {
+        setSaveStatus('error');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      }
+    } catch (error) {
+      console.error('Error saving phone number:', error);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    }
+  };
+
+  const startEditingPhone = () => {
+    setTempPhoneNumber(restaurantPhoneNumber);
+    setIsEditingPhone(true);
+  };
+
+  const cancelEditingPhone = () => {
+    setIsEditingPhone(false);
+    setTempPhoneNumber('');
+  };
+
   const settingsSections = [
     {
       id: 'account',
@@ -39,6 +109,33 @@ const Settings: React.FC = () => {
         { label: 'Email Notifications', value: true, type: 'toggle' },
         { label: 'Push Notifications', value: true, type: 'toggle' },
         { label: 'SMS Notifications', value: false, type: 'toggle' },
+      ]
+    },
+    {
+      id: 'call-to-order',
+      title: 'Call-to-Order Settings',
+      icon: <Phone size={20} />,
+      color: 'bg-green-50 text-green-600',
+      settings: [
+        { 
+          label: 'Restaurant Phone Number', 
+          value: restaurantPhoneNumber, 
+          type: 'phone',
+          isEditing: isEditingPhone,
+          tempValue: tempPhoneNumber,
+          onEdit: startEditingPhone,
+          onSave: saveRestaurantPhoneNumber,
+          onCancel: cancelEditingPhone,
+          onChange: setTempPhoneNumber,
+          saveStatus: saveStatus
+        },
+        // TODO: Add API Key setting for Click to Call service
+        // { 
+        //   label: 'Click to Call API Key', 
+        //   value: '••••••••', 
+        //   type: 'password',
+        //   description: 'API key for cloudshope.com call service'
+        // },
       ]
     },
     {
@@ -129,6 +226,51 @@ const Settings: React.FC = () => {
                         <select className="text-sm border-gray-300 rounded-md">
                           <option>{setting.value}</option>
                         </select>
+                      ) : setting.type === 'phone' ? (
+                        <div className="flex items-center space-x-2">
+                          {setting.isEditing ? (
+                            <>
+                              <input
+                                type="tel"
+                                value={setting.tempValue}
+                                onChange={(e) => setting.onChange(e.target.value)}
+                                className="text-sm border-gray-300 rounded-md px-3 py-1 w-40"
+                                placeholder="+91-9876543210"
+                              />
+                              <button
+                                onClick={setting.onSave}
+                                disabled={setting.saveStatus === 'saving'}
+                                className="text-green-600 text-sm hover:text-green-700 disabled:opacity-50"
+                              >
+                                {setting.saveStatus === 'saving' ? 'Saving...' : 'Save'}
+                              </button>
+                              <button
+                                onClick={setting.onCancel}
+                                className="text-gray-600 text-sm hover:text-gray-700"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-sm text-gray-800 font-mono">
+                                {maskPhoneNumber(setting.value)}
+                              </span>
+                              <button
+                                onClick={setting.onEdit}
+                                className="text-blue-600 text-sm hover:text-blue-700"
+                              >
+                                Edit
+                              </button>
+                            </>
+                          )}
+                          {setting.saveStatus === 'success' && (
+                            <Check size={16} className="text-green-600" />
+                          )}
+                          {setting.saveStatus === 'error' && (
+                            <span className="text-red-600 text-xs">Error</span>
+                          )}
+                        </div>
                       ) : (
                         <div className="flex items-center">
                           <input

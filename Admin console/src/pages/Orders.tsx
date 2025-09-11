@@ -79,7 +79,7 @@ const Orders: React.FC = () => {
       setError('');
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/vendors/orders/admin`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/vendors/orders/admin`, {
           headers: { 'Authorization': token ? `Bearer ${token}` : '' }
         });
         const data = await res.json();
@@ -155,7 +155,7 @@ const Orders: React.FC = () => {
     if (!window.confirm(`Are you sure you want to delete order ${order._id}?`)) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/vendors/orders/admin/${order._id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/vendors/orders/admin/${order._id}`, {
         method: 'DELETE',
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
@@ -195,7 +195,7 @@ const Orders: React.FC = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const apiUrl = `${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/vendors/orders/admin/${form._id}/status`;
+      const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/vendors/orders/admin/${form._id}/status`;
       
       console.log('Updating order status:', {
         orderId: form._id,

@@ -1,7 +1,9 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, SafeAreaView, Modal, Pressable, Text, Dimensions } from 'react-native';
+import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, SafeAreaView, Modal, Pressable, Text, Dimensions, Animated } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import BottomNavigationBar from '@/components/BottomNavigationBar';
+import { socketService } from '@/services/socketService';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
@@ -11,6 +13,8 @@ import { Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
+import { useFocusEffect } from '@react-navigation/native';
+import { fetchUserOrders } from '@/services/orderService';
 
 type User = {
   id: string;
@@ -58,8 +62,12 @@ export default function ProfileScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [stats, setStats] = useState({ total: 0, completed: 0, rating: 4.8 });
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
 
   const insets = useSafeAreaInsets();
+  const scrollY = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const initializeProfile = async () => {
@@ -75,10 +83,27 @@ export default function ProfileScreen() {
     initializeProfile();
   }, []);
 
+  // Refresh when screen regains focus (e.g., after editing profile)
+  useFocusEffect(
+    React.useCallback(() => {
+      checkAuthStatus();
+      return () => {};
+    }, [])
+  );
+
   const getProfileImageUrl = (profileImage: string | undefined) => {
     if (!profileImage) return '';
     if (profileImage.startsWith('http')) return profileImage;
     return `${API_URL}${profileImage}`;
+  };
+
+  // Helper to color status text
+  const getStatusStyle = (status: string) => {
+    const normalized = (status || '').toLowerCase();
+    if (normalized.includes('complete')) return { color: '#22c55e' };
+    if (normalized.includes('cancel')) return { color: '#ef4444' };
+    if (normalized.includes('ongoing') || normalized.includes('preparing') || normalized.includes('accepted')) return { color: '#f59e0b' };
+    return { color: '#4b5563' };
   };
 
   const checkAuthStatus = async () => {
@@ -129,6 +154,86 @@ export default function ProfileScreen() {
         user: null,
         isLoading: false,
       });
+    }
+  };
+
+  const refreshUserStats = async () => {
+    try {
+      setOrdersLoading(true);
+      const token = await AsyncStorage.getItem('token');
+      if (!token || !authState.user?.id) { setOrdersLoading(false); return; }
+      // Use shared service to fetch orders
+      const orders = await fetchUserOrders();
+      const total = Array.isArray(orders) ? orders.length : 0;
+      const completed = Array.isArray(orders) ? orders.filter((o: any) => o.status === 'completed').length : 0;
+      setStats((s) => ({ ...s, total, completed }));
+      // Store latest 5 orders for display
+      if (Array.isArray(orders)) {
+        setRecentOrders(orders.slice(0, 5));
+      }
+      setOrdersLoading(false);
+    } catch {
+      setOrdersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (authState.isAuthenticated) {
+      refreshUserStats();
+    }
+  }, [authState.isAuthenticated]);
+
+  // Subscribe to realtime events to refresh stats/profile
+  useEffect(() => {
+    if (!authState.isAuthenticated) return;
+    const onOrderCreated = () => refreshUserStats();
+    const onOrderUpdated = () => refreshUserStats();
+    const onOrderCompleted = () => refreshUserStats();
+    try {
+      socketService.on('orderCreated', onOrderCreated);
+      socketService.on('orderUpdated', onOrderUpdated);
+      socketService.on('orderCompleted', onOrderCompleted);
+    } catch {}
+    return () => {
+      try {
+        socketService.off('orderCreated', onOrderCreated);
+        socketService.off('orderUpdated', onOrderUpdated);
+        socketService.off('orderCompleted', onOrderCompleted);
+      } catch {}
+    };
+  }, [authState.isAuthenticated]);
+
+  const pickAndUploadPhoto = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Permission required', 'We need access to your photos to update your avatar.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1,1], quality: 0.8 });
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (!asset?.uri || !authState.user?.id) return;
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
+      const form = new FormData();
+      const filename = asset.fileName || `avatar_${Date.now()}.jpg`;
+      // @ts-ignore
+      form.append('profileImage', { uri: asset.uri, name: filename, type: 'image/jpeg' });
+      const upload = await fetch(`${API_URL}/api/users/${authState.user.id}/profile-photo`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: form as any,
+      });
+      const data = await upload.json();
+      if (!upload.ok) {
+        Alert.alert('Upload failed', data?.message || 'Unable to update profile photo');
+        return;
+      }
+      setAuthState((prev) => prev.user ? ({ ...prev, user: { ...prev.user, profileImage: data.profileImage } }) : prev);
+      setShowPhotoMenu(false);
+    } catch (e) {
+      Alert.alert('Error', 'Could not update profile photo');
     }
   };
 
@@ -385,19 +490,51 @@ export default function ProfileScreen() {
   if (authState.isAuthenticated && authState.user) {
     return (
       <ThemedView style={{ flex: 1, backgroundColor: '#f7f8fa' }}>
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <Animated.ScrollView 
+          contentContainerStyle={{ paddingBottom: 40 }} 
+          showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: true }
+          )}
+        >
           {/* Hero Section */}
-          <LinearGradient
-            colors={["#4CAF50", "#43e97b"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.hero, { paddingTop: insets.top + 40 }]}
+          <Animated.View
+            style={{
+              transform: [
+                {
+                  translateY: scrollY.interpolate({
+                    inputRange: [-150, 0, 150],
+                    outputRange: [-50, 0, 0],
+                    extrapolate: 'clamp',
+                  }),
+                },
+                {
+                  scale: scrollY.interpolate({
+                    inputRange: [-150, 0],
+                    outputRange: [1.06, 1],
+                    extrapolateLeft: 'extend',
+                  }),
+                },
+              ],
+            }}
           >
+            <LinearGradient
+              colors={["#4CAF50", "#43e97b"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.hero, { paddingTop: insets.top + 40 }]}
+            >
             <View style={styles.avatarWrapper}>
               <View style={styles.avatarShadow}>
-                <View style={styles.avatarCircle}>
-                  <Ionicons name="person" size={60} color="#fff" />
-                </View>
+                <TouchableOpacity activeOpacity={0.85} style={styles.avatarCircle} onPress={() => setShowPhotoMenu(true)}>
+                  {authState.user.profileImage ? (
+                    <Image source={{ uri: authState.user.profileImage }} style={{ width: '100%', height: '100%', borderRadius: 50 }} />
+                  ) : (
+                    <Ionicons name="person" size={60} color="#fff" />
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
             <Text style={styles.name}>{authState.user.name || authState.user.username || 'User'}</Text>
@@ -406,25 +543,46 @@ export default function ProfileScreen() {
               <Ionicons name="star" size={14} color="#fff" />
               <Text style={styles.roleText}>{authState.user.role ? authState.user.role.toUpperCase() : 'USER'}</Text>
             </View>
-          </LinearGradient>
+            </LinearGradient>
+          </Animated.View>
 
           {/* Stats Row */}
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <Ionicons name="cart-outline" size={28} color="#4CAF50" />
-              <Text style={styles.statNumber}>24</Text>
+              <Text style={styles.statNumber}>{stats.total}</Text>
               <Text style={styles.statLabel}>Orders</Text>
             </View>
             <View style={styles.statCard}>
               <Ionicons name="checkmark-done-outline" size={28} color="#43e97b" />
-              <Text style={styles.statNumber}>12</Text>
+              <Text style={styles.statNumber}>{stats.completed}</Text>
               <Text style={styles.statLabel}>Completed</Text>
             </View>
             <View style={styles.statCard}>
               <Ionicons name="star-outline" size={28} color="#FFD700" />
-              <Text style={styles.statNumber}>4.8</Text>
+              <Text style={styles.statNumber}>{stats.rating}</Text>
               <Text style={styles.statLabel}>Rating</Text>
             </View>
+          </View>
+
+          {/* Quick Actions */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: 18 }}>
+            <TouchableOpacity activeOpacity={0.9} style={styles.quickAction} onPress={handleEditProfile}>
+              <Ionicons name="create-outline" size={22} color="#4CAF50" />
+              <Text style={styles.quickActionText}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.9} style={styles.quickAction} onPress={() => router.push('/orders')}>
+              <Ionicons name="receipt-outline" size={22} color="#4CAF50" />
+              <Text style={styles.quickActionText}>Orders</Text>
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.9} style={styles.quickAction} onPress={() => router.push('/payments')}>
+              <Ionicons name="wallet-outline" size={22} color="#4CAF50" />
+              <Text style={styles.quickActionText}>Payments</Text>
+            </TouchableOpacity>
+            <TouchableOpacity activeOpacity={0.9} style={styles.quickAction} onPress={() => router.push('/settings')}>
+              <Ionicons name="settings-outline" size={22} color="#4CAF50" />
+              <Text style={styles.quickActionText}>Settings</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Personal Info Card */}
@@ -465,6 +623,50 @@ export default function ProfileScreen() {
             </BlurView>
           </View>
 
+          {/* Recent Orders */}
+          <View style={styles.infoCardWrapper}>
+            <BlurView intensity={40} tint="light" style={styles.infoCardGlass}>
+              <View style={styles.infoAccentBar} />
+              <View style={styles.infoCardContent}>
+                <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom: 12 }}>
+                  <Text style={styles.infoTitle}>Recent Orders</Text>
+                  <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/orders')} style={{ flexDirection:'row', alignItems:'center' }}>
+                    <Text style={{ color:'#4CAF50', fontWeight:'600' }}>View All</Text>
+                    <Ionicons name="chevron-forward" size={18} color="#4CAF50" />
+                  </TouchableOpacity>
+                </View>
+                {ordersLoading ? (
+                  <ActivityIndicator color="#4CAF50" />
+                ) : recentOrders.length === 0 ? (
+                  <Text style={{ color:'#555' }}>No recent orders</Text>
+                ) : (
+                  recentOrders.map((order: any, index: number) => {
+                    const createdAt = (order.timestamp || order.createdAt) ? new Date(order.timestamp || order.createdAt) : null;
+                    const title = order._id ? `Order #${String(order._id).slice(-6)}` : `Order ${index+1}`;
+                    const subtitle = createdAt ? createdAt.toLocaleString() : (order.vendorName || '');
+                    const status = order.status || 'pending';
+                    const itemsCount = Array.isArray(order.items) ? order.items.length : (order.quantity || 0);
+                    return (
+                      <View key={order._id || index} style={styles.orderRow}>
+                        <View style={styles.orderIconWrapper}>
+                          <Ionicons name="receipt-outline" size={20} color="#4CAF50" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.orderTitle}>{title}</Text>
+                          <Text style={styles.orderSubtitle}>{subtitle}</Text>
+                        </View>
+                        <View style={styles.orderMeta}>
+                          <Text style={[styles.orderStatus, getStatusStyle(status)]}>{status}</Text>
+                          {itemsCount ? <Text style={styles.orderItems}>{itemsCount} items</Text> : null}
+                        </View>
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+            </BlurView>
+          </View>
+
           {/* Action Buttons */}
           <TouchableOpacity style={styles.editBtn} onPress={handleEditProfile}>
             <Ionicons name="create-outline" size={20} color="#fff" />
@@ -474,7 +676,27 @@ export default function ProfileScreen() {
             <Ionicons name="log-out-outline" size={20} color="#fff" />
             <Text style={styles.logoutBtnText}>Sign Out</Text>
           </TouchableOpacity>
-        </ScrollView>
+        </Animated.ScrollView>
+
+        {/* Photo picker modal */}
+        <Modal visible={showPhotoMenu} transparent animationType="fade" onRequestClose={() => setShowPhotoMenu(false)}>
+          <View style={{ flex:1, backgroundColor:'rgba(0,0,0,0.4)', justifyContent:'center', alignItems:'center' }}>
+            <View style={{ backgroundColor:'#fff', borderRadius:16, padding:18, width:'80%' }}>
+              <Text style={{ fontSize:16, fontWeight:'700', marginBottom:10 }}>Update Profile Photo</Text>
+              <TouchableOpacity style={styles.quickAction} onPress={pickAndUploadPhoto}>
+                <Ionicons name="image-outline" size={22} color="#4CAF50" />
+                <Text style={styles.quickActionText}>Choose from Gallery</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.quickAction, { backgroundColor:'#fef2f2' }]} onPress={() => setShowPhotoMenu(false)}>
+                <Ionicons name="close-circle-outline" size={22} color="#ef4444" />
+                <Text style={[styles.quickActionText, { color:'#ef4444' }]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Enhanced Navigation Bar */}
+        <BottomNavigationBar />
       </ThemedView>
     );
   }
@@ -619,6 +841,9 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
+
+        {/* Enhanced Navigation Bar */}
+        <BottomNavigationBar />
       </SafeAreaView>
     </ThemedView>
   );
@@ -1016,6 +1241,26 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
+  quickAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 6,
+    marginBottom: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  quickActionText: {
+    marginLeft: 8,
+    color: '#333',
+    fontWeight: '600',
+  },
   infoTitle: {
     fontSize: 17,
     fontWeight: 'bold',
@@ -1063,5 +1308,47 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
     marginLeft: 8,
+  },
+  orderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+  },
+  orderIconWrapper: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#e8f9ee',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  orderTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#222',
+  },
+  orderSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  orderMeta: {
+    alignItems: 'flex-end',
+    marginLeft: 8,
+  },
+  orderStatus: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  orderItems: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
 }); 

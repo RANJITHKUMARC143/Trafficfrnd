@@ -1,50 +1,121 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Switch, ScrollView, Alert, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import Screen from '@/components/common/Screen';
 import { COLORS, FONTS } from '@/constants/theme';
-import { User, CheckCircle, Car, FileText, Banknote, Bell, Globe, Phone, Shield, Home, ClipboardList, DollarSign, Headphones } from 'lucide-react-native';
+import { User, CheckCircle, Banknote, Shield } from 'lucide-react-native';
 import { getCurrentUser, logoutUser } from '@/utils/auth';
+import { updateDeliveryStatus, getSocket, connectSocket } from '@/utils/socket';
+import { useAuth } from '@/context/AuthContext';
 // Assume these exist and are implemented to fetch from backend
 // import { fetchFinance, fetchStats, fetchPreferences, updateOnlineStatus } from '@/utils/api';
 
-// Dummy implementations for demo (replace with real API calls)
-const fetchFinance = async () => ({ bankAccount: 'XXXX1234', ifsc: 'SBIN0001234' });
+// Dummy stats (can be replaced if backend provides richer stats endpoint)
 const fetchStats = async () => ({ totalDeliveries: 1200, rating: 4.85, monthlyEarnings: 18500 });
-const fetchPreferences = async () => ({ language: 'English', notifications: true, emergencyContact: '+91 9876543210' });
-const updateOnlineStatus = async (val) => true;
+
 
 export default function DeliveryBoyProfile() {
   const router = useRouter();
+  const { user: authUser } = useAuth();
   const [user, setUser] = useState<any>(null);
   const [finance, setFinance] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
-  const [preferences, setPreferences] = useState<any>(null);
   const [isOnline, setIsOnline] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const isFetchingRef = useRef(false);
+  const [surgeEnabled, setSurgeEnabled] = useState<boolean>(false);
 
   const fetchProfileData = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
       const userData = await getCurrentUser();
       if (userData) {
         setUser(userData);
         setIsOnline(userData.isOnline);
         setStats(userData.stats);
-        setFinance(await fetchFinance());
-        setPreferences(await fetchPreferences());
+        // Finance details come from backend as bankDetails edited by admin
+        setFinance(userData.bankDetails || null);
+        if ((userData as any)?.surge?.enabled !== undefined) setSurgeEnabled(!!(userData as any)?.surge?.enabled);
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
       Alert.alert('Error', 'Failed to fetch profile data');
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
   }, []);
 
   useEffect(() => {
+    // Seed UI immediately from auth context to avoid blank screen
+    if (authUser && !user) {
+      setUser(authUser);
+      setIsOnline(authUser.status === 'online');
+      if ((authUser as any)?.surge?.enabled !== undefined) setSurgeEnabled(!!(authUser as any)?.surge?.enabled);
+    }
     fetchProfileData();
-  }, [fetchProfileData]);
+    // Only run when authUser changes to avoid repeated calls
+  }, [authUser]);
+
+  // Setup realtime listeners for this delivery boy
+  useEffect(() => {
+    const ensureConnection = () => {
+      if (!getSocket() && authUser?.id && authUser?.token) {
+        connectSocket({ id: authUser.id, role: 'delivery', token: (authUser as any).token || undefined });
+      }
+    };
+    ensureConnection();
+
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleStatusUpdated = ({ deliveryBoyId, status }: { deliveryBoyId: string; status: 'online' | 'offline' | 'busy' }) => {
+      if (authUser?.id && String(deliveryBoyId) === String(authUser.id)) {
+        setIsOnline(status === 'online');
+        setUser((prev: any) => prev ? { ...prev, status } : prev);
+      }
+    };
+
+    const handleLocationUpdated = ({ deliveryBoyId, location }: any) => {
+      if (authUser?.id && String(deliveryBoyId) === String(authUser.id)) {
+        setUser((prev: any) => prev ? { ...prev, location: { ...location, updatedAt: new Date().toISOString() } } : prev);
+      }
+    };
+
+    const handleOrderEvents = () => {
+      // Orders and earnings can influence stats; refetch profile summary
+      fetchProfileData();
+    };
+
+    const handleProfileUpdated = (payload: any) => {
+      if (authUser?.id && String(payload?.id) === String(authUser.id)) {
+        if (payload?.bankDetails) {
+          setFinance(payload.bankDetails);
+        }
+        if (payload?.surge) {
+          setSurgeEnabled(!!payload.surge.enabled);
+        }
+        // Pull latest for any other fields
+        fetchProfileData();
+      }
+    };
+
+    socket.on('deliveryStatusUpdated', handleStatusUpdated);
+    socket.on('locationUpdated', handleLocationUpdated);
+    socket.on('orderCreated', handleOrderEvents);
+    socket.on('orderStatusUpdated', handleOrderEvents);
+    socket.on('deliveryProfileUpdated', handleProfileUpdated);
+
+    return () => {
+      socket.off('deliveryStatusUpdated', handleStatusUpdated);
+      socket.off('locationUpdated', handleLocationUpdated);
+      socket.off('orderCreated', handleOrderEvents);
+      socket.off('orderStatusUpdated', handleOrderEvents);
+      socket.off('deliveryProfileUpdated', handleProfileUpdated);
+    };
+  }, [authUser, fetchProfileData]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -55,12 +126,21 @@ export default function DeliveryBoyProfile() {
   const handleToggleOnline = async (value: boolean) => {
     setIsOnline(value);
     try {
-      await updateOnlineStatus(value);
+      if (authUser?.id) {
+        await updateDeliveryStatus(authUser.id, value ? 'online' : 'offline');
+      }
       await fetchProfileData();
     } catch (e) {
       Alert.alert('Error', 'Failed to update status');
       setIsOnline(!value);
     }
+  };
+
+  const greet = () => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 18) return 'Good afternoon';
+    return 'Good evening';
   };
 
   const handleLogout = async () => {
@@ -72,7 +152,34 @@ export default function DeliveryBoyProfile() {
     }
   };
 
+  const toggleSurge = async (next: boolean) => {
+    try {
+      const token = (authUser as any)?.token || (user as any)?.token;
+      // Fallback to API_URL from config used elsewhere
+      const API_URL = (process as any).env?.EXPO_PUBLIC_API_URL || 'http://192.168.31.107:3000';
+      await fetch(`${API_URL}/api/delivery/me/surge`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+        body: JSON.stringify({ enabled: next })
+      });
+      setSurgeEnabled(next);
+    } catch (e) {
+      Alert.alert('Error', 'Failed to update surge');
+    }
+  };
+
   if (loading) return <View style={styles.loading}><Text>Loading...</Text></View>;
+
+  if (!user) {
+    return (
+      <View style={styles.loading}>
+        <Text>No profile found. Please log in again.</Text>
+        <TouchableOpacity style={styles.logoutButton} onPress={() => router.replace('/auth/login')}>
+          <Text style={styles.logoutButtonText}>Go to Login</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -92,7 +199,7 @@ export default function DeliveryBoyProfile() {
           <Image source={{ uri: user?.profileImage || 'https://i.pravatar.cc/150?img=3' }} style={styles.avatar} />
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={styles.name}>{user?.fullName}</Text>
+              <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">{user?.fullName || 'Driver'}</Text>
               {user?.isVerified && <CheckCircle color={COLORS.primary} size={20} style={{ marginLeft: 6 }} />}
             </View>
             <Text style={styles.phone}>{user?.phone}</Text>
@@ -105,14 +212,6 @@ export default function DeliveryBoyProfile() {
           </View>
         </View>
 
-        {/* Vehicle Card */}
-        <Card icon={<Car color={COLORS.primary} size={22} />} title="Vehicle Details">
-          <Row label="Type" value={user?.vehicleType} />
-          <Row label="Number" value={user?.vehicleNumber} />
-          <Row label="License" value={user?.licenseNumber || 'N/A'} />
-          <Row label="Insurance" value={user?.insuranceStatus ? 'Active' : 'Expired'} valueColor={user?.insuranceStatus ? COLORS.success : COLORS.error} />
-        </Card>
-
         {/* Stats Card */}
         <Card icon={<Shield color={COLORS.primary} size={22} />} title="Performance">
           <Row label="Total Deliveries" value={stats?.totalDeliveries} />
@@ -120,25 +219,36 @@ export default function DeliveryBoyProfile() {
           <Row label="Monthly Earnings" value={`₹${stats?.monthlyEarnings}`} />
         </Card>
 
-        {/* Documents Card */}
-        <Card icon={<FileText color={COLORS.primary} size={22} />} title="Documents">
-          <TouchableOpacity style={styles.docButton} onPress={() => {}}>
-            <Text style={styles.docButtonText}>View / Upload Documents</Text>
-          </TouchableOpacity>
-        </Card>
-
-        {/* Finance Card */}
+        {/* Finance Card (admin-managed). Show blank if not filled) */}
         <Card icon={<Banknote color={COLORS.primary} size={22} />} title="Finance">
-          <Row label="Bank Account" value={finance?.bankAccount} />
-          <Row label="IFSC" value={finance?.ifsc} />
-          <Row label="Payout History" value="View" onPress={() => {}} valueStyle={styles.link} />
+          <Row label="Account Holder" value={finance?.accountHolderName || ''} />
+          <Row label="Bank Name" value={finance?.bankName || ''} />
+          <Row label="Account Number" value={finance?.accountNumber || ''} />
+          <Row label="IFSC" value={finance?.ifscCode || ''} />
         </Card>
 
-        {/* Preferences Card */}
-        <Card icon={<Globe color={COLORS.primary} size={22} />} title="Preferences">
-          <Row label="Language" value={preferences?.language} />
-          <Row label="Notifications" value={preferences?.notifications ? 'Enabled' : 'Disabled'} />
-          <Row label="Emergency Contact" value={preferences?.emergencyContact} icon={<Phone size={16} color={COLORS.primary} />} />
+        {/* Surge toggle */}
+        <Card icon={<Shield color={COLORS.primary} size={22} />} title="Surge">
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={styles.rowLabel}>{surgeEnabled ? 'On (+20% fee)' : 'Off'}</Text>
+            <Switch value={surgeEnabled} onValueChange={toggleSurge} />
+          </View>
+        </Card>
+
+
+        {/* Quick Actions */}
+        <Card icon={<User color={COLORS.primary} size={22} />} title="Quick actions">
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/profile/edit')}> 
+              <Text style={styles.quickBtnText}>Edit Profile</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/earnings')}>
+              <Text style={styles.quickBtnText}>Earnings</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/support')}>
+              <Text style={styles.quickBtnText}>Support</Text>
+            </TouchableOpacity>
+          </View>
         </Card>
 
         {/* Logout Button */}
@@ -200,5 +310,7 @@ const styles = StyleSheet.create({
   docButton: { backgroundColor: COLORS.ultraLightGray, borderRadius: 8, padding: 12, alignItems: 'center', marginTop: 8 },
   docButtonText: { color: COLORS.primary, ...FONTS.body3Medium },
   logoutButton: { backgroundColor: COLORS.primary, borderRadius: 8, padding: 16, alignItems: 'center', margin: 24 },
-  logoutButtonText: { ...FONTS.body2Medium, color: COLORS.white }
+  logoutButtonText: { ...FONTS.body2Medium, color: COLORS.white },
+  quickBtn: { backgroundColor: COLORS.ultraLightGray, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8 },
+  quickBtnText: { ...FONTS.body4Medium, color: COLORS.darkGray }
 }); 

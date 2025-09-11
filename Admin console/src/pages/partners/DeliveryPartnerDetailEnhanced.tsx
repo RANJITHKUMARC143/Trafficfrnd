@@ -57,6 +57,12 @@ interface DeliveryPartner {
   };
   address?: any;
   createdAt?: string;
+  bankDetails?: {
+    accountHolderName: string;
+    bankName: string;
+    accountNumber: string;
+    ifscCode: string;
+  };
 }
 
 interface OrderItem {
@@ -100,6 +106,9 @@ const DeliveryPartnerDetailEnhanced: React.FC = () => {
   const [orderSearch, setOrderSearch] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [bankDetails, setBankDetails] = useState({ accountHolderName: '', bankName: '', accountNumber: '', ifscCode: '' });
 
   useEffect(() => {
     if (id) {
@@ -111,7 +120,7 @@ const DeliveryPartnerDetailEnhanced: React.FC = () => {
   const fetchPartnerDetails = async () => {
     try {
       const token = localStorage.getItem('token');
-      const url = `${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/delivery/${id}`;
+      const url = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/delivery/${id}`;
       
       const res = await fetch(url, {
         headers: { 
@@ -127,15 +136,74 @@ const DeliveryPartnerDetailEnhanced: React.FC = () => {
       
       const data = await res.json();
       setPartner(data);
+      setBankDetails({
+        accountHolderName: (data.bankDetails && data.bankDetails.accountHolderName) || '',
+        bankName: (data.bankDetails && data.bankDetails.bankName) || '',
+        accountNumber: (data.bankDetails && data.bankDetails.accountNumber) || '',
+        ifscCode: (data.bankDetails && data.bankDetails.ifscCode) || ''
+      });
     } catch (err: any) {
       setError(err.message || 'Failed to fetch partner details');
+    }
+  };
+
+  const approvePartner = async () => {
+    if (!id) return;
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/delivery/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
+        body: JSON.stringify({ status: 'active', isActive: true })
+      });
+      if (!res.ok) throw new Error('Failed to approve partner');
+      const data = await res.json();
+      setPartner(data);
+    } catch (e) {
+      alert((e as any).message || 'Approval failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveBankDetails = async () => {
+    if (!id) return;
+    setSaving(true);
+    setSaveMessage('');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/delivery/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
+        body: JSON.stringify({ bankDetails })
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        let msg = 'Failed to save bank details';
+        try { const j = JSON.parse(text); if (j && j.message) msg = j.message; } catch {}
+        throw new Error(msg);
+      }
+      const updated = await res.json();
+      setPartner(updated);
+      setBankDetails({
+        accountHolderName: (updated.bankDetails && updated.bankDetails.accountHolderName) || '',
+        bankName: (updated.bankDetails && updated.bankDetails.bankName) || '',
+        accountNumber: (updated.bankDetails && updated.bankDetails.accountNumber) || '',
+        ifscCode: (updated.bankDetails && updated.bankDetails.ifscCode) || ''
+      });
+      setSaveMessage('Bank details saved');
+    } catch (e) {
+      alert((e as any).message || 'Save failed');
+    } finally {
+      setSaving(false);
     }
   };
 
   const fetchPartnerOrders = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/delivery/${id}/orders`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/delivery/${id}/orders`, {
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
       if (!res.ok) throw new Error('Failed to fetch partner orders');
@@ -255,6 +323,20 @@ const DeliveryPartnerDetailEnhanced: React.FC = () => {
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">{partner.fullName}</h1>
                 <p className="text-gray-600">Delivery Partner Details</p>
+              </div>
+              <div className="ml-auto flex items-center space-x-2">
+                <button
+                  onClick={approvePartner}
+                  disabled={saving}
+                  className="inline-flex items-center px-3 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-60"
+                  title="Approve & Activate"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  {saving ? 'Saving...' : 'Approve'}
+                </button>
+                {partner.status !== 'active' && (
+                  <span className="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800 border border-yellow-200">{partner.status}</span>
+                )}
               </div>
             </div>
           </div>
@@ -406,6 +488,69 @@ const DeliveryPartnerDetailEnhanced: React.FC = () => {
               <p className="text-3xl font-bold text-red-600">{partner.cancellationRate || 0}%</p>
               <p className="text-sm text-gray-600">Cancellation Rate</p>
             </div>
+          </div>
+        </motion.div>
+
+        {/* Bank Details (Admin editable) */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.25 }}
+          className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 mb-8"
+        >
+          <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+            <DollarSign className="w-5 h-5 mr-2 text-purple-600" />
+            Bank Details
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Account Holder Name</label>
+              <input
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={bankDetails.accountHolderName}
+                onChange={(e) => setBankDetails({ ...bankDetails, accountHolderName: e.target.value })}
+                placeholder="e.g. John Doe"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>
+              <input
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={bankDetails.bankName}
+                onChange={(e) => setBankDetails({ ...bankDetails, bankName: e.target.value })}
+                placeholder="e.g. State Bank"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
+              <input
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={bankDetails.accountNumber}
+                onChange={(e) => setBankDetails({ ...bankDetails, accountNumber: e.target.value })}
+                placeholder="e.g. 1234567890"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">IFSC Code</label>
+              <input
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={bankDetails.ifscCode}
+                onChange={(e) => setBankDetails({ ...bankDetails, ifscCode: e.target.value })}
+                placeholder="e.g. SBIN0001234"
+              />
+            </div>
+          </div>
+          <div className="mt-6 flex items-center justify-end space-x-3">
+            {saveMessage && (
+              <span className="text-sm text-green-600">{saveMessage}</span>
+            )}
+            <button
+              onClick={saveBankDetails}
+              disabled={saving}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
+            >
+              {saving ? 'Saving...' : 'Save Bank Details'}
+            </button>
           </div>
         </motion.div>
 

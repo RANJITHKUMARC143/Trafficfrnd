@@ -19,7 +19,7 @@ export default function OrdersScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { orders } = useOrders();
-  const [activeTab, setActiveTab] = useState('active');
+  const [activeTab, setActiveTab] = useState('available');
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = () => {
@@ -31,16 +31,32 @@ export default function OrdersScreen() {
     // Optionally, you could trigger a refetch in OrderContext
   };
   
+  // Helpers to avoid type mismatches between ObjectId and string
+  const toId = (val: any) => (val && typeof val === 'object' && '_id' in val ? String((val as any)._id) : String(val || ''));
+  const normStatus = (s: any) => String(s || '').trim().toLowerCase();
+  const myId = String(user?.id || '');
+
   // Filter orders based on active tab
   let filteredOrders: Order[] = [];
   if (activeTab === 'active') {
-    filteredOrders = orders.filter(order => order.deliveryBoyId === user.id && ['pending', 'confirmed', 'pickup', 'enroute'].includes(order.status));
+    // Active: orders assigned to me and not in a terminal state
+    const activeStatuses = ['pending', 'confirmed', 'enroute', 'preparing', 'ready'];
+    filteredOrders = orders.filter(order => toId(order.deliveryBoyId) === myId && activeStatuses.includes(normStatus(order.status)));
   } else if (activeTab === 'completed') {
-    filteredOrders = orders.filter(order => order.deliveryBoyId === user.id && ['delivered', 'canceled', 'cancelled'].includes(order.status));
+    // Completed: terminal states
+    const completedStatuses = ['completed', 'delivered', 'canceled', 'cancelled'];
+    filteredOrders = orders.filter(order => toId(order.deliveryBoyId) === myId && completedStatuses.includes(normStatus(order.status)));
   } else if (activeTab === 'available') {
-    filteredOrders = orders.filter(order => (!order.deliveryBoyId || order.deliveryBoyId === '' || order.deliveryBoyId === undefined) && (order.status === 'pending' || order.status === 'confirmed'));
-    console.log('[OrdersScreen] All orders:', orders);
-    console.log('[OrdersScreen] Filtered available orders:', filteredOrders);
+    // Available: unassigned AND pending only (defensive against odd API values)
+    filteredOrders = orders.filter(order => {
+      const assignee = toId(order.deliveryBoyId).trim().toLowerCase();
+      const isUnassigned = assignee === '' || assignee === 'null' || assignee === 'undefined';
+      return isUnassigned && normStatus(order.status) === 'pending';
+    }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    console.log('[OrdersScreen] All orders (count):', orders.length);
+    if (filteredOrders.some(o => normStatus(o.status) !== 'pending')) {
+      console.warn('[OrdersScreen] Non-pending order detected in Available after filter:', filteredOrders.map(o => ({ id: o._id, status: o.status, deliveryBoyId: toId(o.deliveryBoyId) })));
+    }
   }
 
   const renderEmptyState = () => {

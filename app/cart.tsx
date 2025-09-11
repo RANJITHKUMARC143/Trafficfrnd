@@ -1,22 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, TouchableOpacity, FlatList, Alert, Modal, TextInput } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, FlatList, Alert, TextInput, Image } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createOrder } from './services/orderService';
+import { createOrder, fetchDeliveryPoints, quoteDeliveryFee, getPaymentConfig } from './services/orderService';
 import * as Location from 'expo-location';
-import { Linking, Modal as RNModal } from 'react-native';
+import { Linking } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
 import { useIsFocused } from '@react-navigation/native';
-import MapView, { Marker } from 'react-native-maps';
-import LottieView from 'lottie-react-native';
+// Map preview removed
+import { API_URL } from '@src/config';
+// Lottie removed
 
 type CartItem = {
   id: string;
   name: string;
   price: string;
+  mrp?: string;
   quantity: number;
   size?: string;
   imageUrl: string;
@@ -26,7 +29,7 @@ type CartItem = {
 async function fetchLatestDeliveryPoint(destination) {
   const token = await AsyncStorage.getItem('token');
   const userId = await AsyncStorage.getItem('userId');
-  const res = await fetch(`https://trafficfrnd-2.onrender.com/api/users/${userId}/delivery-point?destination=${encodeURIComponent(destination)}`, {
+  const res = await fetch(`${API_URL}/api/users/${userId}/delivery-point?destination=${encodeURIComponent(destination)}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   if (!res.ok) throw new Error('No delivery point found');
@@ -39,13 +42,31 @@ export default function CartScreen() {
   const [loading, setLoading] = useState(true);
   const [vehicleModalVisible, setVehicleModalVisible] = useState(false);
   const [vehicleNumber, setVehicleNumber] = useState('');
-  const [pendingOrder, setPendingOrder] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState(true);
   const [routeId, setRouteId] = useState<string | null>(null);
   const [loadingCheckpoint, setLoadingCheckpoint] = useState(false);
   const [checkpointError, setCheckpointError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{latitude: number; longitude: number; address: string} | null>(null);
   const isFocused = useIsFocused();
   const [selectedDeliveryPoint, setSelectedDeliveryPoint] = useState(null);
+  const [suggestedDeliveryPoints, setSuggestedDeliveryPoints] = useState<any[]>([]);
+  const [deliveryFeeQuote, setDeliveryFeeQuote] = useState<{ fee?: number; breakdown?: any } | null>(null);
+  const [quoting, setQuoting] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('cod');
+  const [razorpayKeyId, setRazorpayKeyId] = useState<string | null>(null);
+
+  // Load Razorpay key id to decide whether to enable Online option
+  useEffect(() => {
+    (async () => {
+      try {
+        const cfg = await getPaymentConfig();
+        const keyId = cfg?.keyId || '';
+        setRazorpayKeyId(keyId || null);
+      } catch {
+        setRazorpayKeyId(null);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     loadCartItems();
@@ -73,15 +94,112 @@ export default function CartScreen() {
     }
   }, [isFocused]);
 
-  // Fetch user location when vehicle modal opens
+  // Fetch user location and nearby delivery point suggestions when placing order
   useEffect(() => {
-    if (vehicleModalVisible && !userLocation) {
-      (async () => {
-        const loc = await getUserCurrentLocation();
-        if (loc) setUserLocation(loc);
-      })();
-    }
-  }, [vehicleModalVisible]);
+    if (!pendingOrder) return;
+    let cancelled = false;
+
+    const getDeliveryPointsCached = async () => {
+      try {
+        const cacheStr = await AsyncStorage.getItem('deliveryPointsCache');
+        const now = Date.now();
+        if (cacheStr) {
+          const cache = JSON.parse(cacheStr);
+          if (cache.expiresAt && cache.expiresAt > now && Array.isArray(cache.points)) {
+            return cache.points as any[];
+          }
+        }
+      } catch {}
+      try {
+        const fresh = await fetchDeliveryPoints();
+        // cache for 10 minutes
+        await AsyncStorage.setItem(
+          'deliveryPointsCache',
+          JSON.stringify({ points: fresh, expiresAt: Date.now() + 10 * 60 * 1000 })
+        );
+        return fresh as any[];
+      } catch {
+        return [] as any[];
+      }
+    };
+
+    const getFastLocation = async () => {
+      try {
+        // Try last known first for instant UI
+        const last = await Location.getLastKnownPositionAsync();
+        if (last?.coords) {
+          const { latitude, longitude } = last.coords;
+          return { latitude, longitude, address: 'Current Location' };
+        }
+      } catch {}
+      // Fallback to current (already balanced and timeout set in getUserCurrentLocation)
+      return await getUserCurrentLocation();
+    };
+
+    (async () => {
+      try {
+        const [loc, points] = await Promise.all([getFastLocation(), getDeliveryPointsCached()]);
+        if (cancelled) return;
+        if (loc && !userLocation) setUserLocation(loc);
+        if (loc && points && points.length) {
+          const withDistance = points
+            .map((p: any) => ({
+              ...p,
+              distance: haversineDistanceKm(
+                { latitude: loc.latitude, longitude: loc.longitude },
+                { latitude: p.latitude, longitude: p.longitude }
+              )
+            }))
+            .filter((p: any) => Number.isFinite(p.distance));
+          withDistance.sort((a: any, b: any) => a.distance - b.distance);
+          setSuggestedDeliveryPoints(withDistance.slice(0, 3));
+        } else {
+          setSuggestedDeliveryPoints([]);
+        }
+      } catch {
+        if (!cancelled) setSuggestedDeliveryPoints([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingOrder]);
+
+  // Auto-quote delivery fee when user location and delivery point are available
+  useEffect(() => {
+    let cancelled = false;
+    const doQuote = async () => {
+      if (!pendingOrder) return;
+      if (!userLocation || !selectedDeliveryPoint) return;
+      try {
+        setQuoting(true);
+        const quote = await quoteDeliveryFee({
+          userLocation: { latitude: userLocation.latitude, longitude: userLocation.longitude },
+          selectedDeliveryPoint: { latitude: selectedDeliveryPoint.latitude, longitude: selectedDeliveryPoint.longitude },
+          etaMinutes: 0,
+        });
+        if (!cancelled) setDeliveryFeeQuote({ fee: quote.deliveryFee, breakdown: quote.feeBreakdown });
+      } catch {
+        if (!cancelled) setDeliveryFeeQuote({ fee: undefined, breakdown: null });
+      } finally {
+        if (!cancelled) setQuoting(false);
+      }
+    };
+    doQuote();
+    return () => { cancelled = true; };
+  }, [pendingOrder, userLocation, selectedDeliveryPoint]);
+
+  function haversineDistanceKm(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) {
+    const toRad = (n: number) => (n * Math.PI) / 180;
+    const R = 6371; // km
+    const dLat = toRad(b.latitude - a.latitude);
+    const dLon = toRad(b.longitude - a.longitude);
+    const lat1 = toRad(a.latitude);
+    const lat2 = toRad(b.latitude);
+    const x = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(x)));
+  }
 
   const loadCartItems = async () => {
     try {
@@ -97,14 +215,27 @@ export default function CartScreen() {
     }
   };
 
+  const persistCart = async (updated: CartItem[]) => {
+    await AsyncStorage.setItem('cart', JSON.stringify(updated));
+    setCartItems(updated);
+  };
+
   const removeFromCart = async (itemId: string) => {
     try {
       const updatedCart = cartItems.filter(item => item.id !== itemId);
-      await AsyncStorage.setItem('cart', JSON.stringify(updatedCart));
-      setCartItems(updatedCart);
+      await persistCart(updatedCart);
     } catch (error) {
       console.error('Error removing item from cart:', error);
       Alert.alert('Error', 'Failed to remove item from cart');
+    }
+  };
+
+  const updateQuantity = async (itemId: string, delta: number) => {
+    try {
+      const updated = cartItems.map(ci => ci.id === itemId ? { ...ci, quantity: Math.max(1, (ci.quantity || 1) + delta) } : ci);
+      await persistCart(updated);
+    } catch {
+      Alert.alert('Error', 'Failed to update quantity');
     }
   };
 
@@ -112,6 +243,20 @@ export default function CartScreen() {
     return cartItems.reduce((total, item) => {
       return total + (parseFloat(item.price) * item.quantity);
     }, 0);
+  };
+
+  const calculateMrpTotal = () => {
+    return cartItems.reduce((total, item) => {
+      const unit = parseFloat(item.price);
+      const mrp = item.mrp ? parseFloat(item.mrp) : unit * 1.1;
+      return total + mrp * item.quantity;
+    }, 0);
+  };
+
+  const calculateSavings = () => {
+    const mrp = calculateMrpTotal();
+    const total = calculateTotal();
+    return Math.max(0, mrp - total);
   };
 
   const handlePlaceOrder = async () => {
@@ -127,7 +272,6 @@ export default function CartScreen() {
     } catch (e) {
       setSelectedDeliveryPoint(null);
     }
-    setVehicleModalVisible(true);
     setPendingOrder(true);
   };
 
@@ -136,7 +280,7 @@ export default function CartScreen() {
     setCheckpointError('');
     try {
       const token = await AsyncStorage.getItem('token');
-      const res = await fetch(`https://trafficfrnd-2.onrender.com/api/routes/${routeId}/selected-checkpoint`, {
+      const res = await fetch(`${API_URL}/api/routes/${routeId}/selected-checkpoint`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -210,10 +354,6 @@ export default function CartScreen() {
   };
 
   const confirmVehicleNumberAndOrder = async () => {
-    if (!vehicleNumber.trim()) {
-      Alert.alert('Error', 'Please enter your vehicle number');
-      return;
-    }
     let vendorId = cartItems[0]?.vendorId;
     if (typeof vendorId === 'object' && vendorId !== null && vendorId._id) {
       vendorId = vendorId._id;
@@ -284,12 +424,18 @@ export default function CartScreen() {
           quantity: item.quantity,
         })),
         totalAmount: calculateTotal(),
+        // vehicle number is optional; include as-is (can be empty)
         vehicleNumber,
         userLocation: currentLocation, // Add user location to order data
         selectedDeliveryPoint: deliveryPoint // Add selected delivery point to order data
       };
       console.log('Order payload:', orderData);
-      const order = await createOrder(orderData);
+      // If online selected but key missing, block and ask to use COD
+      if (paymentMethod === 'online' && !razorpayKeyId) {
+        Alert.alert('Online payment unavailable', 'Razorpay key not configured. Please select Cash on Delivery.');
+        return;
+      }
+      const order = await createOrder({ ...orderData, payment: { method: paymentMethod } });
       await AsyncStorage.removeItem('cart');
       setCartItems([]);
       setVehicleNumber('');
@@ -309,20 +455,40 @@ export default function CartScreen() {
     }
   };
 
+  const renderRightActions = (itemId: string) => (
+    <TouchableOpacity style={styles.swipeDelete} onPress={() => removeFromCart(itemId)}>
+      <Ionicons name="trash" size={20} color="#fff" />
+      <ThemedText style={styles.swipeDeleteText}>Delete</ThemedText>
+    </TouchableOpacity>
+  );
+
   const renderItem = ({ item }: { item: CartItem }) => (
-    <View style={styles.cartItem}>
-      <View style={styles.itemInfo}>
-        <ThemedText style={styles.itemName}>{item.name}</ThemedText>
-        <ThemedText style={styles.itemPrice}>₹{item.price}</ThemedText>
-        <ThemedText style={styles.itemQuantity}>Quantity: {item.quantity}</ThemedText>
+    <Swipeable renderRightActions={() => renderRightActions(item.id)}>
+      <View style={styles.cartItem}>
+        <Image source={{ uri: item.imageUrl || 'https://via.placeholder.com/80' }} style={styles.itemImage} />
+        <View style={styles.itemInfo}>
+          <ThemedText style={styles.itemName} numberOfLines={1}>{item.name}</ThemedText>
+          <View style={styles.priceRow}>
+            <ThemedText style={styles.itemPrice}>₹{parseFloat(item.price).toFixed(2)}</ThemedText>
+            <View style={styles.freeBadge}><ThemedText style={styles.freeBadgeText}>Free delivery</ThemedText></View>
+          </View>
+          <View style={styles.qtyRow}>
+            <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item.id, -1)}>
+              <Ionicons name="remove" size={18} color="#4CAF50" />
+            </TouchableOpacity>
+            <ThemedText style={styles.qtyText}>{item.quantity}</ThemedText>
+            <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item.id, 1)}>
+              <Ionicons name="add" size={18} color="#4CAF50" />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.itemActions}>
+          <TouchableOpacity style={styles.removeButton} onPress={() => removeFromCart(item.id)}>
+            <Ionicons name="trash-outline" size={20} color="#FF5252" />
+          </TouchableOpacity>
+        </View>
       </View>
-      <TouchableOpacity
-        style={styles.removeButton}
-        onPress={() => removeFromCart(item.id)}
-      >
-        <Ionicons name="trash-outline" size={24} color="#FF5252" />
-      </TouchableOpacity>
-    </View>
+    </Swipeable>
   );
 
   if (loading) {
@@ -357,78 +523,274 @@ export default function CartScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <>
+        <View>
           <FlatList
             data={cartItems}
             renderItem={renderItem}
             keyExtractor={item => item.id}
-            contentContainerStyle={styles.cartList}
-          />
-          <View style={styles.footer}>
-            <View style={styles.totalContainer}>
-              <ThemedText style={styles.totalLabel}>Total:</ThemedText>
-              <ThemedText style={styles.totalAmount}>₹{calculateTotal().toFixed(2)}</ThemedText>
-            </View>
-            <TouchableOpacity
-              style={styles.placeOrderButton}
-              onPress={handlePlaceOrder}
-            >
-              <ThemedText style={styles.placeOrderButtonText}>Place Order</ThemedText>
-            </TouchableOpacity>
-          </View>
-        </>
-      )}
-      <Modal
-        visible={vehicleModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setVehicleModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <LottieView
-              source={require('../assets/animations/animation.json')}
-              autoPlay
-              loop
-              style={{ width: 120, height: 120, marginBottom: 8 }}
-            />
-            <ThemedText style={styles.cautionHeading}>Confirm Location</ThemedText>
-            {/* Map for confirming delivery point */}
-            {selectedDeliveryPoint && selectedDeliveryPoint.latitude && selectedDeliveryPoint.longitude && (
-              <View style={{ width: '100%', height: 160, borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
-                <MapView
-                  style={{ flex: 1 }}
-                  initialRegion={{
-                    latitude: selectedDeliveryPoint.latitude,
-                    longitude: selectedDeliveryPoint.longitude,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
-                  }}
-                  pointerEvents="none"
-                >
-                  {/* User's current location marker */}
-                  {userLocation && userLocation.latitude && userLocation.longitude && (
-                    <Marker
-                      coordinate={{
-                        latitude: userLocation.latitude,
-                        longitude: userLocation.longitude,
-                      }}
-                      title="Your Location"
-                      description={userLocation.address}
-                      pinColor="#4CAF50"
-                    />
+            contentContainerStyle={[styles.cartList, { paddingBottom: 220 }]}
+            ListFooterComponent={() => (
+              <View style={{ paddingBottom: 8 }}>
+                <View style={styles.couponRow}>
+                  <Ionicons name="pricetags" size={18} color="#4CAF50" />
+                  <TextInput placeholder="Apply coupon code" style={styles.couponInput} placeholderTextColor="#9CA3AF" />
+                  <TouchableOpacity style={styles.couponBtn}><ThemedText style={styles.couponBtnText}>Apply</ThemedText></TouchableOpacity>
+                </View>
+                {/* Inline Confirm Location below items */}
+                <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
+                  <ThemedText style={styles.cautionHeading}>Confirm Location</ThemedText>
+                  {suggestedDeliveryPoints.length > 0 && (
+                    <View style={{ width: '100%', marginBottom: 12 }}>
+                      <ThemedText style={{ fontWeight: '700', marginBottom: 8 }}>Nearby Delivery Points</ThemedText>
+                      {suggestedDeliveryPoints.slice(0, 3).map((p, idx) => {
+                        const pointId = p.id || p._id;
+                        const isSelected = selectedDeliveryPoint && (selectedDeliveryPoint.id === pointId);
+                        return (
+                          <TouchableOpacity
+                            key={pointId || idx}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: 10,
+                              borderWidth: 2,
+                              borderColor: isSelected ? '#4CAF50' : '#e5e7eb',
+                              borderRadius: 10,
+                              marginBottom: 8,
+                              backgroundColor: isSelected ? '#e8f5e8' : '#fafafa'
+                            }}
+                            onPress={async () => {
+                              const chosen = {
+                                id: pointId,
+                                name: p.name,
+                                latitude: p.latitude,
+                                longitude: p.longitude,
+                                address: p.address
+                              };
+                              await AsyncStorage.setItem('selectedDeliveryPoint', JSON.stringify(chosen));
+                              setSelectedDeliveryPoint(chosen as any);
+                            }}
+                          >
+                            <View style={{ flex: 1, paddingRight: 8 }}>
+                              <ThemedText style={{ fontWeight: '600' }}>{p.name}</ThemedText>
+                              <ThemedText style={{ color: '#6b7280', fontSize: 12 }}>{p.address}</ThemedText>
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <ThemedText style={{ color: '#2e7d32', fontWeight: '700' }}>{p.distance.toFixed(1)} km</ThemedText>
+                              {isSelected ? (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                                  <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                                  <ThemedText style={{ color: '#4CAF50', fontSize: 12, marginLeft: 4 }}>Selected</ThemedText>
+                                </View>
+                              ) : null}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                      {!selectedDeliveryPoint && suggestedDeliveryPoints.length > 0 && (
+                        <TouchableOpacity
+                          style={{ backgroundColor: '#4CAF50', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+                          onPress={async () => {
+                            const nearest = suggestedDeliveryPoints[0];
+                            if (!nearest) return;
+                            const chosen = {
+                              id: nearest.id || nearest._id,
+                              name: nearest.name,
+                              latitude: nearest.latitude,
+                              longitude: nearest.longitude,
+                              address: nearest.address
+                            };
+                            await AsyncStorage.setItem('selectedDeliveryPoint', JSON.stringify(chosen));
+                            setSelectedDeliveryPoint(chosen as any);
+                            try {
+                              if (userLocation) {
+                                setQuoting(true);
+                                const quote = await quoteDeliveryFee({
+                                  userLocation: { latitude: userLocation.latitude, longitude: userLocation.longitude },
+                                  selectedDeliveryPoint: { latitude: chosen.latitude, longitude: chosen.longitude },
+                                  etaMinutes: 0,
+                                });
+                                setDeliveryFeeQuote({ fee: quote.deliveryFee, breakdown: quote.feeBreakdown });
+                              }
+                            } catch {}
+                            setQuoting(false);
+                          }}
+                        >
+                          <ThemedText style={{ color: '#fff', fontWeight: '700' }}>Use Nearest Point</ThemedText>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   )}
-                  {/* Delivery point marker */}
-                  <Marker
-                    coordinate={{
-                      latitude: selectedDeliveryPoint.latitude,
-                      longitude: selectedDeliveryPoint.longitude,
-                    }}
-                    title={selectedDeliveryPoint.name}
-                    description={selectedDeliveryPoint.address}
-                    pinColor="#D32F2F"
+                  {userLocation && selectedDeliveryPoint && (
+                    <View style={{ width: '100%', marginBottom: 8 }}>
+                      <ThemedText style={{ fontWeight: '700' }}>
+                        Delivery Fee: {typeof deliveryFeeQuote?.fee === 'number' ? `₹${deliveryFeeQuote.fee.toFixed(2)}` : (quoting ? 'Calculating…' : '—')}
+                      </ThemedText>
+                      {deliveryFeeQuote?.breakdown?.baseFare !== undefined && (
+                        <ThemedText style={{ color: '#6b7280', fontSize: 12 }}>
+                          Base ₹{deliveryFeeQuote.breakdown.baseFare}, Dist ~{Math.round(deliveryFeeQuote.breakdown.distanceMeters)}m, Surge {Math.round((deliveryFeeQuote.breakdown.surgePercent||0)*100)}%
+                        </ThemedText>
+                      )}
+                    </View>
+                  )}
+                  <ThemedText style={styles.modalTitle}>Enter Your Vehicle Number</ThemedText>
+                  {/* Payment method selector */}
+                  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+                    <TouchableOpacity onPress={() => setPaymentMethod('cod')} style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: paymentMethod==='cod' ? '#4CAF50' : '#e5e7eb', backgroundColor: paymentMethod==='cod' ? '#e8f5e8' : '#fff' }}>
+                      <ThemedText>Cash on Delivery</ThemedText>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (!razorpayKeyId) {
+                          Alert.alert('Online payment unavailable', 'Razorpay key not configured. Choose COD for now.');
+                          return;
+                        }
+                        setPaymentMethod('online');
+                      }}
+                      style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: paymentMethod==='online' ? '#4CAF50' : '#e5e7eb', backgroundColor: paymentMethod==='online' ? '#e8f5e8' : (!razorpayKeyId ? '#f9fafb' : '#fff'), opacity: !razorpayKeyId ? 0.6 : 1 }}
+                    >
+                      <ThemedText>Online (Razorpay){!razorpayKeyId ? ' — coming soon' : ''}</ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Vehicle Number"
+                    value={vehicleNumber}
+                    onChangeText={setVehicleNumber}
+                    autoCapitalize="characters"
+                    maxLength={15}
                   />
-                </MapView>
+                  <TouchableOpacity
+                    style={[styles.confirmButton, !selectedDeliveryPoint && { opacity: 0.5 }]}
+                    disabled={!selectedDeliveryPoint}
+                    onPress={confirmVehicleNumberAndOrder}
+                  >
+                    <ThemedText style={styles.confirmButtonText}>Confirm & Place Order</ThemedText>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          />
+          <View style={styles.footerSticky}>
+            <View style={styles.breakdownRow}><ThemedText style={styles.breakdownLabel}>MRP</ThemedText><ThemedText style={styles.breakdownValue}>₹{calculateMrpTotal().toFixed(2)}</ThemedText></View>
+            <View style={styles.breakdownRow}><ThemedText style={styles.breakdownLabel}>Discount</ThemedText><ThemedText style={[styles.breakdownValue, { color: '#2e7d32' }]}>-₹{calculateSavings().toFixed(2)}</ThemedText></View>
+            {/* Delivery Fee (separate) */}
+            <View style={styles.breakdownRow}>
+              <ThemedText style={styles.breakdownLabel}>Delivery Fee</ThemedText>
+              <ThemedText style={styles.breakdownValue}>
+                {typeof deliveryFeeQuote?.fee === 'number' ? `₹${deliveryFeeQuote.fee.toFixed(2)}` : '—'}
+              </ThemedText>
+            </View>
+            {/* Grand Total: subtotal + delivery fee when available */}
+            <View style={styles.totalContainer}>
+              <ThemedText style={styles.totalLabel}>Grand Total</ThemedText>
+              <ThemedText style={styles.totalAmount}>
+                ₹{(
+                  calculateTotal() + (typeof deliveryFeeQuote?.fee === 'number' ? deliveryFeeQuote.fee : 0)
+                ).toFixed(2)}
+              </ThemedText>
+            </View>
+            {/* Footer action removed to avoid duplicate with inline Confirm & Place Order */}
+          </View>
+        </View>
+      )}
+      {/* Removed old inline overlay confirm; using inline section above */}
+      {false && (
+        <View>
+          <View>
+            <ThemedText style={styles.cautionHeading}>Confirm Location</ThemedText>
+            {userLocation && selectedDeliveryPoint && (
+              <View style={{ width: '100%', marginBottom: 8 }}>
+                <ThemedText style={{ fontWeight: '700' }}>
+                  Delivery Fee: {typeof deliveryFeeQuote?.fee === 'number' ? `₹${deliveryFeeQuote.fee.toFixed(2)}` : (quoting ? 'Calculating…' : '—')}
+                </ThemedText>
+                {deliveryFeeQuote?.breakdown?.baseFare !== undefined && (
+                  <ThemedText style={{ color: '#6b7280', fontSize: 12 }}>
+                    Base ₹{deliveryFeeQuote.breakdown.baseFare}, Dist ~{Math.round(deliveryFeeQuote.breakdown.distanceMeters)}m, Surge {Math.round((deliveryFeeQuote.breakdown.surgePercent||0)*100)}%
+                  </ThemedText>
+                )}
+              </View>
+            )}
+            {suggestedDeliveryPoints.length > 0 && (
+              <View style={{ width: '100%', marginBottom: 12 }}>
+                <ThemedText style={{ fontWeight: '700', marginBottom: 8 }}>Nearby Delivery Points</ThemedText>
+                {suggestedDeliveryPoints.slice(0, 3).map((p, idx) => {
+                  const pointId = p.id || p._id;
+                  const isSelected = selectedDeliveryPoint && (selectedDeliveryPoint.id === pointId);
+                  return (
+                  <TouchableOpacity
+                    key={pointId || idx}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: 10,
+                      borderWidth: 2,
+                      borderColor: isSelected ? '#4CAF50' : '#e5e7eb',
+                      borderRadius: 10,
+                      marginBottom: 8,
+                      backgroundColor: isSelected ? '#e8f5e8' : '#fafafa'
+                    }}
+                    onPress={async () => {
+                      const chosen = {
+                        id: pointId,
+                        name: p.name,
+                        latitude: p.latitude,
+                        longitude: p.longitude,
+                        address: p.address
+                      };
+                      await AsyncStorage.setItem('selectedDeliveryPoint', JSON.stringify(chosen));
+                      setSelectedDeliveryPoint(chosen as any);
+                    }}
+                  >
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <ThemedText style={{ fontWeight: '600' }}>{p.name}</ThemedText>
+                      <ThemedText style={{ color: '#6b7280', fontSize: 12 }}>{p.address}</ThemedText>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <ThemedText style={{ color: '#2e7d32', fontWeight: '700' }}>{p.distance.toFixed(1)} km</ThemedText>
+                      {isSelected ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                          <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                          <ThemedText style={{ color: '#4CAF50', fontSize: 12, marginLeft: 4 }}>Selected</ThemedText>
+                        </View>
+                      ) : null}
+                    </View>
+                  </TouchableOpacity>
+                );})}
+                {!selectedDeliveryPoint && suggestedDeliveryPoints.length > 0 && (
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#4CAF50', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+                    onPress={async () => {
+                      const nearest = suggestedDeliveryPoints[0];
+                      if (!nearest) return;
+                      const chosen = {
+                        id: nearest.id || nearest._id,
+                        name: nearest.name,
+                        latitude: nearest.latitude,
+                        longitude: nearest.longitude,
+                        address: nearest.address
+                      };
+                      await AsyncStorage.setItem('selectedDeliveryPoint', JSON.stringify(chosen));
+                      setSelectedDeliveryPoint(chosen as any);
+                      // try quote
+                      try {
+                        if (userLocation) {
+                          setQuoting(true);
+                          const quote = await quoteDeliveryFee({
+                            userLocation: { latitude: userLocation.latitude, longitude: userLocation.longitude },
+                            selectedDeliveryPoint: { latitude: chosen.latitude, longitude: chosen.longitude },
+                            etaMinutes: 0,
+                          });
+                          setDeliveryFeeQuote({ fee: quote.deliveryFee, breakdown: quote.feeBreakdown });
+                        }
+                      } catch {}
+                      setQuoting(false);
+                    }}
+                  >
+                    <ThemedText style={{ color: '#fff', fontWeight: '700' }}>Use Nearest Point</ThemedText>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
             <ThemedText style={styles.modalTitle}>Enter Your Vehicle Number</ThemedText>
@@ -441,44 +803,22 @@ export default function CartScreen() {
               maxLength={15}
             />
             <TouchableOpacity
-              style={styles.confirmButton}
+              style={[styles.confirmButton, !selectedDeliveryPoint && { opacity: 0.5 }]}
+              disabled={!selectedDeliveryPoint}
               onPress={confirmVehicleNumberAndOrder}
             >
               <ThemedText style={styles.confirmButtonText}>Confirm & Place Order</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.changeDeliveryButton, { marginBottom: 10 }]}
-              onPress={() => {
-                setVehicleModalVisible(false);
-                setPendingOrder(false);
-                router.push('/map');
-              }}
-            >
-              <ThemedText style={styles.changeDeliveryButtonText}>Change Delivery Point</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
               style={styles.cancelButton}
-              onPress={() => { setVehicleModalVisible(false); setPendingOrder(false); }}
+              onPress={() => { setPendingOrder(false); }}
             >
               <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
-      {loadingCheckpoint && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <ThemedText style={styles.modalTitle}>Loading checkpoint...</ThemedText>
-          </View>
-        </View>
       )}
-      {checkpointError ? (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <ThemedText style={styles.modalTitle}>{checkpointError}</ThemedText>
-          </View>
-        </View>
-      ) : null}
+      {/* Removed legacy checkpoint overlays */}
     </ThemedView>
   );
 }
@@ -495,11 +835,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#f8f8f8',
-    borderRadius: 12,
-    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 12,
     marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 3,
   },
+  itemImage: { width: 64, height: 64, borderRadius: 10, marginRight: 12, backgroundColor: '#f5f5f5' },
   itemInfo: {
     flex: 1,
   },
@@ -514,25 +862,36 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     marginBottom: 4,
   },
-  itemQuantity: {
-    fontSize: 14,
-    color: '#666',
-  },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  freeBadge: { backgroundColor: '#e8f5e8', borderColor: '#4CAF50', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
+  freeBadgeText: { color: '#2e7d32', fontSize: 11, fontWeight: '700' },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  qtyBtn: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+  qtyText: { width: 24, textAlign: 'center', fontWeight: '700', color: '#111' },
+  itemActions: { justifyContent: 'space-between', alignItems: 'flex-end' },
   removeButton: {
     padding: 8,
   },
+  couponRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingTop: 6 },
+  couponInput: { flex: 1, height: 42, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 12, backgroundColor: '#fff', color: '#111' },
+  couponBtn: { backgroundColor: '#4CAF50', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
+  couponBtnText: { color: '#fff', fontWeight: '700' },
   footer: {
     padding: 20,
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
     backgroundColor: '#fff',
   },
+  footerSticky: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#eee', padding: 14 },
   totalContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 15,
   },
+  breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 },
+  breakdownLabel: { color: '#6b7280' },
+  breakdownValue: { color: '#111827', fontWeight: '600' },
   totalLabel: {
     fontSize: 18,
     fontWeight: '600',

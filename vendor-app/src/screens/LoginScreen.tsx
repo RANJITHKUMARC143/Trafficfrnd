@@ -50,7 +50,7 @@ export const LoginScreen = ({ navigation }: any) => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Image source={require('../../assets/images/logo.png')} style={{ width: 160, height: 160, resizeMode: 'contain', marginBottom: 16 }} />
-          <Text style={styles.title}>Traffic Friend</Text>
+          <Text style={styles.title}>Traffic Frnd</Text>
           <Text style={styles.subtitle}>Vendor Portal</Text>
         </View>
 

@@ -108,7 +108,7 @@ export const SignupScreen = ({ navigation }: any) => {
             <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join Traffic Friend as a Vendor</Text>
+          <Text style={styles.subtitle}>Join Traffic Frnd as a Vendor</Text>
         </View>
 
         <View style={styles.form}>

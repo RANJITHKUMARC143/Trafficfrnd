@@ -3,6 +3,8 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/ui/PageHeader';
 import { GoogleMap, Marker, useJsApiLoader, Autocomplete } from '@react-google-maps/api';
+// Note: Marker is deprecated but AdvancedMarkerElement requires newer package version
+// TODO: Update @react-google-maps/api to latest version to use AdvancedMarkerElement
 import { toast } from 'react-toastify';
 import axios from 'axios';
 import { Share2, Copy, ExternalLink } from 'lucide-react';
@@ -19,8 +21,12 @@ interface DeliveryPoint {
 const defaultCenter = { lat: 13.0827, lng: 80.2707 }; // Chennai as default
 const mapContainerStyle = { width: '100%', height: '100%', borderRadius: '8px' };
 const modalMapStyle = { width: '100%', height: 220 };
-const GOOGLE_MAPS_API_KEY = 'AIzaSyAJX6Yjwz2DiEHjWE_0HIBvEkiYpS5TXAU';
-const API_BASE = '/api/delivery-points';
+// Google Maps API Key - Replace with your own key if needed
+const GOOGLE_MAPS_API_KEY = 'AIzaSyAW74HcfPLqNz7kmr7EK4LM6TTmCnJ3pXM';
+const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/delivery-points`;
+
+// Fix performance warning by keeping libraries array static
+const GOOGLE_MAPS_LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ['places'];
 
 const DeliveryPoints: React.FC = () => {
   const [deliveryPoints, setDeliveryPoints] = useState<DeliveryPoint[]>([]);
@@ -37,9 +43,9 @@ const DeliveryPoints: React.FC = () => {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [selectedPoint, setSelectedPoint] = useState<DeliveryPoint | null>(null);
 
-  const { isLoaded } = useJsApiLoader({
+  const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-    libraries: ['places'],
+    libraries: GOOGLE_MAPS_LIBRARIES,
   });
 
   // Fetch all delivery points
@@ -48,10 +54,9 @@ const DeliveryPoints: React.FC = () => {
     setError('');
     try {
       const res = await axios.get(API_BASE);
-      console.log('Fetched delivery points:', res.data); // Debugging line
       setDeliveryPoints(Array.isArray(res.data) ? res.data : (res.data.data || []));
     } catch (err: any) {
-      setError('Failed to load delivery points');
+      setError(`Failed to load delivery points: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -60,6 +65,7 @@ const DeliveryPoints: React.FC = () => {
   useEffect(() => {
     fetchDeliveryPoints();
   }, [fetchDeliveryPoints]);
+
 
   // Reverse geocode using Google Maps Geocoding API
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
@@ -283,7 +289,48 @@ const DeliveryPoints: React.FC = () => {
             </div>
           </div>
           <div style={{ height: 400, width: '100%' }}>
-            {isLoaded && (
+            {loadError ? (
+              <div className="h-full">
+                <div className="flex items-center justify-center h-48 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 mb-4">
+                  <div className="text-center">
+                    <div className="text-red-500 text-lg font-semibold mb-2">Google Maps Error</div>
+                    <div className="text-gray-600 mb-4">
+                      {loadError.message.includes('BillingNotEnabled') 
+                        ? 'Google Maps billing is not enabled. Please enable billing in Google Cloud Console.'
+                        : 'Failed to load Google Maps. Please check your API key configuration.'}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                        Go to Google Cloud Console
+                      </a>
+                    </div>
+                  </div>
+                </div>
+                {/* Fallback: Show delivery points as list */}
+                <div className="bg-white rounded-lg border p-4">
+                  <h4 className="font-semibold mb-3">Delivery Points (List View)</h4>
+                  <div className="space-y-2">
+                    {deliveryPoints.map((point, idx) => (
+                      <div key={point._id || idx} className="flex justify-between items-center p-3 bg-gray-50 rounded border">
+                        <div>
+                          <div className="font-medium">{point.name}</div>
+                          <div className="text-sm text-gray-600">{point.address}</div>
+                          <div className="text-xs text-gray-500">
+                            Lat: {point.latitude.toFixed(6)}, Lng: {point.longitude.toFixed(6)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleShare(point)}
+                          className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                        >
+                          Share
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : isLoaded ? (
               <GoogleMap
                 mapContainerStyle={mapContainerStyle}
                 center={deliveryPoints.length > 0 ? { lat: deliveryPoints[0].latitude, lng: deliveryPoints[0].longitude } : defaultCenter}
@@ -299,6 +346,10 @@ const DeliveryPoints: React.FC = () => {
                   />
                 ))}
               </GoogleMap>
+            ) : (
+              <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
+                <div className="text-gray-500">Loading Google Maps...</div>
+              </div>
             )}
           </div>
         </div>
@@ -337,7 +388,18 @@ const DeliveryPoints: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium mb-1">Location (Pin on Map)</label>
                 <div style={modalMapStyle} className="mb-2 rounded overflow-hidden border">
-                  {isLoaded && (
+                  {loadError ? (
+                    <div className="flex items-center justify-center h-full bg-gray-100 border-2 border-dashed border-gray-300">
+                      <div className="text-center p-4">
+                        <div className="text-red-500 font-semibold mb-2">Maps Error</div>
+                        <div className="text-sm text-gray-600">
+                          {loadError.message.includes('BillingNotEnabled') 
+                            ? 'Enable billing in Google Cloud Console'
+                            : 'Check API key configuration'}
+                        </div>
+                      </div>
+                    </div>
+                  ) : isLoaded ? (
                     <GoogleMap
                       mapContainerStyle={modalMapStyle}
                       center={mapLocation ? { lat: mapLocation.latitude, lng: mapLocation.longitude } : modalMapCenter}
@@ -348,6 +410,10 @@ const DeliveryPoints: React.FC = () => {
                         <Marker position={{ lat: mapLocation.latitude, lng: mapLocation.longitude }} />
                       )}
                     </GoogleMap>
+                  ) : (
+                    <div className="flex items-center justify-center h-full bg-gray-100">
+                      <div className="text-gray-500">Loading map...</div>
+                    </div>
                   )}
                 </div>
               </div>

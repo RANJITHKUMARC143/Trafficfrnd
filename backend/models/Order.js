@@ -4,7 +4,8 @@ const orderSchema = new mongoose.Schema({
   vendorId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Vendor',
-    required: true
+    required: false,
+    default: null
   },
   customerName: {
     type: String,
@@ -31,6 +32,22 @@ const orderSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  // Delivery fee and transparent breakdown (Traffic Frnd model)
+  deliveryFee: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  feeBreakdown: {
+    baseFare: { type: Number, default: 0 },
+    distanceMeters: { type: Number, default: 0 },
+    timeMinutes: { type: Number, default: 0 },
+    timeFreeMinutes: { type: Number, default: 20 },
+    timeAdjustment: { type: Number, default: 0 },
+    surgePercent: { type: Number, default: 0 }, // e.g., 0.2 for 20%
+    surgeReasons: { type: [String], default: [] },
+    finalFee: { type: Number, default: 0 }
+  },
   status: {
     type: String,
     enum: ['pending', 'confirmed', 'enroute', 'preparing', 'ready', 'completed', 'cancelled'],
@@ -44,12 +61,14 @@ const orderSchema = new mongoose.Schema({
   },
   vehicleNumber: {
     type: String,
-    required: true
+    required: false,
+    default: ''
   },
   routeId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Route',
-    required: true
+    required: false,
+    default: null
   },
   // Location information at the time of order
   locations: {
@@ -132,6 +151,22 @@ const orderSchema = new mongoose.Schema({
     latitude: { type: Number },
     longitude: { type: Number },
     address: { type: String }
+  },
+  // Payment information
+  payment: {
+    method: { type: String, enum: ['cod', 'online'], default: 'cod' },
+    status: { type: String, enum: ['pending', 'paid', 'failed', 'refunded'], default: 'pending' },
+    amount: { type: Number, default: 0 },
+    gateway: { type: String, enum: ['razorpay', 'stripe', null], default: null },
+    gatewayOrderId: { type: String },
+    gatewayPaymentId: { type: String },
+    signature: { type: String },
+    paidAt: { type: Date },
+    refund: {
+      amount: { type: Number, default: 0 },
+      id: { type: String },
+      at: { type: Date }
+    }
   }
 }, {
   collection: 'food_orders'

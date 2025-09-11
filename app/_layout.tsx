@@ -36,8 +36,9 @@ export default function RootLayout() {
   }, [loaded]);
 
   useEffect(() => {
-    // Initialize socket service
-    socketService.initialize();
+    // Socket service will be initialized when user logs in
+    // No automatic initialization to prevent connection errors
+    console.log('App started - socket will initialize on login');
   }, []);
 
   if (!loaded) {
@@ -56,9 +57,20 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
         <Stack.Screen name="mode-selection" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen 
+          name="(tabs)" 
+          options={{ 
+            headerShown: false,
+            title: '',
+            headerTitle: '',
+          }} 
+        />
       </Stack>
     </ThemeProvider>
   );

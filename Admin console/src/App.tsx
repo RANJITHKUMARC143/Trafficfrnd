@@ -29,6 +29,7 @@ import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Orders from './pages/Orders';
+import OrderCreate from './pages/orders/OrderCreate';
 import DeliveryPoints from './pages/DeliveryPoints';
 import Alerts from './pages/Alerts';
 
@@ -73,6 +74,7 @@ function App() {
             <Route path="/payments/reports" element={<ProtectedRoute><PaymentsReports /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+            <Route path="/orders/create" element={<ProtectedRoute><OrderCreate /></ProtectedRoute>} />
             <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
             <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
             <Route path="/delivery-points" element={<ProtectedRoute><DeliveryPoints /></ProtectedRoute>} />

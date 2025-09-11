@@ -4,7 +4,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-const API_URL = 'https://trafficfrnd-2.onrender.com';
+const API_URL = 'http://192.168.31.107:3000';
 
 type Vendor = {
   _id: string;
@@ -197,6 +197,11 @@ export default function ExploreScreen() {
     }
   };
 
+  const handleVendorSelect = (vendor: Vendor) => {
+    setSelectedVendor(vendor);
+    setVendorModalVisible(false);
+  };
+
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
@@ -256,7 +261,7 @@ export default function ExploreScreen() {
         </Pressable>
       </Modal>
 
-      <ScrollView
+      <FlatList
         style={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -269,92 +274,111 @@ export default function ExploreScreen() {
             titleColor="#4CAF50"
           />
         }
-      >
-        <View style={styles.lastUpdateContainer}>
-          <ThemedText style={styles.lastUpdateText}>
-            Last updated: {lastUpdateTime.toLocaleTimeString()}
-          </ThemedText>
-          {refreshing && (
-            <View style={styles.refreshIndicator}>
-              <ActivityIndicator size="small" color="#4CAF50" />
-              <ThemedText style={styles.refreshText}>Refreshing...</ThemedText>
-            </View>
-          )}
-        </View>
-
-        {/* Categories Section */}
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Categories</ThemedText>
-          <View style={styles.categoriesGrid}>
-            {loadingInitialData ? (
-              <ActivityIndicator size="large" color="#4CAF50" />
-            ) : categories.length === 0 ? (
-              <ThemedText style={styles.emptyText}>No categories available</ThemedText>
-            ) : (
-              categories.map((category) => (
-                <TouchableOpacity
-                  key={category}
-                  style={styles.categoryCard}
-                  onPress={() => handleCategoryPress(category)}
-                >
-                  <View style={styles.categoryIcon}>
-                    <Ionicons 
-                      name={getCategoryIcon(category)} 
-                      size={28} 
-                      color="#4CAF50" 
-                    />
+        data={[
+          { type: 'header', id: 'header' },
+          { type: 'categories', id: 'categories' },
+          { type: 'menu', id: 'menu' }
+        ]}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => {
+          if (item.type === 'header') {
+            return (
+              <View style={styles.lastUpdateContainer}>
+                <ThemedText style={styles.lastUpdateText}>
+                  Last updated: {lastUpdateTime.toLocaleTimeString()}
+                </ThemedText>
+                {refreshing && (
+                  <View style={styles.refreshIndicator}>
+                    <ActivityIndicator size="small" color="#4CAF50" />
+                    <ThemedText style={styles.refreshText}>Refreshing...</ThemedText>
                   </View>
-                  <ThemedText style={styles.categoryName}>{category}</ThemedText>
-                  <ThemedText style={styles.categoryItems}>
-                    {menuItems.filter(item => item.category === category).length} items
-                  </ThemedText>
-                </TouchableOpacity>
-              ))
-            )}
-          </View>
-        </View>
-
-        {/* Menu Items Section */}
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>
-            {selectedVendor ? `${selectedVendor.businessName}'s Menu` : 'All Menu Items'}
-          </ThemedText>
-          {loadingInitialData || loadingMenu ? (
-            <ActivityIndicator size="large" color="#4CAF50" />
-          ) : menuItems.length === 0 ? (
-            <ThemedText style={styles.emptyText}>No menu items available.</ThemedText>
-          ) : (
-            menuItems
-              .filter(item => !selectedVendor || item.vendorId === selectedVendor._id)
-              .map((item) => (
-                <TouchableOpacity
-                  key={item._id}
-                  style={styles.itemCard}
-                  onPress={() => handleItemPress(item)}
-                >
-                  <Image
-                    source={{ uri: item.image }}
-                    style={styles.itemImage}
-                    defaultSource={{ uri: 'https://placehold.co/400x300/e2e8f0/64748b?text=No+Image' }}
-                  />
-                  <View style={styles.itemInfo}>
-                    <ThemedText style={styles.itemName}>{item.name}</ThemedText>
-                    <ThemedText style={styles.itemVendorName}>{item.vendorName}</ThemedText>
-                    <ThemedText style={styles.itemDescription} numberOfLines={2}>
-                      {item.description}
-                    </ThemedText>
-                    <View style={styles.itemFooter}>
-                      <ThemedText style={styles.itemPrice}>₹{item.price.toFixed(2)}</ThemedText>
-                      <ThemedText style={styles.preparationTime}>
-                        {item.preparationTime} mins
-                      </ThemedText>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))
-          )}
-        </View>
-      </ScrollView>
+                )}
+              </View>
+            );
+          }
+          
+          if (item.type === 'categories') {
+            return (
+              <View style={styles.section}>
+                <ThemedText style={styles.sectionTitle}>Categories</ThemedText>
+                <View style={styles.categoriesGrid}>
+                  {loadingInitialData ? (
+                    <ActivityIndicator size="large" color="#4CAF50" />
+                  ) : categories.length === 0 ? (
+                    <ThemedText style={styles.emptyText}>No categories available</ThemedText>
+                  ) : (
+                    categories.map((category) => (
+                      <TouchableOpacity
+                        key={category}
+                        style={styles.categoryCard}
+                        onPress={() => handleCategoryPress(category)}
+                      >
+                        <View style={styles.categoryIcon}>
+                          <Ionicons 
+                            name={getCategoryIcon(category)} 
+                            size={28} 
+                            color="#4CAF50" 
+                          />
+                        </View>
+                        <ThemedText style={styles.categoryName}>{category}</ThemedText>
+                        <ThemedText style={styles.categoryItems}>
+                          {menuItems.filter(item => item.category === category).length} items
+                        </ThemedText>
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </View>
+              </View>
+            );
+          }
+          
+          if (item.type === 'menu') {
+            return (
+              <View style={styles.section}>
+                <ThemedText style={styles.sectionTitle}>
+                  {selectedVendor ? `${selectedVendor.businessName}'s Menu` : 'All Menu Items'}
+                </ThemedText>
+                {loadingInitialData || loadingMenu ? (
+                  <ActivityIndicator size="large" color="#4CAF50" />
+                ) : menuItems.length === 0 ? (
+                  <ThemedText style={styles.emptyText}>No menu items available.</ThemedText>
+                ) : (
+                  menuItems
+                    .filter(item => !selectedVendor || item.vendorId === selectedVendor._id)
+                    .map((item) => (
+                      <TouchableOpacity
+                        key={item._id}
+                        style={styles.itemCard}
+                        onPress={() => handleItemPress(item)}
+                      >
+                        <Image
+                          source={{ uri: item.image }}
+                          style={styles.itemImage}
+                          defaultSource={{ uri: 'https://placehold.co/400x300/e2e8f0/64748b?text=No+Image' }}
+                        />
+                        <View style={styles.itemInfo}>
+                          <ThemedText style={styles.itemName}>{item.name}</ThemedText>
+                          <ThemedText style={styles.itemVendorName}>{item.vendorName}</ThemedText>
+                          <ThemedText style={styles.itemDescription} numberOfLines={2}>
+                            {item.description}
+                          </ThemedText>
+                          <View style={styles.itemFooter}>
+                            <ThemedText style={styles.itemPrice}>₹{item.price.toFixed(2)}</ThemedText>
+                            <ThemedText style={styles.preparationTime}>
+                              {item.preparationTime} mins
+                            </ThemedText>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    ))
+                )}
+              </View>
+            );
+          }
+          
+          return null;
+        }}
+      />
     </ThemedView>
   );
 }

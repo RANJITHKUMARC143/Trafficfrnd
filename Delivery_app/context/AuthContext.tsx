@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getBaseUrl, API_ENDPOINTS } from '@/config/api';
-import { updateDeliveryStatus } from '@/utils/socket';
+import { updateDeliveryStatus, connectSocket, disconnectSocket, updateDeliveryLocation } from '@/utils/socket';
+import * as Location from 'expo-location';
 
 interface User {
   id: string;
@@ -56,6 +57,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const rawUser = userData.profile || userData;
           const user = { ...rawUser, id: rawUser.id || rawUser._id, token };
           setUser(user);
+          // Ensure socket is connected for realtime updates when app relaunches
+          try {
+            connectSocket({ id: user.id, role: 'delivery', token: user.token });
+          } catch (e) {}
         } else {
           await AsyncStorage.removeItem(TOKEN_KEY);
         }
@@ -93,6 +98,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const user = { ...rawUser, id: rawUser.id || rawUser._id, token: data.token };
       setUser(user);
       updateDeliveryStatus(user.id, 'online');
+      // Connect socket and begin location streaming
+      try {
+        connectSocket({ id: user.id, role: 'delivery', token: user.token });
+        const { status: perm } = await Location.requestForegroundPermissionsAsync();
+        if (perm === 'granted') {
+          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          if (pos?.coords) {
+            updateDeliveryLocation(user.id, { latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+          }
+        }
+      } catch (e) {}
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       throw err;
@@ -123,6 +139,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const user = { ...rawUser, id: rawUser.id || rawUser._id, token: data.token };
       setUser(user);
       updateDeliveryStatus(user.id, 'online');
+      // Connect socket and send initial location
+      try {
+        connectSocket({ id: user.id, role: 'delivery', token: user.token });
+        const { status: perm } = await Location.requestForegroundPermissionsAsync();
+        if (perm === 'granted') {
+          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          if (pos?.coords) {
+            updateDeliveryLocation(user.id, { latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+          }
+        }
+      } catch (e) {}
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       throw err;
@@ -136,6 +163,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       await AsyncStorage.removeItem(TOKEN_KEY);
       setUser(null);
+      disconnectSocket();
     } catch (err) {
       console.error('Error during logout:', err);
     }

@@ -37,7 +37,7 @@ export default function ModeSelectionScreen() {
       <StatusBar style="dark" />
       
       <View style={styles.content}>
-        <ThemedText style={styles.title}>Welcome to Traffic Friend</ThemedText>
+        <ThemedText style={styles.title}>Welcome to Traffic Frnd</ThemedText>
         <ThemedText style={styles.subtitle}>How would you like to use the app?</ThemedText>
 
         <View style={styles.optionsContainer}>

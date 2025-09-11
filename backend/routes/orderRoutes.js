@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const { getOrders, getOrderById, updateOrderStatus, getOrdersByStatus, createOrder, getAvailableOrders } = require('../controllers/orderController');
+const { quoteDeliveryFee } = require('../services/quoteService');
 const Order = require('../models/Order');
 const User = require('../models/User');
 const Vendor = require('../models/Vendor');
@@ -129,5 +130,17 @@ router.get('/admin/:orderId/details', auth, async (req, res) => {
 
 // Create a new order
 router.post('/', auth, createOrder);
+
+// Quote delivery fee (distance user -> delivery point) — public for preview
+router.post('/quote', quoteDeliveryFee);
+
+// Admin create order (same handler; supports userId in body)
+router.post('/admin', auth, (req, res, next) => {
+  // Only admins or super_admins may use this explicit admin endpoint
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'super_admin')) {
+    return res.status(403).json({ message: 'Forbidden: Admins only' });
+  }
+  next();
+}, createOrder);
 
 module.exports = router; 

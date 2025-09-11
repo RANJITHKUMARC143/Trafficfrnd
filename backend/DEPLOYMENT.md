@@ -1,4 +1,4 @@
-# Deployment Guide for Traffic Friend Backend
+# Deployment Guide for Traffic Frnd Backend
 
 ## Deploying to Render
 

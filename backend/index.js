@@ -68,9 +68,18 @@ const upload = multer({
 });
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('Could not connect to MongoDB:', err));
+const mongoURI = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/Trafficfrnd';
+console.log(`Connecting to MongoDB: ${mongoURI}`);
+
+mongoose.connect(mongoURI)
+  .then(() => {
+    console.log('Connected to MongoDB');
+    console.log(`Database: ${mongoose.connection.name}`);
+  })
+  .catch(err => {
+    console.error('Could not connect to MongoDB:', err);
+    console.error('Make sure MongoDB is running locally on port 27017');
+  });
 
 // Middleware to verify JWT token
 const authenticateToken = (req, res, next) => {
@@ -198,6 +207,25 @@ app.put('/api/users/profile', authenticateToken, upload.single('profileImage'), 
     res.json(user);
   } catch (error) {
     console.error('Profile update error:', error);
+    res.status(500).json({ message: 'Error updating profile' });
+  }
+});
+
+// Fallback: Update user by ID (ensures compatibility if /api/users/profile is unavailable)
+app.put('/api/users/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (req.user.userId.toString() !== id.toString()) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    const updates = req.body || {};
+    const user = await User.findByIdAndUpdate(id, { $set: updates }, { new: true, select: '-password' });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json(user);
+  } catch (error) {
+    console.error('Profile update (by id) error:', error);
     res.status(500).json({ message: 'Error updating profile' });
   }
 });
@@ -900,6 +928,9 @@ app.get('/api/test', (req, res) => {
 });
 
 app.use('/api/delivery-points', require('./routes/deliveryPointRoutes'));
+
+// Click-to-call proxy route
+app.use('/api/call', require('./routes/callRoutes'));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
