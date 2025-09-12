@@ -147,14 +147,26 @@ const getOrderById = async (req, res) => {
       console.error('No user found on request!');
       return res.status(401).json({ message: 'Unauthorized: No user found' });
     }
-    // Allow vendor or delivery boy to fetch their order
-    const order = await Order.findOne({
-      _id: req.params.orderId,
-      $or: [
-        { vendorId: req.user._id },
-        { deliveryBoyId: req.user._id }
-      ]
-    });
+    
+    // For users, allow them to fetch their own orders
+    // For vendors/delivery boys, allow them to fetch orders they're involved with
+    let query = { _id: req.params.orderId };
+    
+    if (req.user.role === 'user') {
+      query.user = req.user._id;
+    } else if (req.user.role === 'vendor') {
+      query.vendorId = req.user._id;
+    } else if (req.user.role === 'delivery') {
+      query.deliveryBoyId = req.user._id;
+    } else if (req.user.role === 'admin' || req.user.role === 'super_admin') {
+      // Admin can fetch any order
+      query = { _id: req.params.orderId };
+    }
+
+    const order = await Order.findOne(query)
+      .populate('deliveryBoyId', 'fullName phone vehicleType vehicleNumber rating totalDeliveries onTimeRate currentLocation')
+      .populate('vendorId', 'businessName phone address location')
+      .populate('user', 'name email phone');
 
     if (!order) {
       console.log('[BACKEND] Order not found for orderId:', req.params.orderId, 'userId:', req.user._id);
@@ -392,6 +404,18 @@ const createOrder = async (req, res) => {
     };
     const fee = await computeDeliveryFee(calcInput);
 
+    // Prepare selectedDeliveryPoint with GeoJSON location
+    let processedDeliveryPoint = selectedDeliveryPoint;
+    if (selectedDeliveryPoint && selectedDeliveryPoint.latitude && selectedDeliveryPoint.longitude) {
+      processedDeliveryPoint = {
+        ...selectedDeliveryPoint,
+        location: {
+          type: 'Point',
+          coordinates: [selectedDeliveryPoint.longitude, selectedDeliveryPoint.latitude]
+        }
+      };
+    }
+
     const order = new Order({
       vendorId: vendorObjectId || undefined,
       routeId: routeObjectId || undefined,
@@ -408,7 +432,7 @@ const createOrder = async (req, res) => {
       timestamp: new Date(),
       updatedAt: new Date(),
       user: orderUserId,
-      selectedDeliveryPoint: selectedDeliveryPoint || undefined,
+      selectedDeliveryPoint: processedDeliveryPoint || undefined,
     });
 
     await order.save();
@@ -562,25 +586,16 @@ const getAvailableOrders = async (req, res) => {
     // Only pending & unassigned orders within 1km of driver, using selectedDeliveryPoint
     // selectedDeliveryPoint is stored in order as { latitude, longitude }
     const nearby = await Order.aggregate([
-      { $match: {
-          status: 'pending',
-          $or: [ { deliveryBoyId: { $exists: false } }, { deliveryBoyId: null } ],
-          selectedDeliveryPoint: { $exists: true }
-        }
-      },
-      { $addFields: {
-          deliveryPointGeo: {
-            type: 'Point',
-            coordinates: [ '$selectedDeliveryPoint.longitude', '$selectedDeliveryPoint.latitude' ]
-          }
-        }
-      },
       { $geoNear: {
           near: { type: 'Point', coordinates: [ driverLng, driverLat ] },
           distanceField: 'distance',
           maxDistance: 1000,
           spherical: true,
-          key: 'deliveryPointGeo'
+          query: {
+            status: 'pending',
+            $or: [ { deliveryBoyId: { $exists: false } }, { deliveryBoyId: null } ],
+            'selectedDeliveryPoint.location': { $exists: true }
+          }
         }
       },
       { $sort: { timestamp: -1 } }

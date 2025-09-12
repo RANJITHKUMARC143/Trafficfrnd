@@ -150,7 +150,18 @@ const orderSchema = new mongoose.Schema({
     name: { type: String },
     latitude: { type: Number },
     longitude: { type: Number },
-    address: { type: String }
+    address: { type: String },
+    location: {
+      type: {
+        type: String,
+        enum: ['Point'],
+        default: 'Point'
+      },
+      coordinates: {
+        type: [Number],
+        default: [0, 0]
+      }
+    }
   },
   // Payment information
   payment: {
@@ -196,6 +207,14 @@ function checkPreparing(next) {
 orderSchema.pre('findOneAndUpdate', checkPreparing);
 orderSchema.pre('updateOne', checkPreparing);
 orderSchema.pre('updateMany', checkPreparing);
+
+// Create 2dsphere index for selectedDeliveryPoint for geo queries
+orderSchema.index({ 
+  'selectedDeliveryPoint.location': '2dsphere'
+}, { 
+  name: 'selectedDeliveryPoint_2dsphere',
+  background: true 
+});
 
 const Order = mongoose.model('Order', orderSchema);
 

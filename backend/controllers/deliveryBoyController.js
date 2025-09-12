@@ -357,7 +357,7 @@ exports.updateOnlineStatus = async (req, res) => {
 exports.getEarningsSummary = async (req, res) => {
   try {
     const { timeframe = 'daily' } = req.query;
-    const deliveryBoyId = req.user.id;
+    const deliveryBoyId = req.user._id;
 
     // Get earnings data from database
     const earnings = await Earnings.find({
@@ -390,7 +390,7 @@ exports.getEarningsSummary = async (req, res) => {
 exports.getEarningsHistory = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
-    const deliveryBoyId = req.user.id;
+    const deliveryBoyId = req.user._id;
 
     const earnings = await Earnings.find({ deliveryBoyId })
       .sort({ createdAt: -1 })
@@ -523,6 +523,36 @@ exports.updateOrderStatus = async (req, res) => {
         success: false, 
         message: 'Order not found or not assigned to you' 
       });
+    }
+
+    // If order moved to delivered/completed, create an earnings record and notify client in realtime
+    try {
+      // Emit earnings update only when order is marked completed
+      if (order && status === 'completed') {
+        const amount = typeof order.deliveryFee === 'number' ? order.deliveryFee : Math.max(0, Math.round((order.totalAmount || 0) * 0.1));
+        const earnDoc = new Earnings({
+          deliveryBoyId: req.user._id,
+          orderId: order._id,
+          amount,
+          date: new Date(),
+          hours: 0,
+          status: 'Paid'
+        });
+        await earnDoc.save();
+        try {
+          const io = req.app.get('io');
+          if (io) {
+            io.to(`deliveryBoy:${String(req.user._id)}`).emit('earningsUpdated', {
+              deliveryBoyId: String(req.user._id),
+              amount,
+              orderId: String(order._id),
+              at: new Date().toISOString()
+            });
+          }
+        } catch {}
+      }
+    } catch (e) {
+      console.warn('Failed to create earnings record/emit update:', e?.message);
     }
 
     res.json({

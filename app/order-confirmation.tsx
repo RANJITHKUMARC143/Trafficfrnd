@@ -138,12 +138,20 @@ export default function OrderConfirmationScreen() {
           </View>
         </View>
 
-        <TouchableOpacity 
-          style={styles.continueButton}
-          onPress={handleContinueShopping}
-        >
-          <ThemedText style={styles.continueButtonText}>Continue Shopping</ThemedText>
-        </TouchableOpacity>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            style={[styles.continueButton, { marginRight: 10 }]}
+            onPress={() => router.push(`/order-details/${orderId}`)}
+          >
+            <ThemedText style={styles.continueButtonText}>View Order Details</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.continueButton, { backgroundColor: '#FF9800' }]}
+            onPress={handleContinueShopping}
+          >
+            <ThemedText style={styles.continueButtonText}>Continue Shopping</ThemedText>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
       <Modal
         visible={showLetsGoModal}
@@ -229,12 +237,16 @@ const styles = StyleSheet.create({
   statusText: {
     color: '#4CAF50',
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    width: '100%',
+  },
   continueButton: {
     backgroundColor: '#4CAF50',
     borderRadius: 12,
     paddingVertical: 15,
-    paddingHorizontal: 30,
-    width: '100%',
+    paddingHorizontal: 20,
+    flex: 1,
     alignItems: 'center',
   },
   continueButtonText: {

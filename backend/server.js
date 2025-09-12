@@ -12,6 +12,7 @@ const orderRoutes = require('./routes/orderRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const deliveryBoyRoutes = require('./routes/deliveryBoyRoutes');
+const callRoutes = require('./routes/callRoutes');
 const userAuthRoutes = require('./routes/userAuth');
 const routeRoutes = require('./routes/routeRoutes');
 const journeyRoutes = require('./routes/journeyRoutes');
@@ -101,6 +102,7 @@ app.use('/api/vendors/orders', orderRoutes);
 app.use('/api/vendors/dashboard', dashboardRoutes);
 app.use('/api/vendors/analytics', analyticsRoutes);
 app.use('/api/delivery', deliveryBoyRoutes);
+app.use('/api/call', callRoutes);
 app.use('/api/routes', routeRoutes);
 app.use('/api/users/journey', journeyRoutes);
 app.use('/api/users/route-session', routeSessionRoutes);
@@ -265,11 +267,36 @@ io.on('connection', (socket) => {
   // Handle room joining for specific orders
   socket.on('joinOrderRoom', (orderId) => {
     socket.join(`order_${orderId}`);
+    console.log(`Socket ${socket.id} joined order room: order_${orderId}`);
   });
 
   // Handle room leaving
   socket.on('leaveOrderRoom', (orderId) => {
     socket.leave(`order_${orderId}`);
+    console.log(`Socket ${socket.id} left order room: order_${orderId}`);
+  });
+
+  // Handle chat messages
+  socket.on('message', async (data) => {
+    try {
+      const { orderId, message, sender } = data;
+      if (!orderId || !message || !sender) return;
+
+      // Create message object
+      const messageObj = {
+        id: Date.now().toString(),
+        text: message,
+        sender,
+        timestamp: new Date(),
+        orderId
+      };
+
+      // Broadcast message to all clients in the order room
+      io.to(`order_${orderId}`).emit('message', messageObj);
+      console.log(`Message sent to order room ${orderId}:`, messageObj);
+    } catch (error) {
+      console.error('Error handling message:', error);
+    }
   });
 
   socket.on('disconnect', () => {
@@ -324,9 +351,8 @@ process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down gracefully...');
   server.close(() => {
     console.log('Server closed');
-    mongoose.connection.close(false, () => {
-      console.log('MongoDB connection closed');
-      process.exit(0);
-    });
+    mongoose.connection.close();
+    console.log('MongoDB connection closed');
+    process.exit(0);
   });
 }); 

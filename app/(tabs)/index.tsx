@@ -18,6 +18,7 @@ import { MenuItem } from '@/types/menu';
 import LottieView from 'lottie-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useMemo } from 'react';
+import { fetchUserOrders } from '@/services/orderService';
 import { BlurView } from 'expo-blur';
 
 type Category = {
@@ -131,6 +132,7 @@ export default function HomeScreen() {
   const [topRatedItems, setTopRatedItems] = useState<MenuItem[]>([]);
   const [loadingTopRated, setLoadingTopRated] = useState(true);
   const [cartCount, setCartCount] = useState(0);
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   // One-time provider token initializer for Expo Go runtime
   useEffect(() => {
     (async () => {
@@ -170,6 +172,27 @@ export default function HomeScreen() {
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [popularSearches] = useState(['Chicken Biryani', 'Chicken Curry', 'Chicken Tikka', 'Pizza', 'Burger', 'Coffee', 'Snacks', 'Drinks']);
   const [searchAnimation] = useState(new Animated.Value(0));
+
+  // Load user's active order and update every 20s
+  useFocusEffect(
+    React.useCallback(() => {
+      let mounted = true;
+      const loadActiveOrder = async () => {
+        try {
+          const orders = await fetchUserOrders();
+          const active = (orders || []).find((o: any) =>
+            ['confirmed','preparing','enroute','ready'].includes(String(o?.status || '').toLowerCase())
+          );
+          if (mounted) setActiveOrderId(active?._id || null);
+        } catch (e) {
+          if (mounted) setActiveOrderId(null);
+        }
+      };
+      loadActiveOrder();
+      const t = setInterval(loadActiveOrder, 20000);
+      return () => { mounted = false; clearInterval(t); };
+    }, [])
+  );
 
   const [searchFilters, setSearchFilters] = useState({
     category: '',
@@ -2165,6 +2188,38 @@ export default function HomeScreen() {
             </View>
           )}
         </TouchableOpacity>
+          </Animated.View>
+        )}
+
+        {/* Active Order Track Button */}
+        {activeOrderId && (
+          <Animated.View
+            style={[
+              styles.floatingCartButton,
+              {
+                opacity: callButtonAnimation,
+                transform: [{
+                  translateY: callButtonAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [50, 0],
+                  })
+                }, {
+                  scale: callButtonAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.8, 1],
+                  })
+                }]
+              }
+            ]}
+          >
+            <TouchableOpacity
+              style={[styles.floatingCartButtonInner, { backgroundColor: '#1976D2' }]}
+              onPress={() => router.push(`/order-details/${activeOrderId}`)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="bicycle" size={22} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '700', marginTop: 4, fontSize: 12 }}>Track</Text>
+            </TouchableOpacity>
           </Animated.View>
         )}
       </View>

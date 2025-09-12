@@ -1,10 +1,68 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import StatCard from '../components/dashboard/StatCard';
 import OverviewChart from '../components/dashboard/OverviewChart';
 import RecentActivityTable from '../components/dashboard/RecentActivityTable';
 import { Users, Briefcase, CreditCard, Truck } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
+  const [metrics, setMetrics] = useState<any | null>(null);
+  const [counts, setCounts] = useState<{ users: number; vendors: number; delivery: number } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const baseUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+        const token = localStorage.getItem('token') || '';
+
+        const [usersRes, vendorsRes, deliveryRes, ordersRes] = await Promise.all([
+          fetch(`${baseUrl}/api`, { headers: { Authorization: token ? `Bearer ${token}` : '' } }),
+          fetch(`${baseUrl}/api/vendors`, { headers: { Authorization: token ? `Bearer ${token}` : '' } }),
+          fetch(`${baseUrl}/api/delivery`, { headers: { Authorization: token ? `Bearer ${token}` : '' } }),
+          fetch(`${baseUrl}/api/vendors/orders/admin`, { headers: { Authorization: token ? `Bearer ${token}` : '' } }),
+        ]);
+
+        const [users, vendors, delivery, orders] = await Promise.all([
+          usersRes.json(), vendorsRes.json(), deliveryRes.json(), ordersRes.json()
+        ]);
+
+        if (!usersRes.ok) throw new Error(users?.message || 'Failed to fetch users');
+        if (!vendorsRes.ok) throw new Error(vendors?.message || 'Failed to fetch vendors');
+        if (!deliveryRes.ok) throw new Error(delivery?.message || 'Failed to fetch delivery partners');
+        if (!ordersRes.ok) throw new Error(orders?.message || 'Failed to fetch orders');
+
+        // Compute admin-wide metrics as a fallback from orders
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const ordersArray = Array.isArray(orders) ? orders : [];
+        const todayOrders = ordersArray.filter((o: any) => {
+          const t = new Date(o.timestamp || o.createdAt || 0).getTime();
+          return t >= today.getTime() && t < tomorrow.getTime();
+        });
+        const revenueToday = todayOrders.reduce((sum: number, o: any) => sum + Number(o.totalAmount || 0), 0);
+        const activeOrders = ordersArray.filter((o: any) => ['pending','confirmed','preparing','ready'].includes(o.status));
+
+        setMetrics({
+          revenue: revenueToday,
+          orders: todayOrders.length,
+          rating: 0,
+          activeOrders,
+        });
+        setCounts({ users: (users || []).length, vendors: (vendors || []).length, delivery: (delivery || []).length });
+      } catch (e: any) {
+        setError(e.message || 'Failed to load dashboard');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
@@ -16,30 +74,26 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard 
           title="Total Users" 
-          value="4,276" 
+          value={counts?.users ?? '-'} 
           icon={<Users size={18} />}
-          change={{ value: 12, type: 'increase' }}
           color="blue"
         />
         <StatCard 
-          title="Active Jobs" 
-          value="843" 
+          title="Active Orders" 
+          value={metrics?.activeOrders?.length ?? 0} 
           icon={<Briefcase size={18} />}
-          change={{ value: 5, type: 'increase' }}
           color="green"
         />
         <StatCard 
-          title="Revenue" 
-          value="$128,540" 
+          title="Revenue (Today)" 
+          value={new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(Number(metrics?.revenue || 0))} 
           icon={<CreditCard size={18} />}
-          change={{ value: 8, type: 'increase' }}
           color="purple"
         />
         <StatCard 
           title="Partners" 
-          value="36" 
+          value={(counts?.vendors ?? 0) + (counts?.delivery ?? 0)} 
           icon={<Truck size={18} />}
-          change={{ value: 2, type: 'decrease' }}
           color="teal"
         />
       </div>

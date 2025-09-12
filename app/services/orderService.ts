@@ -29,6 +29,17 @@ export async function fetchUserOrders() {
   return res.json();
 }
 
+export async function fetchOrderDetails(orderId: string) {
+  const token = await AsyncStorage.getItem('token');
+  const res = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) throw new Error('Failed to fetch order details');
+  return res.json();
+}
+
 export async function updatePushToken(expoPushToken) {
   const token = await AsyncStorage.getItem('token');
   const res = await fetch(`${API_BASE_URL}/userAuth/push-token`, {

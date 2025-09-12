@@ -1,11 +1,21 @@
 const crypto = require('crypto');
-const Razorpay = require('razorpay');
+let RazorpayModule = null;
 
 function getClient() {
+  if (!RazorpayModule) {
+    try {
+      // Lazy-load to avoid crashing if package isn't installed in local/dev
+      // or when payments are not configured.
+      // eslint-disable-next-line global-require
+      RazorpayModule = require('razorpay');
+    } catch (e) {
+      throw new Error('Razorpay SDK not installed. Run "npm install razorpay" or disable online payments.');
+    }
+  }
   const key_id = process.env.RAZORPAY_KEY_ID;
   const key_secret = process.env.RAZORPAY_KEY_SECRET;
   if (!key_id || !key_secret) throw new Error('Razorpay keys not configured');
-  return new Razorpay({ key_id, key_secret });
+  return new RazorpayModule({ key_id, key_secret });
 }
 
 async function createOrderRzp(amountInPaise, receiptId) {

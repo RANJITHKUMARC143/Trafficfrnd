@@ -92,7 +92,14 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const navigate = useNavigate();
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (raw) setCurrentUser(JSON.parse(raw));
+    } catch {}
+  }, []);
   
   const handleSignOut = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -199,11 +206,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
       <div className="p-4 border-t border-gray-200">
         <div className="flex items-center">
           <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
-            A
+            {(currentUser?.name || currentUser?.username || currentUser?.email || 'A').toString().charAt(0).toUpperCase()}
           </div>
           <div className="ml-3">
-            <p className="text-sm font-medium text-gray-700">Admin User</p>
-            <p className="text-xs text-gray-500">admin@example.com</p>
+            <p className="text-sm font-medium text-gray-700">{currentUser?.name || currentUser?.username || 'Admin'}</p>
+            <p className="text-xs text-gray-500">{currentUser?.email || ''}</p>
           </div>
         </div>
         <motion.button

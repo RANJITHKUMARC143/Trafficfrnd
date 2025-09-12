@@ -67,13 +67,15 @@ export const updateDeliveryStatus = (deliveryBoyId: string, status: 'online' | '
 
 export const joinOrderRoom = (orderId: string) => {
   if (socket) {
-    socket.emit('joinOrderRoom', { orderId });
+    // Backend expects a plain string orderId, not an object
+    socket.emit('joinOrderRoom', orderId);
   }
 };
 
 export const leaveOrderRoom = (orderId: string) => {
   if (socket) {
-    socket.emit('leaveOrderRoom', { orderId });
+    // Backend expects a plain string orderId, not an object
+    socket.emit('leaveOrderRoom', orderId);
   }
 };
 

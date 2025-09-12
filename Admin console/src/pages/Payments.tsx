@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { CreditCard, DollarSign, FileText, TrendingUp, AlertTriangle, Download, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -9,6 +9,10 @@ import PageHeader from '../components/ui/PageHeader';
 
 const Payments: React.FC = () => {
   const navigate = useNavigate();
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+  const [paymentStats, setPaymentStats] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   
   const paymentRoutes = [
     {
@@ -37,75 +41,60 @@ const Payments: React.FC = () => {
     }
   ];
   
-  const recentTransactions = [
-    {
-      id: 'TRX12345',
-      description: 'Premium Job Posting - Tech Solutions Inc.',
-      amount: 299.99,
-      date: '2023-06-15',
-      status: 'completed',
-      method: 'Credit Card'
-    },
-    {
-      id: 'TRX12344',
-      description: 'Resume Database Access - 1 Month',
-      amount: 149.99,
-      date: '2023-06-14',
-      status: 'completed',
-      method: 'PayPal'
-    },
-    {
-      id: 'TRX12343',
-      description: 'Featured Job Package - Healthcare Group',
-      amount: 499.99,
-      date: '2023-06-14',
-      status: 'pending',
-      method: 'Bank Transfer'
-    },
-    {
-      id: 'TRX12342',
-      description: 'Employer Verification Service',
-      amount: 79.99,
-      date: '2023-06-13',
-      status: 'failed',
-      method: 'Credit Card'
-    },
-    {
-      id: 'TRX12341',
-      description: 'Background Check Service - Basic',
-      amount: 24.99,
-      date: '2023-06-12',
-      status: 'completed',
-      method: 'Credit Card'
-    }
-  ];
-  
-  const paymentStats = [
-    { 
-      label: 'Monthly Revenue', 
-      value: '$28,459', 
-      change: '+12.5%',
-      changeType: 'positive' 
-    },
-    { 
-      label: 'Pending Transactions', 
-      value: '$3,871', 
-      change: '+2.1%',
-      changeType: 'positive' 
-    },
-    { 
-      label: 'Failed Transactions', 
-      value: '$892', 
-      change: '-5.3%',
-      changeType: 'negative' 
-    },
-    { 
-      label: 'Average Transaction', 
-      value: '$215', 
-      change: '+8.7%',
-      changeType: 'positive' 
-    }
-  ];
+  useEffect(() => {
+    const fetchPayments = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const baseUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+        const token = localStorage.getItem('token') || '';
+
+        // Use vendor orders as transactions proxy for now
+        const ordersRes = await fetch(`${baseUrl}/api/vendors/orders/admin`, {
+          headers: { Authorization: token ? `Bearer ${token}` : '' }
+        });
+        const ordersData = await ordersRes.json();
+        if (!ordersRes.ok) throw new Error(ordersData?.message || 'Failed to fetch orders');
+
+        // Fetch analytics for revenue/averages
+        const analyticsRes = await fetch(`${baseUrl}/api/analytics/metrics`, {
+          headers: { Authorization: token ? `Bearer ${token}` : '' }
+        });
+        const analytics = await analyticsRes.json();
+        if (!analyticsRes.ok) throw new Error(analytics?.message || 'Failed to fetch analytics');
+
+        const tx = (ordersData || []).slice(0, 20).map((o: any) => ({
+          id: o._id,
+          description: o.items?.map((i: any) => i.name).join(', ') || 'Order',
+          amount: Number(o.totalAmount || 0),
+          date: new Date(o.timestamp || o.createdAt || Date.now()).toISOString().slice(0, 10),
+          status: (o.payment?.status === 'paid' || o.status === 'completed') ? 'completed' : (o.payment?.status === 'failed' ? 'failed' : 'pending'),
+          method: o.payment?.method ? String(o.payment.method).toUpperCase() : 'ONLINE'
+        }));
+        setRecentTransactions(tx);
+
+        const monthRevenue = analytics?.metrics?.lastMonth?.revenue ?? 0;
+        const todayRevenue = analytics?.metrics?.today?.revenue ?? 0;
+        const totalOrders = (ordersData || []).length;
+        const failedCount = (ordersData || []).filter((o: any) => o.payment?.status === 'failed').length;
+        const pendingAmount = (ordersData || []).filter((o: any) => !(o.payment?.status === 'paid'))
+          .reduce((s: number, o: any) => s + Number(o.totalAmount || 0), 0);
+        const avgTx = totalOrders ? (ordersData.reduce((s: number, o: any) => s + Number(o.totalAmount || 0), 0) / totalOrders) : 0;
+
+        setPaymentStats([
+          { label: 'Monthly Revenue', value: new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(monthRevenue), change: '+', changeType: 'positive' },
+          { label: 'Pending Transactions', value: new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(pendingAmount), change: '', changeType: 'positive' },
+          { label: 'Failed Transactions', value: new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(failedCount), change: '', changeType: 'negative' },
+          { label: 'Average Transaction', value: new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(avgTx), change: '', changeType: 'positive' },
+        ]);
+      } catch (e: any) {
+        setError(e.message || 'Failed to load payments');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPayments();
+  }, []);
   
   const getStatusClass = (status: string) => {
     switch (status) {
@@ -169,11 +158,13 @@ const Payments: React.FC = () => {
             <p className="text-sm text-gray-500 mb-1">{stat.label}</p>
             <div className="flex items-end">
               <p className="text-2xl font-semibold text-gray-800">{stat.value}</p>
-              <div className={`ml-2 flex items-center text-sm ${
-                stat.changeType === 'positive' ? 'text-emerald-600' : 'text-red-600'
-              }`}>
-                {stat.change}
-              </div>
+              {stat.change && (
+                <div className={`ml-2 flex items-center text-sm ${
+                  stat.changeType === 'positive' ? 'text-emerald-600' : 'text-red-600'
+                }`}>
+                  {stat.change}
+                </div>
+              )}
             </div>
           </motion.div>
         ))}
@@ -253,14 +244,16 @@ const Payments: React.FC = () => {
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{transaction.id}</td>
                     <td className="px-6 py-4 text-sm text-gray-800">{transaction.description}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">${transaction.amount.toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">{
+                      new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(Number(transaction.amount || 0))
+                    }</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{transaction.date}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{transaction.method}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <span className={`flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusClass(transaction.status)}`}>
                           <span className="mr-1">{getStatusIcon(transaction.status)}</span>
-                          {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
+                          {String(transaction.status || '').charAt(0).toUpperCase() + String(transaction.status || '').slice(1)}
                         </span>
                       </div>
                     </td>

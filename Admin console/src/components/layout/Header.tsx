@@ -21,6 +21,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [notifications, setNotifications] = useState<NotificationType[]>([
     { id: 1, message: 'New user registration needs approval', time: '2 minutes ago', read: false, type: 'info' },
     { id: 2, message: 'Payment transaction failed', time: '1 hour ago', read: false, type: 'error' },
@@ -39,6 +40,15 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (raw) {
+        setCurrentUser(JSON.parse(raw));
+      }
+    } catch {}
   }, []);
 
   const getPageTitle = () => {
@@ -219,7 +229,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               whileTap={{ scale: 0.95 }}
             >
               <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
-                A
+                {(currentUser?.name || currentUser?.username || currentUser?.email || 'A').toString().charAt(0).toUpperCase()}
               </div>
             </motion.button>
             
@@ -234,8 +244,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="p-3 border-b border-gray-100">
-                    <p className="text-sm font-medium text-gray-700">Admin User</p>
-                    <p className="text-xs text-gray-500">admin@example.com</p>
+                    <p className="text-sm font-medium text-gray-700">{currentUser?.name || currentUser?.username || 'Admin'}</p>
+                    <p className="text-xs text-gray-500">{currentUser?.email || ''}</p>
                   </div>
                   <div className="py-1">
                     <a href="#" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">

@@ -97,7 +97,10 @@ router.get('/available', auth, (req, res, next) => {
 router.get('/:orderId', auth, async (req, res) => {
   console.log('HIT /orders/:orderId', req.params.orderId);
   try {
-    const order = await Order.findById(req.params.orderId);
+    const order = await Order.findById(req.params.orderId)
+      .populate('deliveryBoyId', 'fullName phone vehicleType vehicleNumber rating totalDeliveries onTimeRate currentLocation')
+      .populate('vendorId', 'businessName phone address location')
+      .populate('user', 'name email phone');
     console.log('Order found:', order);
     if (!order) return res.status(404).json({ message: 'Order not found' });
     res.json(order);

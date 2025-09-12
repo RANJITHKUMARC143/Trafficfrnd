@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Linking, Alert, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Linking, Alert, Platform, TextInput, ScrollView } from 'react-native';
 import { COLORS, FONTS, IS_WEB } from '@/constants/theme';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import StatusBadge from '../common/StatusBadge';
 import { MapPin, Clock, DollarSign, Phone, Navigation, Package } from 'lucide-react-native';
+import Constants from 'expo-constants';
 import { Order } from '@/types/order';
 import { useRouter } from 'expo-router';
 import SlideToUnlock from 'react-native-slide-to-unlock';
+import { getSocket, joinOrderRoom, leaveOrderRoom } from '@/utils/socket';
 
 interface OrderDetailProps {
   order: Order;
@@ -17,7 +20,13 @@ interface OrderDetailProps {
 const OrderDetail = ({ order, onStatusUpdate }: OrderDetailProps) => {
   const [loading, setLoading] = useState(false);
   const [showGoToMap, setShowGoToMap] = useState(false);
+  const [messages, setMessages] = useState<Array<{ id: string; text: string; sender: 'user' | 'delivery'; timestamp?: any }>>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
   const router = useRouter();
+  const historyKeyRef = useRef<string>(`driver_chat_history_${orderId}`);
+  // Use the same token key as the rest of the delivery app
+  const TOKEN_KEY = '@traffic_friend_token';
 
   // Safe access to order properties with fallbacks
   const orderId = order._id || order.id || 'N/A';
@@ -45,14 +54,52 @@ const OrderDetail = ({ order, onStatusUpdate }: OrderDetailProps) => {
   console.log('OrderDetail - Order ID:', orderId);
   console.log('OrderDetail - Order object:', order);
 
-  const handleCall = () => {
-    const phoneNumber = `tel:${customerPhone}`;
-    if (IS_WEB) {
-      window.open(phoneNumber);
-    } else {
-      Linking.openURL(phoneNumber).catch(() => {
-        Alert.alert('Error', 'Could not open phone dialer');
+  const handleCall = async () => {
+    try {
+      const baseUrl = (Constants?.expoConfig?.extra?.API_BASE_URL as string) || 'http://192.168.31.107:3000/api';
+      const storedToken = await AsyncStorage.getItem(TOKEN_KEY);
+      const fallbackToken = (global as any).deliveryAuthToken || (Constants?.expoConfig?.extra?.DELIVERY_TOKEN as string) || '';
+      const token = storedToken || fallbackToken;
+
+      const rawFrom = order?.deliveryBoyId?.phone || '';
+      const rawTo = order?.user?.phone || customerPhone || '';
+      if (!rawFrom || !rawTo) throw new Error('Missing phone numbers');
+
+      const normalize = (n: string) => {
+        const trimmed = String(n).trim();
+        if (trimmed.startsWith('+')) return trimmed;
+        // naive local normalization: assume IN if 10 digits
+        const digits = trimmed.replace(/\D/g, '');
+        if (digits.length === 10) return `+91${digits}`;
+        return trimmed;
+      };
+
+      const fromNumber = normalize(rawFrom);
+      const toNumber = normalize(rawTo);
+
+      if (!token) {
+        Alert.alert('Login required', 'Please login again to initiate the call.');
+        return;
+      }
+
+      // Try click-to-call via backend proxy
+      const res = await fetch(`${baseUrl.replace(/\/$/, '')}/call`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ from_number: fromNumber, to_number: toNumber })
       });
+
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json?.success !== false) {
+        Alert.alert('Call Initiated', 'You will receive a call shortly.');
+        return;
+      }
+      Alert.alert('Call failed', json?.message || 'Unable to initiate call. Please try again later.');
+    } catch (e) {
+      Alert.alert('Error', 'Failed to initiate call. Please try again.');
     }
   };
 
@@ -105,6 +152,52 @@ const OrderDetail = ({ order, onStatusUpdate }: OrderDetailProps) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // --- Chat setup ---
+  useEffect(() => {
+    // Load cached chat history for this order
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(historyKeyRef.current);
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) setMessages(arr);
+        }
+      } catch {}
+    })();
+
+    const roomId = (order?._id || (order as any)?.id) as string | undefined;
+    const socket = getSocket();
+    if (roomId && socket) {
+      joinOrderRoom(roomId);
+      const onMessage = (message: any) => {
+        if (String(message?.orderId) === String(roomId)) {
+          const unique = { ...message, id: `${message?.id || Date.now().toString()}-${Math.random().toString(36).slice(2)}` };
+          setMessages((prev) => [...prev, unique]);
+          setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+        }
+      };
+      socket.on('message', onMessage);
+      return () => {
+        socket.off('message', onMessage);
+        leaveOrderRoom(roomId);
+      };
+    }
+  }, [order?._id]);
+
+  useEffect(() => {
+    // Persist chat history on each update
+    (async () => {
+      try {
+        await AsyncStorage.setItem(historyKeyRef.current, JSON.stringify(messages));
+      } catch {}
+    })();
+  }, [messages]);
+
+  const sendMessage = () => {
+    // disabled (receive-only)
+    return;
   };
 
   const renderStatusButtons = () => {
@@ -275,6 +368,46 @@ const OrderDetail = ({ order, onStatusUpdate }: OrderDetailProps) => {
         </View>
       </Card>
 
+      {/* Chat Section */}
+      <Card style={styles.chatCard}>
+        <Text style={styles.sectionTitle}>Send message to Customer</Text>
+        <View style={styles.chatContainer}>
+          <ScrollView
+            ref={scrollRef}
+            style={styles.messagesContainer}
+            showsVerticalScrollIndicator
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+          >
+            {messages.map((m) => {
+              const dt = m?.timestamp ? new Date(m.timestamp) : null;
+              const timeText = dt && !isNaN(dt.getTime()) ? dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+              const isMe = m.sender === 'delivery';
+              return (
+                <View key={m.id} style={[styles.messageBubble, isMe ? styles.meBubble : styles.themBubble]}>
+                  <Text style={[styles.messageText, isMe ? styles.meText : styles.themText]}>{m.text}</Text>
+                  {!!timeText && <Text style={styles.messageTime}>{timeText}</Text>}
+                </View>
+              );
+            })}
+          </ScrollView>
+          <View style={styles.inputRow}>
+            <TextInput
+              style={[styles.input, { opacity: 0.5 }]}
+              value={''}
+              editable={false}
+              placeholder="Reply disabled"
+              placeholderTextColor={COLORS.gray}
+              multiline
+            />
+            <TouchableOpacity style={[styles.sendBtn, { backgroundColor: COLORS.lightGray }]} disabled>
+              <Text style={{ color: '#999', fontWeight: '700' }}>Send</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Card>
+
       <View style={styles.buttonContainer}>
         {renderStatusButtons()}
       </View>
@@ -396,6 +529,69 @@ const styles = StyleSheet.create({
   },
   itemsCard: {
     marginBottom: 16,
+  },
+  chatCard: {
+    marginBottom: 16,
+  },
+  chatContainer: {
+    borderWidth: 1,
+    borderColor: COLORS.ultraLightGray,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  messagesContainer: {
+    maxHeight: 260,
+    minHeight: 120,
+    padding: 12,
+  },
+  messageBubble: {
+    maxWidth: '80%',
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  meBubble: {
+    backgroundColor: COLORS.primary + '1A',
+    alignSelf: 'flex-end',
+  },
+  themBubble: {
+    backgroundColor: COLORS.ultraLightGray,
+    alignSelf: 'flex-start',
+  },
+  messageText: {
+    ...FONTS.body3,
+    marginBottom: 4,
+  },
+  meText: { color: COLORS.darkGray },
+  themText: { color: COLORS.darkGray },
+  messageTime: {
+    ...FONTS.body4,
+    color: COLORS.gray,
+    alignSelf: 'flex-end',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.ultraLightGray,
+    padding: 10,
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: COLORS.ultraLightGray,
+    borderRadius: 8,
+    padding: 10,
+    minHeight: 40,
+    maxHeight: 100,
+    marginRight: 8,
+    ...FONTS.body3,
+  },
+  sendBtn: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
   },
   itemRow: {
     flexDirection: 'row',

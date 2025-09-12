@@ -70,14 +70,8 @@ router.get('/:id/orders', auth, async (req, res) => {
 });
 
 // --- EARNINGS ROUTES ---
-router.get('/earnings/summary', auth, async (req, res, next) => {
-  console.log('Earnings summary for:', req.user?._id);
-  next();
-});
-router.get('/earnings/history', auth, async (req, res, next) => {
-  console.log('Earnings history for:', req.user?._id);
-  next();
-});
+router.get('/earnings/summary', auth, deliveryBoyController.getEarningsSummary);
+router.get('/earnings/history', auth, deliveryBoyController.getEarningsHistory);
 router.post('/earnings/summary/cashout', auth, deliveryBoyController.requestCashout);
 
 // --- ADMIN CRUD ENDPOINTS ---
