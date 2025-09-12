@@ -53,6 +53,44 @@ router.post('/', [auth, validateMenuItem], async (req, res) => {
   }
 });
 
+// Admin: Add new menu item for a specific vendor (requires admin role)
+router.post('/admin', [auth], async (req, res) => {
+  try {
+    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'super_admin')) {
+      return res.status(403).json({ message: 'Forbidden: Admins only' });
+    }
+
+    const { vendorId, name, description, price, image, category, isAvailable = true, preparationTime = 15, customizationOptions = [], nutritionalInfo, allergens = [] } = req.body || {};
+    if (!vendorId) return res.status(400).json({ message: 'vendorId is required' });
+    if (!name || !description || typeof price !== 'number' || !image || !category) {
+      return res.status(400).json({ message: 'Missing required fields: name, description, price, image, category' });
+    }
+
+    const vendor = await Vendor.findById(vendorId);
+    if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+
+    const menuItem = new MenuItem({
+      vendorId,
+      name,
+      description,
+      price,
+      image,
+      category,
+      isAvailable,
+      preparationTime,
+      customizationOptions,
+      nutritionalInfo,
+      allergens
+    });
+    await menuItem.save();
+
+    res.status(201).json(menuItem);
+  } catch (error) {
+    console.error('Error adding menu item (admin):', error);
+    res.status(400).json({ message: 'Error adding menu item', error: error.message });
+  }
+});
+
 // Update menu item
 router.put('/:id', [auth, validateMenuItem], async (req, res) => {
   try {

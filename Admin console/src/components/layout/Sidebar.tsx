@@ -187,6 +187,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
           ]}
         />
         <NavItem 
+          icon={<Package size={20} />} 
+          title="Items"
+          path="/items" 
+        />
+        <NavItem 
           icon={<MapPin size={20} />} 
           title="Delivery Point"
           path="/delivery-points" 

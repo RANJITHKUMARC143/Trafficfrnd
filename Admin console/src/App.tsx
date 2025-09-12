@@ -26,6 +26,7 @@ import PaymentsTransactions from './pages/payments/PaymentsTransactions';
 import PaymentsInvoices from './pages/payments/PaymentsInvoices';
 import PaymentsReports from './pages/payments/PaymentsReports';
 import Settings from './pages/Settings';
+import Items from './pages/Items';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Orders from './pages/Orders';
@@ -73,6 +74,7 @@ function App() {
             <Route path="/payments/invoices" element={<ProtectedRoute><PaymentsInvoices /></ProtectedRoute>} />
             <Route path="/payments/reports" element={<ProtectedRoute><PaymentsReports /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/items" element={<ProtectedRoute><Items /></ProtectedRoute>} />
             <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
             <Route path="/orders/create" element={<ProtectedRoute><OrderCreate /></ProtectedRoute>} />
             <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
