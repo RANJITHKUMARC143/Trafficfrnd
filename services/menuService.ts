@@ -1,6 +1,6 @@
 import { API_URL } from '@src/config';
 import { MenuItem } from '@/types/menu';
-import { socketService } from './socketService';
+import { socketService } from '@/services/socketService';
 
 class MenuService {
   private static instance: MenuService;
@@ -241,4 +241,5 @@ class MenuService {
   }
 }
 
-export const menuService = MenuService.getInstance(); 
+export const menuService = MenuService.getInstance();
+export default menuService; 

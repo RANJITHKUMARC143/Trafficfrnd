@@ -28,5 +28,4 @@ export interface MenuItem {
   vendorId?: string;
 }
 
-// Default export
 export default MenuItem; 

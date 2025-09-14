@@ -1,6 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '@src/config';
 
+// Default export for the service
+const alertService = {
+  fetchAlerts,
+  markAlertRead,
+  deleteAlert,
+  clearAllAlerts
+};
+
+export default alertService;
+
 export async function fetchAlerts() {
   try {
     const token = await AsyncStorage.getItem('token');
@@ -120,14 +130,4 @@ export async function markAlertRead(id: string) {
     console.error('Error in markAlertRead:', error);
     throw error;
   }
-}
-
-// Default export for the service
-const alertService = {
-  fetchAlerts,
-  deleteAlert,
-  clearAllAlerts,
-  markAlertRead
-};
-
-export default alertService; 
+} 

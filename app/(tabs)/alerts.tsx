@@ -3,7 +3,7 @@ import { StyleSheet, FlatList, View, TouchableOpacity, RefreshControl, Alert as 
 import { ThemedText, ThemedView } from '../components';
 import BottomNavigationBar from '../components/BottomNavigationBar';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchAlerts, deleteAlert, clearAllAlerts, markAlertRead } from '../services/alertService';
+import { fetchAlerts, deleteAlert, clearAllAlerts, markAlertRead } from '../../services/alertService';
 import { Audio } from 'expo-av';
 import { Swipeable } from 'react-native-gesture-handler';
 import { router } from 'expo-router';

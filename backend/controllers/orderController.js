@@ -315,7 +315,8 @@ const createOrder = async (req, res) => {
       userLocation, // New field for user's current location
       selectedDeliveryPoint, // New: selected delivery point from client
       userId, // Optional: admin creating order for a specific user
-      customerName: customerNameOverride
+      customerName: customerNameOverride,
+      payment // Payment information from client
     } = req.body;
     // If admin/super_admin passes a userId, allow creating orders on behalf of that user
     let orderUserId = req.user._id;
@@ -433,6 +434,13 @@ const createOrder = async (req, res) => {
       updatedAt: new Date(),
       user: orderUserId,
       selectedDeliveryPoint: processedDeliveryPoint || undefined,
+      payment: payment || { 
+        method: 'cod', 
+        status: 'pending', 
+        amount: 0, 
+        gateway: null,
+        refund: { amount: 0, id: null, at: null }
+      }
     });
 
     await order.save();

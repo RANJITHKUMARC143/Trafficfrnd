@@ -52,18 +52,18 @@ export default function CartScreen() {
   const [suggestedDeliveryPoints, setSuggestedDeliveryPoints] = useState<any[]>([]);
   const [deliveryFeeQuote, setDeliveryFeeQuote] = useState<{ fee?: number; breakdown?: any } | null>(null);
   const [quoting, setQuoting] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('cod');
-  const [razorpayKeyId, setRazorpayKeyId] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'cashfree'>('cod');
+  const [cashfreeClientId, setCashfreeClientId] = useState<string | null>(null);
 
-  // Load Razorpay key id to decide whether to enable Online option
+  // Load payment configuration to decide which payment options to enable
   useEffect(() => {
     (async () => {
       try {
         const cfg = await getPaymentConfig();
-        const keyId = cfg?.keyId || '';
-        setRazorpayKeyId(keyId || null);
+        const cashfreeClientId = cfg?.cashfreeClientId || '';
+        setCashfreeClientId(cashfreeClientId || null);
       } catch {
-        setRazorpayKeyId(null);
+        setCashfreeClientId(null);
       }
     })();
   }, []);
@@ -76,7 +76,27 @@ export default function CartScreen() {
       if (id) setRouteId(id);
     };
     loadRouteId();
+    
+    // Check authentication status
+    checkAuthStatus();
   }, []);
+
+  const checkAuthStatus = async () => {
+    const token = await AsyncStorage.getItem('token');
+    if (!token) {
+      Alert.alert(
+        'Authentication Required',
+        'Please log in to access your cart and place orders.',
+        [
+          {
+            text: 'Login',
+            onPress: () => router.push('/(tabs)/profile')
+          }
+        ],
+        { cancelable: false }
+      );
+    }
+  };
 
   // Re-read selectedDeliveryPoint whenever the cart screen is focused
   useEffect(() => {
@@ -354,6 +374,35 @@ export default function CartScreen() {
   };
 
   const confirmVehicleNumberAndOrder = async () => {
+    // Check if user is authenticated
+    const token = await AsyncStorage.getItem('token');
+    if (!token) {
+      Alert.alert(
+        'Authentication Required',
+        'Please log in to place an order.',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              setVehicleModalVisible(false);
+              setPendingOrder(false);
+            }
+          },
+          {
+            text: 'Login',
+            onPress: () => {
+              setVehicleModalVisible(false);
+              setPendingOrder(false);
+              router.push('/(tabs)/profile');
+            }
+          }
+        ],
+        { cancelable: false }
+      );
+      return;
+    }
+
     let vendorId = cartItems[0]?.vendorId;
     if (typeof vendorId === 'object' && vendorId !== null && vendorId._id) {
       vendorId = vendorId._id;
@@ -364,32 +413,33 @@ export default function CartScreen() {
       setPendingOrder(false);
       return;
     }
-    if (!routeId) {
-      Alert.alert(
-        'Route Required',
-        'Please select a route to proceed.',
-        [
-          {
-            text: 'Go to Map',
-            onPress: () => {
-              setVehicleModalVisible(false);
-              setPendingOrder(false);
-              router.push('/map');
-            }
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel',
-            onPress: () => {
-              setVehicleModalVisible(false);
-              setPendingOrder(false);
-            }
-          }
-        ],
-        { cancelable: false }
-      );
-      return;
-    }
+    // RouteId is optional - users can place orders with just delivery points
+    // if (!routeId) {
+    //   Alert.alert(
+    //     'Route Required',
+    //     'Please select a route to proceed.',
+    //     [
+    //       {
+    //         text: 'Go to Map',
+    //         onPress: () => {
+    //           setVehicleModalVisible(false);
+    //           setPendingOrder(false);
+    //           router.push('/map');
+    //         }
+    //       },
+    //       {
+    //         text: 'Cancel',
+    //         style: 'cancel',
+    //         onPress: () => {
+    //           setVehicleModalVisible(false);
+    //           setPendingOrder(false);
+    //         }
+    //       }
+    //     ],
+    //     { cancelable: false }
+    //   );
+    //   return;
+    // }
     let deliveryPoint;
     try {
       // Always get the latest selected delivery point from AsyncStorage
@@ -430,18 +480,18 @@ export default function CartScreen() {
         selectedDeliveryPoint: deliveryPoint // Add selected delivery point to order data
       };
       console.log('Order payload:', orderData);
-      // If online selected but key missing, block and ask to use COD
-      if (paymentMethod === 'online' && !razorpayKeyId) {
-        Alert.alert('Online payment unavailable', 'Razorpay key not configured. Please select Cash on Delivery.');
+      if (paymentMethod === 'cashfree' && !cashfreeClientId) {
+        Alert.alert('UPI payment unavailable', 'Cashfree key not configured. Please select Cash on Delivery.');
         return;
       }
       const order = await createOrder({ ...orderData, payment: { method: paymentMethod } });
       await AsyncStorage.removeItem('cart');
       setCartItems([]);
       setVehicleNumber('');
-      // Navigate to order confirmation page with all required params
+      // Navigate to appropriate order confirmation page based on payment method
+      const confirmationPath = paymentMethod === 'cashfree' ? '/order-confirmation-cashfree' : '/order-confirmation';
       router.push({
-        pathname: '/order-confirmation',
+        pathname: confirmationPath,
         params: {
           orderId: order._id,
           total: order.totalAmount,
@@ -635,21 +685,39 @@ export default function CartScreen() {
                   )}
                   <ThemedText style={styles.modalTitle}>Enter Your Vehicle Number</ThemedText>
                   {/* Payment method selector */}
-                  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
-                    <TouchableOpacity onPress={() => setPaymentMethod('cod')} style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: paymentMethod==='cod' ? '#4CAF50' : '#e5e7eb', backgroundColor: paymentMethod==='cod' ? '#e8f5e8' : '#fff' }}>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                    <TouchableOpacity 
+                      onPress={() => setPaymentMethod('cod')} 
+                      style={{ 
+                        paddingVertical: 8, 
+                        paddingHorizontal: 12, 
+                        borderRadius: 10, 
+                        borderWidth: 1, 
+                        borderColor: paymentMethod==='cod' ? '#4CAF50' : '#e5e7eb', 
+                        backgroundColor: paymentMethod==='cod' ? '#e8f5e8' : '#fff' 
+                      }}
+                    >
                       <ThemedText>Cash on Delivery</ThemedText>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => {
-                        if (!razorpayKeyId) {
-                          Alert.alert('Online payment unavailable', 'Razorpay key not configured. Choose COD for now.');
+                        if (!cashfreeClientId) {
+                          Alert.alert('UPI payment unavailable', 'Cashfree key not configured. Please choose Cash on Delivery.');
                           return;
                         }
-                        setPaymentMethod('online');
+                        setPaymentMethod('cashfree');
                       }}
-                      style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: paymentMethod==='online' ? '#4CAF50' : '#e5e7eb', backgroundColor: paymentMethod==='online' ? '#e8f5e8' : (!razorpayKeyId ? '#f9fafb' : '#fff'), opacity: !razorpayKeyId ? 0.6 : 1 }}
+                      style={{ 
+                        paddingVertical: 8, 
+                        paddingHorizontal: 12, 
+                        borderRadius: 10, 
+                        borderWidth: 1, 
+                        borderColor: paymentMethod==='cashfree' ? '#4CAF50' : '#e5e7eb', 
+                        backgroundColor: paymentMethod==='cashfree' ? '#e8f5e8' : (!cashfreeClientId ? '#f9fafb' : '#fff'), 
+                        opacity: !cashfreeClientId ? 0.6 : 1 
+                      }}
                     >
-                      <ThemedText>Online (Razorpay){!razorpayKeyId ? ' — coming soon' : ''}</ThemedText>
+                      <ThemedText>UPI (Cashfree){!cashfreeClientId ? ' — coming soon' : ''}</ThemedText>
                     </TouchableOpacity>
                   </View>
                   <TextInput

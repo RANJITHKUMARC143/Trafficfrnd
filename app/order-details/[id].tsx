@@ -20,9 +20,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { fetchOrderDetails } from '../services/orderService';
-import chatService from '../services/chatService';
-import { sendClickToCall } from '../services/callService';
+import { fetchOrderDetails } from '../../services/orderService';
+import chatService from '../../services/chatService';
+import { sendClickToCall } from '../../services/callService';
 
 
 interface Order {

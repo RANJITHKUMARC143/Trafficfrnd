@@ -4,7 +4,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-const API_URL = 'http://192.168.31.107:3000';
+const API_URL = 'http://172.28.180.13:3000';
 
 type Vendor = {
   _id: string;

@@ -1,16 +1,28 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const { createPaymentOrder, confirmPayment, webhook } = require('../controllers/paymentController');
+const { 
+  createCashfreeUPIOrder,
+  createCashfreePaymentSession,
+  verifyCashfreePayment,
+  cashfreeWebhook,
+  getPaymentMethods
+} = require('../controllers/paymentController');
 
 // Client needs key id to init SDK (no secret)
 router.get('/config', (req, res) => {
-  res.json({ keyId: process.env.RAZORPAY_KEY_ID || '' });
+  res.json({ 
+    cashfreeClientId: process.env.CASHFREE_CLIENT_ID || '',
+    environment: process.env.CASHFREE_ENVIRONMENT || 'sandbox'
+  });
 });
 
-router.post('/online/order', auth, createPaymentOrder);
-router.post('/online/confirm', auth, confirmPayment);
-router.post('/webhook', webhook);
+// Cashfree routes
+router.post('/cashfree/upi/order', auth, createCashfreeUPIOrder);
+router.post('/cashfree/session', auth, createCashfreePaymentSession);
+router.post('/cashfree/verify', auth, verifyCashfreePayment);
+router.post('/cashfree/webhook', cashfreeWebhook);
+router.get('/methods', getPaymentMethods);
 
 module.exports = router;
 

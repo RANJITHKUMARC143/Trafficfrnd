@@ -286,4 +286,5 @@ class SocketService {
   }
 }
 
-export const socketService = SocketService.getInstance(); 
+export const socketService = SocketService.getInstance();
+export default socketService; 

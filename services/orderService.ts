@@ -126,3 +126,20 @@ export async function getAvailablePaymentMethods() {
   if (!res.ok) throw new Error('Failed to fetch payment methods');
   return res.json();
 }
+
+// Default export for the service
+const orderService = {
+  createOrder,
+  fetchUserOrders,
+  fetchOrderDetails,
+  updatePushToken,
+  fetchDeliveryPoints,
+  quoteDeliveryFee,
+  getPaymentConfig,
+  createCashfreeUPIOrder,
+  createCashfreePaymentSession,
+  verifyCashfreePayment,
+  getAvailablePaymentMethods
+};
+
+export default orderService;
