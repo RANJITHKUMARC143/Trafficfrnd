@@ -20,6 +20,12 @@ const OrderCreate: React.FC = () => {
   const [selectedPoint, setSelectedPoint] = useState<{ id: string; name: string; latitude: number; longitude: number; address: string } | null>(null);
   const [points, setPoints] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('cod');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [sendPaymentLink, setSendPaymentLink] = useState(false);
+  const [createdOrder, setCreatedOrder] = useState<any>(null);
+  const [paymentLink, setPaymentLink] = useState('');
+  const [generatingPaymentLink, setGeneratingPaymentLink] = useState(false);
 
   const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -46,7 +52,10 @@ const OrderCreate: React.FC = () => {
     fetchData();
   }, []);
 
-  const totalAmount = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 0), 0);
+  // Admin-created orders: delivery fee is fixed at ₹45
+  const itemsSubtotal = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 0), 0);
+  const deliveryFee = 45;
+  const totalAmount = Math.max(0, itemsSubtotal + deliveryFee);
 
   const addItem = () => setItems(prev => [...prev, { name: '', price: 0, quantity: 1 }]);
   // Debounced fetch for suggestions
@@ -88,25 +97,109 @@ const OrderCreate: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!selectedPoint) return alert('Please select a Delivery Point');
+    if (paymentMethod === 'online' && !customerPhone) return alert('Please enter customer phone number for online payment');
+    
     // If vendor/route not set, try default to first available
     const vId = vendorId || (vendors[0]?._id || '');
     const rId = routeId || (routes[0]?._id || '');
     setSubmitting(true);
     try {
       const token = localStorage.getItem('token');
+      
+      // Prepare payment information
+      const paymentInfo = {
+        method: paymentMethod,
+        status: 'pending',
+        amount: totalAmount,
+        gateway: paymentMethod === 'online' ? 'cashfree' : null
+      };
+      
       const res = await fetch(`${API}/api/orders/admin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-        body: JSON.stringify({ vendorId: vId, routeId: rId, items, totalAmount, selectedDeliveryPoint: selectedPoint, userId: userId || undefined, customerName: customerName || undefined, vehicleNumber: '' })
+        body: JSON.stringify({ 
+          vendorId: vId, 
+          routeId: rId, 
+          items, 
+          totalAmount, 
+          selectedDeliveryPoint: selectedPoint, 
+          userId: userId || undefined, 
+          customerName: customerName || undefined, 
+          customerPhone: customerPhone || undefined,
+          vehicleNumber: '',
+          payment: paymentInfo
+        })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to create order');
-      alert('Order created successfully');
-      window.location.href = '/orders';
+      
+      setCreatedOrder(data);
+      
+      // If online payment is selected, generate payment link
+      if (paymentMethod === 'online') {
+        await generatePaymentLink(data._id);
+      } else {
+        alert('Order created successfully');
+        window.location.href = '/orders';
+      }
     } catch (e: any) {
       alert(e.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const generatePaymentLink = async (orderId: string) => {
+    setGeneratingPaymentLink(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/payments/payment-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+        body: JSON.stringify({ 
+          orderId,
+          amount: totalAmount,
+          customerDetails: {
+            name: customerName,
+            phone: customerPhone,
+            email: 'customer@example.com'
+          },
+          purpose: `Order Payment - ${orderId}`
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to generate payment link');
+      
+      setPaymentLink(data.link_url || data.linkUrl || '');
+      alert('Order created and payment link generated successfully!');
+    } catch (e: any) {
+      alert(`Order created but failed to generate payment link: ${e.message}`);
+    } finally {
+      setGeneratingPaymentLink(false);
+    }
+  };
+
+  const sendPaymentLinkViaSMS = async () => {
+    if (!paymentLink || !customerPhone) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/sms/send-payment-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+        body: JSON.stringify({ 
+          phone: customerPhone, 
+          paymentLink, 
+          orderId: createdOrder?._id,
+          customerName: customerName || 'Customer'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to send SMS');
+      
+      alert('Payment link sent successfully via SMS!');
+    } catch (e: any) {
+      alert(`Failed to send SMS: ${e.message}`);
     }
   };
 
@@ -123,6 +216,18 @@ const OrderCreate: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name (optional)</label>
             <input className="w-full border rounded p-2" value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="John Doe" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Customer Phone</label>
+            <input className="w-full border rounded p-2" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="9899090909" />
+            <div className="text-xs text-gray-500 mt-1">Required for online payments</div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+            <select className="w-full border rounded p-2" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as 'cod' | 'online')}>
+              <option value="cod">Cash on Delivery</option>
+              <option value="online">Online Payment</option>
+            </select>
           </div>
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Find User by Phone</label>
@@ -208,9 +313,64 @@ const OrderCreate: React.FC = () => {
         </div>
 
         <div className="mt-6 flex items-center justify-between">
-          <div className="text-sm text-gray-600">Total Amount: <span className="font-semibold">₹{totalAmount}</span></div>
-          <Button variant="primary" size="md" onClick={handleSubmit} isLoading={submitting}>Create Order</Button>
+          <div className="text-sm text-gray-700">
+            <div>Subtotal (Items): <span className="font-semibold">₹{itemsSubtotal}</span></div>
+            <div>Delivery Fee: <span className="font-semibold">₹{deliveryFee}</span></div>
+            <div className="mt-1">Total Amount: <span className="font-bold text-green-700">₹{totalAmount}</span></div>
+          </div>
+          <Button variant="primary" size="md" onClick={handleSubmit} isLoading={submitting || generatingPaymentLink}>
+            {generatingPaymentLink ? 'Generating Payment Link...' : 'Create Order'}
+          </Button>
         </div>
+
+        {/* Payment Link Section */}
+        {paymentLink && (
+          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <h3 className="font-semibold text-green-800 mb-3">Payment Link Generated</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Link</label>
+                <div className="flex gap-2">
+                  <input 
+                    className="flex-1 border rounded p-2 bg-gray-50 text-sm" 
+                    value={paymentLink} 
+                    readOnly 
+                  />
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    onClick={() => navigator.clipboard.writeText(paymentLink)}
+                  >
+                    Copy
+                  </Button>
+                </div>
+              </div>
+              
+              {customerPhone && (
+                <div className="flex gap-2">
+                  <Button 
+                    variant="primary" 
+                    size="sm" 
+                    onClick={sendPaymentLinkViaSMS}
+                  >
+                    Send via SMS
+                  </Button>
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    onClick={() => window.open(paymentLink, '_blank')}
+                  >
+                    Open Link
+                  </Button>
+                </div>
+              )}
+              
+              <div className="text-xs text-gray-600">
+                Order ID: {createdOrder?._id}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,5 +1,102 @@
 const crypto = require('crypto');
 
+// Create payment link using Cashfree Payment Links API (Official API)
+async function createPaymentLink(amount, orderId, customerDetails, purpose = 'Order Payment') {
+  try {
+    const clientId = process.env.CASHFREE_CLIENT_ID;
+    const clientSecret = process.env.CASHFREE_CLIENT_SECRET;
+    const environment = process.env.CASHFREE_ENVIRONMENT || 'sandbox';
+    
+    console.log('Cashfree Payment Link Credentials Check:', {
+      clientId: clientId ? `${clientId.substring(0, 10)}...` : 'NOT SET',
+      clientSecret: clientSecret ? `${clientSecret.substring(0, 10)}...` : 'NOT SET',
+      environment: environment
+    });
+    
+    if (!clientId || !clientSecret) {
+      console.log('Cashfree credentials not configured, returning mock response');
+      return {
+        success: true,
+        cf_link_id: `mock_link_${orderId}_${Date.now()}`,
+        link_id: `link_${orderId}_${Date.now()}`,
+        link_url: `https://mock-cashfree.com/pay/${orderId}`,
+        link_status: 'ACTIVE',
+        link_amount: amount,
+        link_currency: 'INR'
+      };
+    }
+    
+    // Use Cashfree Payment Links API (PG v2)
+    const baseUrl = environment === 'production' 
+      ? 'https://api.cashfree.com/pg' 
+      : 'https://sandbox.cashfree.com/pg';
+    
+    const apiUrl = `${baseUrl}/links`;
+    
+    // Create payment link request payload according to Cashfree API documentation
+    const linkData = {
+      link_id: `link_${orderId}_${Date.now()}`,
+      link_amount: amount,
+      link_currency: 'INR',
+      link_purpose: purpose,
+      customer_details: {
+        customer_name: customerDetails.name || 'Customer',
+        customer_phone: customerDetails.phone || '9999999999',
+        customer_email: customerDetails.email || 'customer@example.com'
+      },
+      link_notify: {
+        send_sms: true,
+        send_email: false
+      },
+      link_auto_reminders: true
+    };
+    
+    console.log('Cashfree Payment Link API Request:', {
+      url: apiUrl,
+      linkData: { ...linkData, customer_details: { ...linkData.customer_details, customer_phone: '***' } }
+    });
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-client-id': clientId,
+        'x-client-secret': clientSecret,
+        'x-api-version': '2023-08-01',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(linkData)
+    });
+    
+    const data = await response.json();
+    console.log('Cashfree Payment Link API Response:', { status: response.status, data });
+    
+    if (!response.ok) {
+      console.error('Cashfree API Error Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: data,
+        requestData: linkData
+      });
+      throw new Error(data?.message || data?.error || `Cashfree Payment Link API error: ${response.status} ${response.statusText}`);
+    }
+    
+    return {
+      success: true,
+      cf_link_id: data?.cf_link_id,
+      link_id: data?.link_id,
+      link_url: data?.link_url,
+      link_status: data?.link_status,
+      link_amount: data?.link_amount,
+      link_currency: data?.link_currency,
+      link_qrcode: data?.link_qrcode
+    };
+  } catch (error) {
+    console.error('Error creating Cashfree payment link:', error);
+    throw error;
+  }
+}
+
 // Create UPI payment link using Cashfree API
 async function createUPIPaymentLink(amount, orderId, customerDetails, upiId) {
   try {
@@ -201,9 +298,149 @@ async function getAvailablePaymentMethods() {
   }
 }
 
+// Send SMS using Cashfree SMS API
+async function sendSMS(phone, message) {
+  try {
+    const clientId = process.env.CASHFREE_CLIENT_ID;
+    const clientSecret = process.env.CASHFREE_CLIENT_SECRET;
+    const environment = process.env.CASHFREE_ENVIRONMENT || 'sandbox';
+    
+    if (!clientId || !clientSecret) {
+      console.log('Cashfree credentials not configured, returning mock SMS response');
+      return {
+        success: true,
+        messageId: `mock_sms_${Date.now()}`,
+        status: 'sent',
+        message: 'SMS sent successfully (mock)'
+      };
+    }
+
+    // Format phone number to 10 digits with country code
+    const formattedPhone = phone.replace(/\D/g, '');
+    let phoneWithCountryCode;
+    
+    if (formattedPhone.length === 10) {
+      phoneWithCountryCode = `91${formattedPhone}`;
+    } else if (formattedPhone.length === 12 && formattedPhone.startsWith('91')) {
+      phoneWithCountryCode = formattedPhone;
+    } else {
+      throw new Error('Invalid phone number format. Please provide 10-digit Indian mobile number.');
+    }
+
+    // Cashfree SMS API endpoint
+    const baseUrl = environment === 'production' 
+      ? 'https://api.cashfree.com' 
+      : 'https://sandbox.cashfree.com';
+    
+    const smsUrl = `${baseUrl}/pg/notifications/sms`;
+
+    // Create basic auth header
+    const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+    const smsData = {
+      phone: phoneWithCountryCode,
+      message: message,
+      sender_id: 'TRAFFC' // TrafficFriend sender ID
+    };
+
+    console.log('Cashfree SMS Request:', {
+      url: smsUrl,
+      phone: phoneWithCountryCode,
+      messageLength: message.length,
+      environment: environment
+    });
+
+    const response = await fetch(smsUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${auth}`,
+        'x-api-version': '2023-08-01'
+      },
+      body: JSON.stringify(smsData)
+    });
+
+    let data = {};
+    try {
+      data = await response.json();
+    } catch (_) {
+      try {
+        data = { message: await response.text() };
+      } catch {}
+    }
+
+    console.log('Cashfree SMS Response:', {
+      status: response.status,
+      data: data
+    });
+
+    if (!response.ok) {
+      throw new Error(data?.message || data?.error || 'Cashfree SMS API error');
+    }
+
+    return {
+      success: true,
+      messageId: data?.message_id || `sms_${Date.now()}`,
+      status: data?.status || 'sent',
+      message: data?.message || 'SMS sent successfully via Cashfree'
+    };
+  } catch (error) {
+    console.error('Cashfree SMS service error:', error);
+    throw error;
+  }
+}
+
+// Create payment link and send SMS in one function
+async function createPaymentLinkAndSendSMS(amount, orderId, customerDetails, purpose = 'Order Payment', sendSMSFlag = false) {
+  try {
+    // First create the payment link using the official Payment Links API
+    const paymentLinkResult = await createPaymentLink(amount, orderId, customerDetails, purpose);
+    
+    // If SMS sending is requested and we have customer phone
+    if (sendSMSFlag && customerDetails.phone) {
+      const message = `Hi ${customerDetails.name || 'Customer'}!
+
+Your order #${orderId} is ready for payment.
+
+Payment Link: ${paymentLinkResult.link_url}
+
+Complete payment to confirm your order. Secure payment powered by Cashfree.
+
+Thank you for choosing TrafficFriend!`;
+
+      try {
+        const smsResult = await sendSMS(customerDetails.phone, message);
+        return {
+          ...paymentLinkResult,
+          smsSent: true,
+          smsResult: smsResult
+        };
+      } catch (smsError) {
+        console.error('SMS sending failed, but payment link created:', smsError);
+        return {
+          ...paymentLinkResult,
+          smsSent: false,
+          smsError: smsError.message
+        };
+      }
+    }
+    
+    return {
+      ...paymentLinkResult,
+      smsSent: false
+    };
+  } catch (error) {
+    console.error('Error creating payment link and sending SMS:', error);
+    throw error;
+  }
+}
+
 module.exports = {
+  createPaymentLink,
   createUPIPaymentLink,
   verifyPayment,
   verifyWebhookSignature,
-  getAvailablePaymentMethods
+  getAvailablePaymentMethods,
+  sendSMS,
+  createPaymentLinkAndSendSMS
 };

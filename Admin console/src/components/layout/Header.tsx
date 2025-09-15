@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { Bell, Search, Menu, X, User, Settings, HelpCircle } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,13 +23,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [notifications, setNotifications] = useState<NotificationType[]>([
-    { id: 1, message: 'New user registration needs approval', time: '2 minutes ago', read: false, type: 'info' },
-    { id: 2, message: 'Payment transaction failed', time: '1 hour ago', read: false, type: 'error' },
-    { id: 3, message: 'System update scheduled for tonight', time: '3 hours ago', read: true, type: 'warning' },
-    { id: 4, message: 'New partner application submitted', time: '5 hours ago', read: false, type: 'info' },
-    { id: 5, message: 'Quarterly report generated successfully', time: '1 day ago', read: true, type: 'success' },
-  ]);
+  const [notifications, setNotifications] = useState<NotificationType[]>([]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -49,6 +44,47 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         setCurrentUser(JSON.parse(raw));
       }
     } catch {}
+    // Socket for real-time admin notifications
+    let socket: Socket | null = null;
+    try {
+      const token = localStorage.getItem('token') || '';
+      socket = io(import.meta.env.VITE_API_URL || 'http://localhost:3000', {
+        transports: ['websocket'],
+        auth: { token, role: 'admin' },
+      });
+      socket.on('adminOrderCreated', (order: any) => {
+        setNotifications(prev => [
+          { id: Date.now(), message: `New order from ${order.customerName}`, time: 'just now', read: false, type: 'info' },
+          ...prev
+        ]);
+      });
+      socket.on('adminOrderStatusUpdated', ({ orderId, status }: { orderId: string; status: string }) => {
+        setNotifications(prev => [
+          { id: Date.now() + 1, message: `Order ${String(orderId).slice(-6)} status: ${status}`, time: 'just now', read: false, type: 'success' },
+          ...prev
+        ]);
+      });
+      socket.on('adminEvent', (evt: any) => {
+        let msg = '';
+        if (evt?.action === 'order_created') msg = `Order created (${String(evt.orderId).slice(-6)}) - ₹${evt.totalAmount}`;
+        else if (evt?.action === 'vendor_confirmed') msg = `Vendor confirmed order ${String(evt.orderId).slice(-6)}`;
+        else if (evt?.action === 'order_claimed') msg = `Order ${String(evt.orderId).slice(-6)} claimed by delivery partner`;
+        else if (evt?.action === 'status_changed') msg = `Order ${String(evt.orderId).slice(-6)}: ${evt.from} → ${evt.to}`;
+        if (msg) {
+          setNotifications(prev => [
+            { id: Date.now() + Math.floor(Math.random()*1000), message: msg, time: 'just now', read: false, type: 'info' },
+            ...prev
+          ]);
+        }
+      });
+    } catch {}
+    return () => {
+      if (socket) {
+        socket.off('adminOrderCreated');
+        socket.off('adminOrderStatusUpdated');
+        socket.disconnect();
+      }
+    };
   }, []);
 
   const getPageTitle = () => {

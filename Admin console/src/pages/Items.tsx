@@ -17,6 +17,20 @@ type Item = {
   vendorName?: string;
 };
 
+// Predefined categories from vendor app
+const PREDEFINED_CATEGORIES = [
+  'main_course',
+  'starters',
+  'appetizers',
+  'desserts',
+  'beverages',
+  'sides',
+  'specials',
+  'breakfast',
+  'lunch',
+  'dinner',
+];
+
 const Items: React.FC = () => {
   const API = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
   const [items, setItems] = useState<Item[]>([]);
@@ -35,6 +49,9 @@ const Items: React.FC = () => {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState('');
   const [form, setForm] = useState<{ vendorId: string; name: string; description: string; price: string; image: string; category: string; isAvailable: boolean }>({ vendorId: '', name: '', description: '', price: '', image: '', category: '', isAvailable: true });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -59,6 +76,15 @@ const Items: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Cleanup image preview URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -101,6 +127,73 @@ const Items: React.FC = () => {
     const base = (API || '').replace(/\/$/, '');
     const path = u.startsWith('/') ? u : `/${u}`;
     return `${base}${path}`;
+  };
+
+  const handleImageUpload = async (file: File) => {
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setAddError('Please select a valid image file');
+      return;
+    }
+    
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      setAddError('Image size must be less than 5MB');
+      return;
+    }
+    
+    setUploadingImage(true);
+    setAddError('');
+    
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API}/api/upload/image`, {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
+        body: formData
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to upload image');
+      }
+      
+      setForm(f => ({ ...f, image: data.url }));
+      setImageFile(file);
+      
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+      
+    } catch (error: any) {
+      setAddError(error.message || 'Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleImageUpload(file);
+    }
+  };
+
+  const clearImage = () => {
+    setForm(f => ({ ...f, image: '' }));
+    setImageFile(null);
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+      setImagePreview('');
+    }
   };
 
   const openDetails = async (item: Item) => {
@@ -239,8 +332,8 @@ const Items: React.FC = () => {
 
       {detailsOpen && selectedItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
               <div>
                 <div className="text-xl font-semibold text-gray-900">{selectedItem.name}</div>
                 <div className="text-sm text-gray-500">{getVendorDisplay(selectedItem)} • {selectedItem.category || 'Uncategorized'}</div>
@@ -249,7 +342,7 @@ const Items: React.FC = () => {
                 <X size={20} />
               </button>
             </div>
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-64px)]">
+            <div className="p-6 overflow-y-auto flex-1">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="md:col-span-1">
                   <div className="w-full aspect-video bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
@@ -323,14 +416,14 @@ const Items: React.FC = () => {
 
       {addOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
               <div className="text-lg font-semibold">Add Item</div>
               <button className="text-gray-500 hover:text-gray-700" onClick={() => setAddOpen(false)} aria-label="Close">
                 <X size={20} />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
               {addError && <div className="text-red-600 text-sm">{addError}</div>}
               <div>
                 <label className="block text-sm text-gray-700 mb-1">Vendor</label>
@@ -354,27 +447,92 @@ const Items: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm text-gray-700 mb-1">Category</label>
-                  <input className="w-full border rounded p-2" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} list="categoryOptions" placeholder="Select or type a category" />
-                  <datalist id="categoryOptions">
-                    {categories.map(c => (
-                      <option key={c} value={c} />
+                  <select 
+                    className="w-full border rounded p-2" 
+                    value={form.category} 
+                    onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                  >
+                    <option value="">Select a category</option>
+                    {PREDEFINED_CATEGORIES.map(category => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
                     ))}
-                  </datalist>
+                  </select>
                 </div>
               </div>
               <div>
-                <label className="block text-sm text-gray-700 mb-1">Image URL</label>
-                <input className="w-full border rounded p-2" value={form.image} onChange={e => setForm(f => ({ ...f, image: e.target.value }))} placeholder="https://... or /public/..." />
+                <label className="block text-sm text-gray-700 mb-1">Image</label>
+                <div className="space-y-3">
+                  {/* Image Preview */}
+                  {(imagePreview || form.image) && (
+                    <div className="relative">
+                      <div className="w-full h-48 bg-gray-100 rounded-lg overflow-hidden">
+                        <img 
+                          src={imagePreview || toAbsoluteUrl(form.image)} 
+                          alt="Preview" 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={clearImage}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Upload Button */}
+                  <div className="flex items-center space-x-3">
+                    <label className="flex-1 cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="hidden"
+                        disabled={uploadingImage}
+                      />
+                      <div className={`w-full border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors ${uploadingImage ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                        {uploadingImage ? (
+                          <div className="flex items-center justify-center space-x-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                            <span className="text-sm text-gray-600">Uploading...</span>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="text-sm text-gray-600 mb-1">Click to upload image</div>
+                            <div className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</div>
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                  
+                  {/* Fallback URL Input */}
+                  <div className="text-xs text-gray-500">
+                    Or enter image URL manually:
+                  </div>
+                  <input 
+                    className="w-full border rounded p-2 text-sm" 
+                    value={form.image} 
+                    onChange={e => setForm(f => ({ ...f, image: e.target.value }))} 
+                    placeholder="https://... or /public/..." 
+                  />
+                </div>
               </div>
               <label className="inline-flex items-center space-x-2">
                 <input type="checkbox" checked={form.isAvailable} onChange={e => setForm(f => ({ ...f, isAvailable: e.target.checked }))} />
                 <span className="text-sm">Available</span>
               </label>
-              <div className="pt-2 flex justify-end space-x-2">
+            </div>
+            <div className="px-6 py-4 border-t bg-gray-50 flex-shrink-0">
+              <div className="flex justify-end space-x-2">
                 <Button variant="secondary" size="md" onClick={() => setAddOpen(false)}>Cancel</Button>
                 <Button variant="primary" size="md" isLoading={adding} onClick={async () => {
                   setAddError('');
-                  if (!form.vendorId || !form.name || !form.description || !form.image || !form.category || !form.price) {
+                  if (!form.vendorId || !form.name || !form.description || (!form.image && !imageFile) || !form.category || !form.price) {
                     setAddError('Please fill all required fields');
                     return;
                   }
@@ -399,6 +557,11 @@ const Items: React.FC = () => {
                     if (!res.ok) throw new Error(data.message || 'Failed to add item');
                     setAddOpen(false);
                     setForm({ vendorId: '', name: '', description: '', price: '', image: '', category: '', isAvailable: true });
+                    setImageFile(null);
+                    if (imagePreview) {
+                      URL.revokeObjectURL(imagePreview);
+                      setImagePreview('');
+                    }
                     fetchData();
                   } catch (e: any) {
                     setAddError(e.message || 'Failed to add item');

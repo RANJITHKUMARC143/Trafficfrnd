@@ -6,6 +6,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { toast } from 'react-toastify';
+import { io, Socket } from 'socket.io-client';
 
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
@@ -19,6 +20,8 @@ interface Order {
   customerName: string;
   items: any[];
   totalAmount: number;
+  deliveryFee?: number;
+  feeBreakdown?: any;
   status: string;
   deliveryAddress?: string;
   specialInstructions?: string;
@@ -92,6 +95,41 @@ const Orders: React.FC = () => {
       }
     };
     fetchOrders();
+    // Realtime updates via Socket.IO
+    let socket: Socket | null = null;
+    try {
+      const token = localStorage.getItem('token') || '';
+      socket = io(import.meta.env.VITE_API_URL || 'http://localhost:3000', {
+        transports: ['websocket'],
+        auth: { token, role: 'admin' },
+      });
+      socket.on('connect', () => {
+        console.log('[Admin] Socket connected:', socket && socket.id);
+      });
+      socket.on('adminOrderCreated', (order: Order) => {
+        setOrders(prev => {
+          if (prev.some(o => o._id === order._id)) return prev;
+          return [order, ...prev];
+        });
+        toast.info(`New order created: ${order.customerName}`, { autoClose: 3000 });
+      });
+      socket.on('adminOrderStatusUpdated', ({ orderId, status }: { orderId: string; status: string }) => {
+        setOrders(prev => prev.map(o => o._id === orderId ? { ...o, status } as any : o));
+        toast.success(`Order ${String(orderId).slice(-6)} status: ${status}`);
+      });
+      socket.on('disconnect', () => {
+        console.log('[Admin] Socket disconnected');
+      });
+    } catch (e) {
+      console.warn('Admin socket setup failed:', e);
+    }
+    return () => {
+      if (socket) {
+        socket.off('adminOrderCreated');
+        socket.off('adminOrderStatusUpdated');
+        socket.disconnect();
+      }
+    };
   }, []);
 
   // Filtering logic
@@ -271,6 +309,17 @@ const Orders: React.FC = () => {
       )
     },
     {
+      key: 'subtotal',
+      header: 'Subtotal',
+      sortable: true,
+      render: (_: any, row: Order) => {
+        const subtotal = Array.isArray(row.items)
+          ? row.items.reduce((sum, it) => sum + Number(it?.price || 0) * Number(it?.quantity || 0), 0)
+          : 0;
+        return <span className="text-gray-800">₹{subtotal}</span>;
+      }
+    },
+    {
       key: 'deliveryBoyId',
       header: 'Delivery Partner',
       sortable: true,
@@ -282,10 +331,25 @@ const Orders: React.FC = () => {
       )
     },
     {
-      key: 'totalAmount',
-      header: 'Amount',
+      key: 'deliveryFee',
+      header: 'Delivery Fee',
       sortable: true,
-      render: (v: number) => <span className="font-bold text-green-600">₹{v}</span>
+      render: (_: any, row: Order) => (
+        <span className="text-gray-800">₹{Number(row.deliveryFee || 0)}</span>
+      )
+    },
+    {
+      key: 'totalAmount',
+      header: 'Total',
+      sortable: true,
+      render: (_: any, row: Order) => {
+        const subtotal = Array.isArray(row.items)
+          ? row.items.reduce((sum, it) => sum + Number(it?.price || 0) * Number(it?.quantity || 0), 0)
+          : 0;
+        const fee = Number(row.deliveryFee || 0);
+        const total = Math.max(0, subtotal + fee);
+        return <span className="font-bold text-green-600">₹{total}</span>;
+      }
     },
     {
       key: 'status',
@@ -729,7 +793,9 @@ const Orders: React.FC = () => {
                 <div><span className="font-semibold">Vendor:</span> {typeof detailsModal.order.vendorId === 'object' && detailsModal.order.vendorId && 'businessName' in detailsModal.order.vendorId ? detailsModal.order.vendorId.businessName : ''}</div>
                 <div><span className="font-semibold">Delivery Partner:</span> {typeof detailsModal.order.deliveryBoyId === 'object' && detailsModal.order.deliveryBoyId && 'fullName' in detailsModal.order.deliveryBoyId ? detailsModal.order.deliveryBoyId.fullName : ''}</div>
                 <div><span className="font-semibold">Status:</span> {detailsModal.order.status}</div>
-                <div><span className="font-semibold">Total Amount:</span> ₹{detailsModal.order.totalAmount}</div>
+                <div><span className="font-semibold">Subtotal (Items):</span> ₹{Math.max(0, (detailsModal.order.totalAmount || 0) - (Number(detailsModal.order.deliveryFee || 0)) )}</div>
+                <div><span className="font-semibold">Delivery Fee:</span> ₹{Number(detailsModal.order.deliveryFee || 0)}</div>
+                <div><span className="font-semibold">Total:</span> <span className="font-bold text-green-700">₹{detailsModal.order.totalAmount}</span></div>
                 <div><span className="font-semibold">Delivery Address (at time of booking):</span> <span className="font-bold text-blue-700">{detailsModal.order.deliveryAddress || '-'}</span></div>
                 <div><span className="font-semibold">Special Instructions:</span> {detailsModal.order.specialInstructions || '-'}</div>
                 <div><span className="font-semibold">Vehicle Number:</span> {detailsModal.order.vehicleNumber || '-'}</div>

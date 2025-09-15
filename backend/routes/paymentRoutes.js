@@ -6,6 +6,7 @@ const {
   createCashfreePaymentSession,
   verifyCashfreePayment,
   cashfreeWebhook,
+  createPaymentLinkController,
   getPaymentMethods
 } = require('../controllers/paymentController');
 
@@ -23,6 +24,12 @@ router.post('/cashfree/session', auth, createCashfreePaymentSession);
 router.post('/cashfree/verify', auth, verifyCashfreePayment);
 router.post('/cashfree/webhook', cashfreeWebhook);
 router.get('/methods', getPaymentMethods);
+
+// UPI Payment Link route for admin console (legacy)
+router.post('/upi-link', auth, createCashfreeUPIOrder);
+
+// Official Payment Links API route
+router.post('/payment-link', auth, createPaymentLinkController);
 
 module.exports = router;
 

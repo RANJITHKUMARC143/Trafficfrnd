@@ -19,6 +19,7 @@ const journeyRoutes = require('./routes/journeyRoutes');
 const routeSessionRoutes = require('./routes/routeSessionRoutes');
 const userOrderRoutes = require('./routes/userOrderRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const smsRoutes = require('./routes/smsRoutes');
 const registrationRoutes = require('./routes/registrationRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const rateLimit = require('express-rate-limit');
@@ -111,6 +112,7 @@ app.use('/api', userAuthRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/user/orders', userOrderRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/sms', smsRoutes);
 // Registrations (admin)
 app.use('/api/registrations', registrationRoutes);
 // Static + uploads

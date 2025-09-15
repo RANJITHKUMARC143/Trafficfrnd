@@ -53,12 +53,31 @@ router.patch('/admin/:orderId/status', auth, async (req, res) => {
     if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'super_admin')) {
       return res.status(403).json({ message: 'Forbidden: Only admins can update order status' });
     }
+    const prev = await Order.findById(req.params.orderId);
+    if (!prev) return res.status(404).json({ message: 'Order not found' });
     const order = await Order.findByIdAndUpdate(
       req.params.orderId,
       { status, updatedAt: Date.now() },
       { new: true }
     );
     if (!order) return res.status(404).json({ message: 'Order not found' });
+    // Emit real-time notifications for admin actions as well
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('adminOrderStatusUpdated', { orderId: String(order._id), status: order.status });
+        io.emit('adminEvent', {
+          action: 'status_changed',
+          orderId: String(order._id),
+          from: prev.status,
+          to: order.status,
+          at: new Date().toISOString(),
+          by: 'admin'
+        });
+      }
+    } catch (e) {
+      console.warn('Admin status emit failed:', e?.message || e);
+    }
     res.json(order);
   } catch (error) {
     res.status(500).json({ message: 'Error updating order status', error: error.message });

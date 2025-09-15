@@ -212,6 +212,16 @@ const updateOrderStatus = async (req, res) => {
       }
       order.updatedAt = Date.now();
       await order.save();
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('adminEvent', {
+          action: 'vendor_confirmed',
+          orderId: order._id,
+          vendorId: order.vendorId,
+          status: order.status,
+          at: new Date().toISOString(),
+        });
+      }
       return res.json({ success: true, order });
     }
     // If delivery boy is accepting
@@ -230,6 +240,13 @@ const updateOrderStatus = async (req, res) => {
       if (io) {
         console.log('[SOCKET] Emitting orderClaimed to deliveryBoys:', order._id);
         io.to('deliveryBoys').emit('orderClaimed', order);
+        io.emit('adminEvent', {
+          action: 'order_claimed',
+          orderId: order._id,
+          deliveryBoyId: order.deliveryBoyId,
+          status: order.status,
+          at: new Date().toISOString(),
+        });
       }
       return res.json({ success: true, order });
     }
@@ -259,6 +276,7 @@ const updateOrderStatus = async (req, res) => {
     }
 
     console.log('updateOrderStatus: attempting to set status', { orderId, from: order.status, to: status });
+    const previousStatus = order.status;
     order.status = status;
     order.updatedAt = Date.now();
     try {
@@ -272,6 +290,15 @@ const updateOrderStatus = async (req, res) => {
     if (io) {
       io.to(`order_${orderId}`).emit('orderStatusUpdated', { orderId, status: order.status });
       if (order.deliveryBoyId) io.to(`deliveryBoy:${String(order.deliveryBoyId)}`).emit('orderStatusUpdated', { orderId, status: order.status });
+      // Admin console global notification
+      io.emit('adminOrderStatusUpdated', { orderId, status: order.status });
+      io.emit('adminEvent', {
+        action: 'status_changed',
+        orderId,
+        from: previousStatus,
+        to: order.status,
+        at: new Date().toISOString(),
+      });
     }
     console.log('updateOrderStatus: success', { orderId, currentStatus: order.status, requestedStatus: status, deliveryBoyId: order.deliveryBoyId, user: req.user._id, role: req.user.role });
     // Return freshly loaded order to ensure client sees persisted changes
@@ -404,6 +431,17 @@ const createOrder = async (req, res) => {
       surgeFestival,
     };
     const fee = await computeDeliveryFee(calcInput);
+    // If created by admin or super_admin, override delivery fee to default 45
+    const isAdminCreator = req.user && (req.user.role === 'admin' || req.user.role === 'super_admin');
+    if (isAdminCreator) {
+      fee.deliveryFee = 45;
+      fee.feeBreakdown = {
+        ...(fee.feeBreakdown || {}),
+        baseFare: 45,
+        finalFee: 45,
+        adminOverride: true,
+      };
+    }
 
     // Prepare selectedDeliveryPoint with GeoJSON location
     let processedDeliveryPoint = selectedDeliveryPoint;
@@ -422,7 +460,12 @@ const createOrder = async (req, res) => {
       routeId: routeObjectId || undefined,
       customerName,
       items: sanitizedItems,
-      totalAmount: typeof totalAmount === 'number' && totalAmount > 0 ? totalAmount : computedTotal,
+      // Store grand total = items total + delivery fee
+      totalAmount: (() => {
+        const itemsTotal = (typeof totalAmount === 'number' && totalAmount > 0) ? totalAmount : computedTotal;
+        const feeAmount = Number(fee?.deliveryFee || 0);
+        return Math.max(0, itemsTotal + feeAmount);
+      })(),
       deliveryFee: fee.deliveryFee,
       feeBreakdown: fee.feeBreakdown,
       status: 'pending',
@@ -518,6 +561,22 @@ const createOrder = async (req, res) => {
     } catch (assignErr) {
       console.error('Smart assignment failed. Not broadcasting to pool:', assignErr);
     }
+
+    // Admin console global notification for new order
+    try {
+      const io2 = req.app.get('io');
+      if (io2) {
+        io2.emit('adminOrderCreated', order);
+        io2.emit('adminEvent', {
+          action: 'order_created',
+          orderId: order._id,
+          customerName,
+          totalAmount: order.totalAmount,
+          deliveryFee: order.deliveryFee,
+          at: new Date().toISOString(),
+        });
+      }
+    } catch {}
 
     res.status(201).json(order);
   } catch (error) {
