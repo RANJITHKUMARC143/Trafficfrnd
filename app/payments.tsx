@@ -1,9 +1,9 @@
 import React from 'react';
 import { StyleSheet, View, TouchableOpacity, FlatList } from 'react-native';
-import { ThemedText } from '@/_components/ThemedText';
-import { ThemedView } from '@/_components/ThemedView';
+import { ThemedText } from '@cmp/ThemedText';
+import { ThemedView } from '@cmp/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
-import BottomNavigationBar from '@/_components/BottomNavigationBar';
+import BottomNavigationBar from '@cmp/_components/BottomNavigationBar';
 
 type PaymentItem = {
   id: string;

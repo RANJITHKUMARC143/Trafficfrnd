@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import { ThemedText } from '@/_components/ThemedText';
+import { ThemedText } from '@cmp/ThemedText';
 
 export default function DeliveryStatusScreen() {
   return (

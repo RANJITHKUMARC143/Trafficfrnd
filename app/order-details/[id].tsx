@@ -12,8 +12,8 @@ import {
   RefreshControl,
   Dimensions
 } from 'react-native';
-import { ThemedText } from '@/_components/ThemedText';
-import { ThemedView } from '@/_components/ThemedView';
+import { ThemedText } from '@cmp/ThemedText';
+import { ThemedView } from '@cmp/ThemedView';
 import { useLocalSearchParams, router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';

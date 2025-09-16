@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, TouchableOpacity, TextInput, Platform, KeyboardAvoidingView, Alert, Animated, Modal, ScrollView, Linking, PanResponder, Dimensions, Text } from 'react-native';
-import { ThemedText, ThemedView } from '@/components';
+import { ThemedText } from '@cmp/ThemedText';
+import { ThemedView } from '@cmp/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -11,7 +12,7 @@ import MapViewDirections from 'react-native-maps-directions';
 import { StatusBar } from 'react-native';
 import { API_URL } from '../../src/config';
 import { useRouter } from 'expo-router';
-import { fetchDeliveryPoints } from '../services/orderService';
+import { fetchDeliveryPoints } from '@lib/services/orderService';
 import { useIsFocused } from '@react-navigation/native';
 
 type RoutePoint = {

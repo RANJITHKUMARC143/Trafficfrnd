@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { StyleSheet, FlatList, View, TouchableOpacity, RefreshControl, Alert as RNAlert, Text, Modal } from 'react-native';
-import { ThemedText, ThemedView } from '../components';
-import BottomNavigationBar from '../components/BottomNavigationBar';
+import { ThemedText } from '@cmp/ThemedText';
+import { ThemedView } from '@cmp/ThemedView';
+import BottomNavigationBar from '@cmp/_components/BottomNavigationBar';
 import { Ionicons } from '@expo/vector-icons';
 import { fetchAlerts, deleteAlert, clearAllAlerts, markAlertRead } from '../../services/alertService';
 import { Audio } from 'expo-av';

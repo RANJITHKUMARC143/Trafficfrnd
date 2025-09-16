@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, TouchableOpacity, Modal, ScrollView, Text } from 'react-native';
-import { ThemedText } from '@/_components/ThemedText';
-import { ThemedView } from '@/_components/ThemedView';
+import { ThemedText } from '@cmp/ThemedText';
+import { ThemedView } from '@cmp/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import LottieView from 'lottie-react-native';
+import LottieView from '@cmp/LottieFallback';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { Linking } from 'react-native';

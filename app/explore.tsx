@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, ScrollView, TouchableOpacity, Image, TextInput, ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, Alert } from 'react-native';
-import { ThemedText } from '@/_components/ThemedText';
-import { ThemedView } from '@/_components/ThemedView';
+import { ThemedText } from '@cmp/ThemedText';
+import { ThemedView } from '@cmp/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 const API_URL = 'https://trafficfrnd-2.onrender.com';

@@ -4,7 +4,7 @@ import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
-import { fetchDeliveryPoints } from '../services/orderService';
+import { fetchDeliveryPoints } from '@lib/services/orderService';
 
 type DeliveryPoint = {
   _id: string;

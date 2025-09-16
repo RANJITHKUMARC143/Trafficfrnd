@@ -1,7 +1,8 @@
 import 'react-native-get-random-values';
 import { StyleSheet, TextInput, ScrollView, TouchableOpacity, View, Image, Alert, Platform, Linking, Dimensions, Animated, KeyboardAvoidingView, Text, Modal, FlatList, Keyboard } from 'react-native';
-import { ThemedText, ThemedView } from '@/components';
-import BottomNavigationBar from '@/_components/BottomNavigationBar';
+import { ThemedText } from '@cmp/ThemedText';
+import { ThemedView } from '@cmp/ThemedView';
+import BottomNavigationBar from '@cmp/_components/BottomNavigationBar';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useRef } from 'react';
@@ -12,13 +13,13 @@ import React from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import MapViewDirections from 'react-native-maps-directions';
-import { menuService } from '@/services/menuService';
-import { sendClickToCall } from '@/services/callService';
-import { MenuItem } from '@/types/menu';
-import LottieView from 'lottie-react-native';
+import { menuService } from '@lib/services/menuService';
+import { sendClickToCall } from '@lib/services/callService';
+import { MenuItem } from '@lib/types/menu';
+import LottieView from '@cmp/LottieFallback';
 import { useFocusEffect } from '@react-navigation/native';
 import { useMemo } from 'react';
-import { fetchUserOrders } from '@/services/orderService';
+import { fetchUserOrders } from '@lib/services/orderService';
 import { BlurView } from 'expo-blur';
 
 type Category = {

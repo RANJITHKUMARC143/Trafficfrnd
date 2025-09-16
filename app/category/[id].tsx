@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ScrollView, TouchableOpacity, Image, ActivityIndicator, Modal, Alert, Share, Platform, Dimensions, Animated } from 'react-native';
-import { ThemedText } from '@/_components/ThemedText';
+import { ThemedText } from '@cmp/ThemedText';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MenuItem } from '@/types/menu';
+import { MenuItem } from '@lib/types/menu';
 import { LinearGradient } from 'expo-linear-gradient';
-import LottieView from 'lottie-react-native';
-import { menuService } from '@/services/menuService';
+import LottieView from '@cmp/LottieFallback';
+import { menuService } from '@lib/services/menuService';
 import { useFocusEffect } from '@react-navigation/native';
 
 const { width, height } = Dimensions.get('window');

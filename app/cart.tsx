@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, TouchableOpacity, FlatList, Alert, TextInput, Image } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { ThemedText } from '@/_components/ThemedText';
-import { ThemedView } from '@/_components/ThemedView';
+import { ThemedText } from '@cmp/ThemedText';
+import { ThemedView } from '@cmp/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createOrder, fetchDeliveryPoints, quoteDeliveryFee, getPaymentConfig } from './services/orderService';
+import { createOrder, fetchDeliveryPoints, quoteDeliveryFee, getPaymentConfig } from '@lib/services/orderService';
 import * as Location from 'expo-location';
 import { Linking } from 'react-native';
 import { useAuth } from '@/context/AuthContext';

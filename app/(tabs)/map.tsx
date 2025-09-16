@@ -4,9 +4,9 @@ import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from 'react-native-maps';
 import { router } from 'expo-router';
-import BottomNavigationBar from '@/_components/BottomNavigationBar';
+import BottomNavigationBar from '@cmp/_components/BottomNavigationBar';
 import * as Location from 'expo-location';
-import { fetchDeliveryPoints } from '../services/orderService';
+import { fetchDeliveryPoints } from '@lib/services/orderService';
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAW74HcfPLqNz7kmr7EK4LM6TTmCnJ3pXM';
 

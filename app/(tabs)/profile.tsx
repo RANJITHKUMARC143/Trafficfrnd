@@ -1,9 +1,9 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, SafeAreaView, Modal, Pressable, Text, Dimensions, Animated } from 'react-native';
-import { ThemedText } from '@/_components/ThemedText';
-import { ThemedView } from '@/_components/ThemedView';
-import BottomNavigationBar from '@/_components/BottomNavigationBar';
-import { socketService } from '@/services/socketService';
+import { ThemedText } from '@cmp/ThemedText';
+import { ThemedView } from '@cmp/ThemedView';
+import BottomNavigationBar from '@cmp/_components/BottomNavigationBar';
+import { socketService } from '@lib/services/socketService';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
@@ -14,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from '@react-navigation/native';
-import { fetchUserOrders } from '@/services/orderService';
+import { fetchUserOrders } from '@lib/services/orderService';
 
 type User = {
   id: string;
@@ -37,7 +37,7 @@ type AuthState = {
 };
 
 // Lazy load the LocationPicker component
-const LocationPicker = lazy(() => import('../_components/LocationPicker'));
+import LocationPicker from '@cmp/_components/LocationPicker';
 
 const { width } = Dimensions.get('window');
 

@@ -1,5 +1,5 @@
 import { API_URL } from '@src/config';
-import { MenuItem } from '@/types/menu';
+import { MenuItem } from '@/_lib/types/menu';
 import { socketService } from './socketService';
 
 class MenuService {

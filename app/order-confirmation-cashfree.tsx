@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, TouchableOpacity, Modal, ScrollView, Alert, Text, StatusBar, Dimensions, TextInput } from 'react-native';
-import { ThemedText } from './_components/ThemedText';
-import { ThemedView } from './components/ThemedView';
+import { ThemedText } from '@cmp/ThemedText';
+import { ThemedView } from '@cmp/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import LottieView from 'lottie-react-native';
+import LottieView from '@cmp/LottieFallback';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { Linking } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { LinearGradient } from 'expo-linear-gradient';
-import { fetchOrderDetails } from './services/orderService';
+import { fetchOrderDetails } from '@lib/services/orderService';
 
 const { width, height } = Dimensions.get('window');
 const API_BASE_URL = `${process.env.EXPO_PUBLIC_API_URL || 'https://trafficfrnd-2.onrender.com'}/api`;

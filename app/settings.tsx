@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Switch, TouchableOpacity } from 'react-native';
-import { ThemedText } from '@/_components/ThemedText';
-import { ThemedView } from '@/_components/ThemedView';
+import { ThemedText } from '@cmp/ThemedText';
+import { ThemedView } from '@cmp/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
-import BottomNavigationBar from '@/_components/BottomNavigationBar';
+import BottomNavigationBar from '@cmp/_components/BottomNavigationBar';
 
 export default function SettingsScreen() {
   const [notifications, setNotifications] = useState(true);

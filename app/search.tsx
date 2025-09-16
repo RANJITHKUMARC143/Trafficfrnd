@@ -1,12 +1,12 @@
 import React from 'react';
 import { StyleSheet, View, ScrollView, Image, TouchableOpacity, ActivityIndicator, TextInput, Animated, Dimensions, StatusBar, Platform, Modal, Alert, Easing, FlatList } from 'react-native';
-import { ThemedText } from '@/_components/ThemedText';
-import { ThemedView } from '@/_components/ThemedView';
+import { ThemedText } from '@cmp/ThemedText';
+import { ThemedView } from '@cmp/ThemedView';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { menuService } from '@/services/menuService';
-import { MenuItem } from '@/types/menu';
-import LottieView from 'lottie-react-native';
+import { menuService } from '@lib/services/menuService';
+import { MenuItem } from '@lib/types/menu';
+import LottieView from '@cmp/LottieFallback';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
