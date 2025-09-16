@@ -1,7 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const SOCKET_URL = 'http://192.168.31.107:3000';
+const SOCKET_URL = 'https://traffic-friend-backend.onrender.com';
 
 class ChatService {
   private static instance: ChatService;
