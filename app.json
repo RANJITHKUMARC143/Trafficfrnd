@@ -30,7 +30,9 @@
         "backgroundColor": "#ffffff"
       },
       "config": {
-        "googleMapsApiKey": "AIzaSyAW74HcfPLqNz7kmr7EK4LM6TTmCnJ3pXM"
+        "googleMaps": {
+          "apiKey": "AIzaSyAW74HcfPLqNz7kmr7EK4LM6TTmCnJ3pXM"
+        }
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
