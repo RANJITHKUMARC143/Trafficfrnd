@@ -4,7 +4,7 @@ import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from 'react-native-maps';
 import { router } from 'expo-router';
-import BottomNavigationBar from '@/components/BottomNavigationBar';
+import BottomNavigationBar from '@/_components/BottomNavigationBar';
 import * as Location from 'expo-location';
 import { fetchDeliveryPoints } from '../services/orderService';
 

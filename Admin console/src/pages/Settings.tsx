@@ -28,7 +28,7 @@ const Settings: React.FC = () => {
 
   const loadRestaurantPhoneNumber = async () => {
     try {
-      const response = await fetch('https://traffic-friend-backend.onrender.com/api/settings/phone-number');
+      const response = await fetch('https://trafficfrnd-2.onrender.com/api/settings/phone-number');
       if (response.ok) {
         const data = await response.json();
         setRestaurantPhoneNumber(data.phoneNumber || '+91-9876543210');
@@ -41,7 +41,7 @@ const Settings: React.FC = () => {
   const saveRestaurantPhoneNumber = async () => {
     setSaveStatus('saving');
     try {
-      const response = await fetch('http://192.168.31.107:3000/api/settings/phone-number', {
+      const response = await fetch('https://trafficfrnd-2.onrender.com/api/settings/phone-number', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

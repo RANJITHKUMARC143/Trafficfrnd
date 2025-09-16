@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl, ScrollView } from 'react-native';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { ThemedText } from '@/_components/ThemedText';
+import { ThemedView } from '@/_components/ThemedView';
 import { fetchUserOrders } from './services/orderService';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';

@@ -4,8 +4,8 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 const API_URL = 'https://trafficfrnd-2.onrender.com';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { ThemedText } from '@/_components/ThemedText';
+import { ThemedView } from '@/_components/ThemedView';
 
 type LocationPickerProps = {
   onLocationSelected?: (location: { latitude: number; longitude: number; address: string }) => void;

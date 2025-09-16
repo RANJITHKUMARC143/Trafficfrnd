@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, TouchableOpacity, Modal, ScrollView, Alert, Text, StatusBar, Dimensions, TextInput } from 'react-native';
-import { ThemedText } from './components/ThemedText';
+import { ThemedText } from './_components/ThemedText';
 import { ThemedView } from './components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';

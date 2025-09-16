@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import { ThemedText } from '@/components/ThemedText';
+import { ThemedText } from '@/_components/ThemedText';
 
 export default function PromotionsScreen() {
   return (

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, SafeAreaView, Modal, Pressable, Text, Dimensions, Animated } from 'react-native';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import BottomNavigationBar from '@/components/BottomNavigationBar';
+import { ThemedText } from '@/_components/ThemedText';
+import { ThemedView } from '@/_components/ThemedView';
+import BottomNavigationBar from '@/_components/BottomNavigationBar';
 import { socketService } from '@/services/socketService';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -37,7 +37,7 @@ type AuthState = {
 };
 
 // Lazy load the LocationPicker component
-const LocationPicker = lazy(() => import('../components/LocationPicker'));
+const LocationPicker = lazy(() => import('../_components/LocationPicker'));
 
 const { width } = Dimensions.get('window');
 

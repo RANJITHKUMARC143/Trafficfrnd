@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, ScrollView, Image, TouchableOpacity, ActivityIndicator, TextInput, Animated, Dimensions, StatusBar, Platform, Modal, Alert, Easing, FlatList } from 'react-native';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { ThemedText } from '@/_components/ThemedText';
+import { ThemedView } from '@/_components/ThemedView';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { menuService } from '@/services/menuService';

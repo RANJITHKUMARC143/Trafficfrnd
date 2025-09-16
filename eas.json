@@ -18,6 +18,12 @@
           "ANDROID_NDK_HOME": "/opt/android-ndk"
         }
       }
+    },
+    "apk": {
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      }
     }
   },
   "submit": {

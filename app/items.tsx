@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { StyleSheet, FlatList, ActivityIndicator, RefreshControl, View, TextInput, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { ThemedView } from '@/components/ThemedView';
-import { ThemedText } from '@/components/ThemedText';
+import { ThemedView } from '@/_components/ThemedView';
+import { ThemedText } from '@/_components/ThemedText';
 import { MenuItem } from '@/types/menu';
 import { menuService } from '@/services/menuService';
-import MenuItemCard from '@/components/MenuItemCard';
+import MenuItemCard from '@/_components/MenuItemCard';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ItemsScreen() {

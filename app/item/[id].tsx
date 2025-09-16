@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Image, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, Dimensions } from 'react-native';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
-import { ThemedText } from '@/components/ThemedText';
+import { ThemedText } from '@/_components/ThemedText';
 import { menuService } from '@/services/menuService';
 import { MenuItem } from '@/types/menu';
 import AsyncStorage from '@react-native-async-storage/async-storage';

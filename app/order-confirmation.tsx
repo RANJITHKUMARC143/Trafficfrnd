@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, Modal, ScrollView } from 'react-native';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { StyleSheet, View, TouchableOpacity, Modal, ScrollView, Text } from 'react-native';
+import { ThemedText } from '@/_components/ThemedText';
+import { ThemedView } from '@/_components/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import LottieView from 'lottie-react-native';
@@ -143,13 +143,13 @@ export default function OrderConfirmationScreen() {
             style={[styles.continueButton, { marginRight: 10 }]}
             onPress={() => router.push(`/order-details/${orderId}`)}
           >
-            <ThemedText style={styles.continueButtonText}>View Order Details</ThemedText>
+            <Text style={styles.continueButtonText}>View Order Details</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.continueButton, { backgroundColor: '#FF9800' }]}
             onPress={handleContinueShopping}
           >
-            <ThemedText style={styles.continueButtonText}>Continue Shopping</ThemedText>
+            <Text style={styles.continueButtonText}>Continue Shopping</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -162,18 +162,18 @@ export default function OrderConfirmationScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <ThemedText style={styles.title}>Order Confirmed!</ThemedText>
-            <ThemedText style={styles.subtitle}>Let's go to the checkpoint</ThemedText>
+            <ThemedText style={styles.subtitle}>Let's go to the delivery point</ThemedText>
             <TouchableOpacity style={styles.continueButton} onPress={handleLetsGo}>
-              <ThemedText style={styles.continueButtonText}>Let's Go</ThemedText>
+              <Text style={styles.modalButtonText}>Let's Go</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.continueButton, { backgroundColor: '#FF9800', marginTop: 10 }]}
               onPress={() => setShowLetsGoModal(false)}
             >
-              <ThemedText style={styles.continueButtonText}>Close</ThemedText>
+              <Text style={styles.modalButtonText}>Close</Text>
             </TouchableOpacity>
             {loadingCheckpoint && (
-              <ThemedText style={styles.subtitle}>Loading checkpoint...</ThemedText>
+              <ThemedText style={styles.subtitle}>Loading Delivery Point...</ThemedText>
             )}
             {checkpointError ? (
               <ThemedText style={[styles.subtitle, { color: 'red' }]}>{checkpointError}</ThemedText>
@@ -248,6 +248,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     flex: 1,
     alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center'
   },
   continueButtonText: {
     color: '#fff',
