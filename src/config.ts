@@ -1,7 +1,7 @@
 // API Configuration
 // For development, use localhost or your computer's local IP address
 // You can find your IP address by running 'ipconfig' on Windows or 'ifconfig' on Mac/Linux
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://traffic-friend-backend.onrender.com';
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://trafficfrnd-2.onrender.com';
 
 // Socket Configuration
 export const SOCKET_CONFIG = {

@@ -131,7 +131,7 @@ export default function EnhancedPaymentModal({
     
     try {
       // Create Cashfree UPI order
-      const response = await fetch('https://traffic-friend-backend.onrender.com/api/payments/cashfree/upi/order', {
+      const response = await fetch('https://trafficfrnd-2.onrender.com/api/payments/cashfree/upi/order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -173,7 +173,7 @@ export default function EnhancedPaymentModal({
     
     try {
       // Create Cashfree UPI order with a generic UPI ID
-      const response = await fetch('https://traffic-friend-backend.onrender.com/api/payments/cashfree/upi/order', {
+      const response = await fetch('https://trafficfrnd-2.onrender.com/api/payments/cashfree/upi/order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -222,7 +222,7 @@ export default function EnhancedPaymentModal({
     setLoading(true);
     
     try {
-      const response = await fetch('https://traffic-friend-backend.onrender.com/api/payments/cashfree/upi/order', {
+      const response = await fetch('https://trafficfrnd-2.onrender.com/api/payments/cashfree/upi/order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -253,7 +253,7 @@ export default function EnhancedPaymentModal({
   const pollPaymentStatus = () => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`https://traffic-friend-backend.onrender.com/api/orders/${orderId}`, {
+        const response = await fetch(`https://trafficfrnd-2.onrender.com/api/orders/${orderId}`, {
           headers: {
             'Authorization': `Bearer ${await getAuthToken()}`,
           },

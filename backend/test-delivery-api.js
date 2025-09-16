@@ -1,6 +1,6 @@
 const fetch = require('node-fetch');
 
-const API_BASE = 'https://traffic-friend-backend.onrender.com/api';
+const API_BASE = 'https://trafficfrnd-2.onrender.com/api';
 
 // Test the delivery partners list endpoint
 async function testDeliveryPartnersList() {
