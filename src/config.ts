@@ -1,7 +1,7 @@
 // API Configuration
 // For development, use localhost or your computer's local IP address
 // You can find your IP address by running 'ipconfig' on Windows or 'ifconfig' on Mac/Linux
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://172.28.180.13:3000';
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.31.107:3000';
 
 // Socket Configuration
 export const SOCKET_CONFIG = {

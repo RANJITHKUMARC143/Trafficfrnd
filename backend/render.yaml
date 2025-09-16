@@ -9,8 +9,10 @@ services:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 3000
+        value: 10000
       - key: JWT_SECRET
         generateValue: true
       - key: MONGODB_URI
-        sync: false 
+        sync: false
+      - key: CORS_ORIGIN
+        value: "*"

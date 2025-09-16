@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { fetchOrderDetails } from './services/orderService';
 
 const { width, height } = Dimensions.get('window');
-const API_BASE_URL = `${process.env.EXPO_PUBLIC_API_URL || 'http://172.28.180.13:3000'}/api`;
+const API_BASE_URL = `${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.31.107:3000'}/api`;
 
 export default function OrderConfirmationCashfreeScreen() {
   const params = useLocalSearchParams();

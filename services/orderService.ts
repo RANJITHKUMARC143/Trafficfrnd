@@ -1,7 +1,7 @@
 // Order service for API calls
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = `${process.env.EXPO_PUBLIC_API_URL || 'http://172.28.180.13:3000'}/api`;
+const API_BASE_URL = `${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.31.107:3000'}/api`;
 
 export async function createOrder(orderData) {
   const token = await AsyncStorage.getItem('token');
