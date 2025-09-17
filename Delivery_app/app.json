@@ -32,11 +32,12 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "e7816bc6-d173-4ab5-a421-c2ca1a27766c"
+        "projectId": "48a3fa8d-104e-4000-900e-a6a94fbc1a8b"
       }
     },
     "android": {
       "package": "com.nanu01.delivery"
-    }
+    },
+    "owner": "ranjith0705"
   }
 }

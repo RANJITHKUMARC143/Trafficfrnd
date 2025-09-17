@@ -1,13 +1,36 @@
 // API Configuration
+import Constants from 'expo-constants';
+
+function deriveLanBaseURL(): string | undefined {
+  try {
+    const hostUri = (Constants as any)?.expoConfig?.hostUri
+      || (Constants as any)?.manifest?.debuggerHost
+      || (Constants as any)?.manifest2?.extra?.expoClient?.hostUri;
+    if (!hostUri || typeof hostUri !== 'string') return undefined;
+    const host = hostUri.split(':')[0];
+    const isIPv4 = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host);
+    if (isIPv4) {
+      return `http://${host}:3000/api`;
+    }
+  } catch {}
+  return undefined;
+}
+
+const LAN_BASE = deriveLanBaseURL();
+
 export const API_CONFIG = {
   // Development
   development: {
-    baseUrl: 'https://trafficfrnd-2.onrender.com/api',
+    baseUrl: (process as any).env?.EXPO_PUBLIC_API_URL
+      ? `${(process as any).env.EXPO_PUBLIC_API_URL}/api`
+      : (LAN_BASE || 'http://localhost:3000/api'),
     timeout: 10000, // 10 seconds
   },
   // Production
   production: {
-    baseUrl: 'https://trafficfrnd-2.onrender.com/api',
+    baseUrl: (process as any).env?.EXPO_PUBLIC_API_URL
+      ? `${(process as any).env.EXPO_PUBLIC_API_URL}/api`
+      : (LAN_BASE || 'http://localhost:3000/api'),
     timeout: 15000, // 15 seconds
   }
 };
@@ -24,17 +47,15 @@ export const getApiConfig = () => {
 };
 
 // Get base URL for API requests
-export const getBaseUrl = () => {
-  return __DEV__ ? 'https://trafficfrnd-2.onrender.com/api' : 'https://trafficfrnd-2.onrender.com/api';
-};
+export const getBaseUrl = () => API_CONFIG[getEnvironment()].baseUrl;
 
 // Get timeout for API requests
 export const getTimeout = () => {
   return getApiConfig().timeout;
 };
 
-const DEV_API_URL = 'https://trafficfrnd-2.onrender.com/api';
-const PROD_API_URL = 'https://trafficfrnd-2.onrender.com/api';
+const DEV_API_URL = 'http://localhost:3000/api';
+const PROD_API_URL = 'http://localhost:3000/api';
 
 export const API_ENDPOINTS = {
   AUTH: {

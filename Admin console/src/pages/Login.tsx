@@ -17,13 +17,20 @@ const Login: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/login`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Login failed');
+      if (!res.ok) {
+        let message = data?.message || 'Login failed';
+        const lower = String(message).toLowerCase();
+        if (res.status === 400 || res.status === 401 || lower.includes('invalid') || lower.includes('not found')) {
+          message = 'User not found. Please sign up in the user app.';
+        }
+        throw new Error(message);
+      }
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       navigate('/');

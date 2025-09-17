@@ -28,7 +28,8 @@ const Settings: React.FC = () => {
 
   const loadRestaurantPhoneNumber = async () => {
     try {
-      const response = await fetch('https://trafficfrnd-2.onrender.com/api/settings/phone-number');
+      const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${API_URL}/api/settings/phone-number`);
       if (response.ok) {
         const data = await response.json();
         setRestaurantPhoneNumber(data.phoneNumber || '+91-9876543210');
@@ -41,7 +42,8 @@ const Settings: React.FC = () => {
   const saveRestaurantPhoneNumber = async () => {
     setSaveStatus('saving');
     try {
-      const response = await fetch('https://trafficfrnd-2.onrender.com/api/settings/phone-number', {
+      const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${API_URL}/api/settings/phone-number`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

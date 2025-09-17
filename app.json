@@ -54,7 +54,11 @@
     "extra": {
       "router": {
         "origin": false
+      },
+      "eas": {
+        "projectId": "4ebbaf8d-7cb9-469a-9448-5d0e64562181"
       }
-    }
+    },
+    "owner": "ranjith0705"
   }
 }

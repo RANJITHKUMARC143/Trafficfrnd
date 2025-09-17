@@ -87,7 +87,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('Login response data:', data);
 
       if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
+        let message = data?.message || 'Login failed';
+        const lower = String(message).toLowerCase();
+        if (response.status === 400 || response.status === 401 || lower.includes('invalid') || lower.includes('not found')) {
+          message = 'User not found. Please sign up in the user app.';
+        }
+        throw new Error(message);
       }
 
       console.log('Token from backend:', data.token);

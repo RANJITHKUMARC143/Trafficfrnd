@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import { API_URL } from '@src/config';
 
 const { width, height } = Dimensions.get('window');
 
@@ -131,7 +132,7 @@ export default function EnhancedPaymentModal({
     
     try {
       // Create Cashfree UPI order
-      const response = await fetch('https://trafficfrnd-2.onrender.com/api/payments/cashfree/upi/order', {
+      const response = await fetch(`${API_URL}/api/payments/cashfree/upi/order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -173,7 +174,7 @@ export default function EnhancedPaymentModal({
     
     try {
       // Create Cashfree UPI order with a generic UPI ID
-      const response = await fetch('https://trafficfrnd-2.onrender.com/api/payments/cashfree/upi/order', {
+      const response = await fetch(`${API_URL}/api/payments/cashfree/upi/order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -222,7 +223,7 @@ export default function EnhancedPaymentModal({
     setLoading(true);
     
     try {
-      const response = await fetch('https://trafficfrnd-2.onrender.com/api/payments/cashfree/upi/order', {
+      const response = await fetch(`${API_URL}/api/payments/cashfree/upi/order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -253,7 +254,7 @@ export default function EnhancedPaymentModal({
   const pollPaymentStatus = () => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`https://trafficfrnd-2.onrender.com/api/orders/${orderId}`, {
+        const response = await fetch(`${API_URL}/api/orders/${orderId}`, {
           headers: {
             'Authorization': `Bearer ${await getAuthToken()}`,
           },

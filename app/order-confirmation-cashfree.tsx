@@ -13,7 +13,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { fetchOrderDetails } from '@lib/services/orderService';
 
 const { width, height } = Dimensions.get('window');
-const API_BASE_URL = `${process.env.EXPO_PUBLIC_API_URL || 'https://trafficfrnd-2.onrender.com'}/api`;
+import { API_URL } from '@src/config';
+const API_BASE_URL = `${API_URL}/api`;
 
 export default function OrderConfirmationCashfreeScreen() {
   const params = useLocalSearchParams();

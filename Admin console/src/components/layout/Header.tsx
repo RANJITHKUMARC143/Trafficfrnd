@@ -48,7 +48,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     let socket: Socket | null = null;
     try {
       const token = localStorage.getItem('token') || '';
-      socket = io(import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com', {
+      socket = io(import.meta.env.VITE_API_URL || 'http://localhost:3000', {
         transports: ['websocket'],
         auth: { token, role: 'admin' },
       });

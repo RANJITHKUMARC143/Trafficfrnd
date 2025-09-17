@@ -74,7 +74,7 @@ const PartnersDelivery: React.FC = () => {
       setError('');
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/delivery`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/delivery`, {
           headers: { 'Authorization': token ? `Bearer ${token}` : '' }
         });
         const data = await res.json();
@@ -183,7 +183,7 @@ const PartnersDelivery: React.FC = () => {
     if (!window.confirm(`Are you sure you want to delete partner ${partner.fullName}?`)) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/delivery/${partner.id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/delivery/${partner.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
@@ -220,7 +220,7 @@ const PartnersDelivery: React.FC = () => {
     setFormError('');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/delivery/${form.id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/delivery/${form.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
         body: JSON.stringify(form)
@@ -242,7 +242,7 @@ const PartnersDelivery: React.FC = () => {
     setFormError('');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/delivery`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/delivery`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
         body: JSON.stringify(form)
@@ -372,7 +372,7 @@ const PartnersDelivery: React.FC = () => {
         onClick={async () => {
           try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://trafficfrnd-2.onrender.com'}/api/delivery/${row.id}`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/delivery/${row.id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
               body: JSON.stringify({ status: 'active', isActive: true })

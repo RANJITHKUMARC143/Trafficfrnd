@@ -2,7 +2,7 @@
 
 ## Summary of Changes Made
 
-All API URLs have been successfully updated from the remote server (`https://trafficfrnd-2.onrender.com`) to localhost (`http://localhost:3000`).
+All API URLs now default to environment variables and fall back to localhost (`http://localhost:3000`). Render URLs were removed.
 
 ### 🔧 Backend Changes
 - ✅ **`backend/config/db.js`** - Updated to use local MongoDB by default
@@ -10,35 +10,21 @@ All API URLs have been successfully updated from the remote server (`https://tra
 - ✅ **`backend/test-delivery-api.js`** - Updated test API base URL
 
 ### 📱 Main App Changes
-- ✅ **`src/config.ts`** - Updated API_URL to localhost
-- ✅ **`app/explore.tsx`** - Updated API_URL to localhost
-- ✅ **`app/services/socketService.ts`** - Updated socket URL to localhost
-- ✅ **`app/components/LocationPicker.tsx`** - Updated API_URL to localhost
-- ✅ **`app/services/alertService.ts`** - Updated API_URL to localhost
-- ✅ **`app/cart.tsx`** - Updated API URLs to localhost
-- ✅ **`app/(tabs)/map.tsx`** - Updated BACKEND_URL to localhost
-- ✅ **`app/order-details/[id].tsx`** - Updated API_BASE_URL to localhost
-- ✅ **`app/services/orderService.ts`** - Updated API_BASE_URL to localhost
+- ✅ **`src/config.ts`** - Centralized `API_URL` from env, default localhost
+- ✅ Use `API_URL` in services and components; removed Render fallbacks
 
 ### 🖥️ Admin Console Changes
-- ✅ **`Admin console/src/pages/Alerts.tsx`** - Updated API_URL to localhost
-- ✅ **`Admin console/src/pages/Login.tsx`** - Updated API URL to localhost
-- ✅ **`Admin console/src/pages/Register.tsx`** - Updated API URL to localhost
-- ✅ **`Admin console/src/pages/Orders.tsx`** - Updated all API URLs to localhost
-- ✅ **`Admin console/src/pages/partners/PartnersVendors.tsx`** - Updated all API URLs to localhost
-- ✅ **`Admin console/src/pages/partners/PartnersDelivery.tsx`** - Updated all API URLs to localhost
-- ✅ **`Admin console/src/pages/partners/DeliveryPartnerDetail.tsx`** - Updated all API URLs to localhost
-- ✅ **`Admin console/src/pages/partners/DeliveryPartnerDetailEnhanced.tsx`** - Updated all API URLs to localhost
-- ✅ **`Admin console/src/pages/partners/PartnersDeliveryEnhanced.tsx`** - Updated all API URLs to localhost
-- ✅ **`Admin console/src/pages/partners/VendorOrders.tsx`** - Updated all API URLs to localhost
-- ✅ **`Admin console/src/pages/users/UserCandidates.tsx`** - Updated all API URLs to localhost
+- ✅ All API uses `VITE_API_URL` with localhost fallback
 
 ### 🏪 Vendor App Changes
-- ✅ **`vendor-app/src/services/api.ts`** - Updated API_URL and SOCKET_URL to localhost
-- ✅ **`vendor-app/src/services/socketService.ts`** - Updated SOCKET_URL to localhost
+- ✅ API and socket use env, fallback to localhost
 
 ### 🚚 Delivery App Changes
-- ✅ **`Delivery_app/config/api.ts`** - Updated all API configurations to localhost
+- ✅ Config reads env; defaults to localhost
+
+## Env variables
+- Expo apps: `EXPO_PUBLIC_API_URL` (e.g., `http://localhost:3000`)
+- Vite Admin console: `VITE_API_URL` (e.g., `http://localhost:3000`)
 
 ## 🚀 How to Start the Local Setup
 

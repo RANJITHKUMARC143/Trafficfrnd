@@ -263,7 +263,21 @@ export default function ProfileScreen() {
         throw new Error('Server did not return valid JSON. See log for details.');
       }
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to login');
+        const serverMsg = (data && (data.message || data.error)) ? (data.message || data.error) : rawText;
+        let message = serverMsg || 'Failed to login';
+        const lower = String(message).toLowerCase();
+        if (
+          response.status === 400 ||
+          response.status === 401 ||
+          response.status === 404 ||
+          lower.includes('invalid') ||
+          lower.includes('not found') ||
+          lower.includes('no user') ||
+          lower.includes('incorrect')
+        ) {
+          message = 'User not found. Please sign up Traffic frnd.';
+        }
+        throw new Error(message);
       }
       if (!data.token || !data.user) {
         console.error('Invalid login response format:', data);

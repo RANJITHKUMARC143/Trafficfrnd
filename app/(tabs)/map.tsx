@@ -2,13 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, TouchableOpacity, Alert, Text, ScrollView, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { Marker, Circle, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from 'react-native-maps';
 import { router } from 'expo-router';
 import BottomNavigationBar from '@cmp/_components/BottomNavigationBar';
 import * as Location from 'expo-location';
 import { fetchDeliveryPoints } from '@lib/services/orderService';
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAW74HcfPLqNz7kmr7EK4LM6TTmCnJ3pXM';
+
+// Fast initial render: fallback location (Bengaluru city center)
+const DEFAULT_COORDS = { latitude: 12.9716, longitude: 77.5946 };
 
 // Configure Google Maps API key for react-native-maps
 if (Platform.OS === 'android') {
@@ -31,7 +34,7 @@ export default function MapScreen() {
   const [locationCoords, setLocationCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [deliveryPoints, setDeliveryPoints] = useState<DeliveryPoint[]>([]);
   const [selectedDeliveryPoint, setSelectedDeliveryPoint] = useState<DeliveryPoint | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showOverlay, setShowOverlay] = useState(true);
   const [mapReady, setMapReady] = useState(false);
@@ -49,35 +52,35 @@ export default function MapScreen() {
     const initializeMap = async () => {
       try {
         console.log('MapScreen: Initializing map...');
-        setLoading(true);
-        
-        // Get user's current location (no authentication required)
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-          console.log('MapScreen: Location permission denied');
-          setError('Location permission denied');
-          setLoading(false);
-          return;
-        }
+        // Kick off both tasks without blocking rendering
+        (async () => {
+          try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+              console.log('MapScreen: Location permission denied, using default coordinates');
+              setLocationCoords(DEFAULT_COORDS);
+              return;
+            }
+            const location = await Location.getCurrentPositionAsync({});
+            const coords = {
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+            };
+            setLocationCoords(coords);
+          } catch {
+            setLocationCoords(DEFAULT_COORDS);
+          }
+        })();
 
-        console.log('MapScreen: Getting current location...');
-        const location = await Location.getCurrentPositionAsync({});
-        const coords = {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-        };
-        console.log('MapScreen: Location obtained:', coords);
-        setLocationCoords(coords);
-        
-        // Fetch all delivery points (no authentication required)
-        console.log('MapScreen: Fetching delivery points...');
-        await fetchAllDeliveryPoints();
-        console.log('MapScreen: Initialization complete');
+        (async () => {
+          try {
+            await fetchAllDeliveryPoints();
+          } catch {}
+        })();
       } catch (error) {
         console.error('MapScreen: Error initializing map:', error);
-        setError('Failed to initialize map');
-      } finally {
-        setLoading(false);
+        // Fall back gracefully
+        if (!locationCoords) setLocationCoords(DEFAULT_COORDS);
       }
     };
 
@@ -236,8 +239,16 @@ export default function MapScreen() {
             .bindPopup('Your Location')
             .openPopup();
           
-          // Add delivery points markers
+          // Add delivery point zones and markers
           ${deliveryPoints.map(point => `
+            L.circle([${point.latitude}, ${point.longitude}], {
+              radius: 300,
+              color: '#4CAF50',
+              weight: 2,
+              fillColor: '#4CAF50',
+              fillOpacity: 0.15
+            }).addTo(map);
+
             L.marker([${point.latitude}, ${point.longitude}])
               .addTo(map)
               .bindPopup('${point.name}<br>${point.address}');
@@ -317,16 +328,6 @@ export default function MapScreen() {
     );
   };
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading map...</Text>
-        </View>
-      </View>
-    );
-  }
-
   if (error) {
     return (
       <View style={styles.container}>
@@ -368,93 +369,9 @@ export default function MapScreen() {
     );
   }
 
-  if (!locationCoords) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Ionicons name="location-outline" size={48} color="#ff6b6b" />
-          <Text style={styles.errorText}>Unable to get your location</Text>
-                    </View>
-                  </View>
-                );
-  }
-
   return (
     <View style={styles.container}>
-      {/* Enhanced debug info at top */}
-      <View style={{ position: 'absolute', top: 50, left: 10, backgroundColor: 'rgba(0,0,0,0.8)', padding: 8, borderRadius: 5, zIndex: 1000, maxWidth: 300 }}>
-        <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>
-          🗺️ Map Debug Info
-        </Text>
-        <Text style={{ color: 'white', fontSize: 9 }}>
-          Map: {mapReady ? '✅ Ready' : '⏳ Loading...'} | Location: ✅ | Points: {deliveryPoints.length}
-        </Text>
-        <Text style={{ color: 'white', fontSize: 8 }}>
-          API Key: {GOOGLE_MAPS_API_KEY.substring(0, 20)}...
-        </Text>
-        <Text style={{ color: 'white', fontSize: 8 }}>
-          Coords: {locationCoords ? `${locationCoords.latitude.toFixed(4)}, ${locationCoords.longitude.toFixed(4)}` : 'None'}
-        </Text>
-        <Text style={{ color: 'white', fontSize: 8 }}>
-          Provider: {useWebMap ? mapProvider.toUpperCase() : (useDefaultProvider ? 'Default' : 'Google Maps')}
-        </Text>
-        <Text style={{ color: 'white', fontSize: 8 }}>
-          {mapTilesLoaded ? '✅ Tiles loaded' : '⏳ Loading tiles...'}
-        </Text>
-        <Text style={{ color: 'white', fontSize: 8 }}>
-          {showFallbackMap ? '🔄 Using fallback view' : (useWebMap ? '🌐 Using web map' : (useDefaultProvider ? '🔄 Using fallback provider' : (mapError ? '❌ Map error detected' : '✅ API Key verified and working')))}
-        </Text>
-      </View>
-
-      {/* Toggle overlay button */}
-                <TouchableOpacity
-        style={{ position: 'absolute', top: 50, right: 10, backgroundColor: 'rgba(0,0,0,0.7)', padding: 8, borderRadius: 5, zIndex: 1000 }}
-        onPress={() => setShowOverlay(!showOverlay)}
-            >
-        <Ionicons name={showOverlay ? "eye-off" : "eye"} size={16} color="white" />
-          </TouchableOpacity>
-            
-      {/* Provider switch button */}
-      <TouchableOpacity 
-        style={{ position: 'absolute', top: 100, right: 10, backgroundColor: 'rgba(0,0,0,0.7)', padding: 8, borderRadius: 5, zIndex: 1000 }}
-        onPress={() => {
-          console.log('🔄 Switching map provider...');
-          if (useWebMap) {
-            // Switch between web map providers
-            setMapProvider(mapProvider === 'openstreetmap' ? 'mapbox' : 'openstreetmap');
-          } else {
-            // Switch between native providers
-            setUseDefaultProvider(!useDefaultProvider);
-          }
-          setMapReady(false);
-          setMapTilesLoaded(false);
-          setMapError(false);
-          setForceRender(prev => prev + 1);
-        }}
-      >
-        <Ionicons name="swap-horizontal" size={16} color="white" />
-      </TouchableOpacity>
-
-      {/* Reload map button */}
-      <TouchableOpacity 
-        style={{ position: 'absolute', top: 150, right: 10, backgroundColor: 'rgba(0,0,0,0.7)', padding: 8, borderRadius: 5, zIndex: 1000 }}
-        onPress={() => {
-          setMapReady(false);
-          setMapTilesLoaded(false);
-          setMapError(false);
-          // Force map to reload
-          if (mapRef.current) {
-            mapRef.current.animateToRegion({
-              latitude: locationCoords?.latitude || 0,
-              longitude: locationCoords?.longitude || 0,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            });
-          }
-        }}
-      >
-        <Ionicons name="refresh" size={16} color="white" />
-      </TouchableOpacity>
+      
 
 
               <MapView
@@ -463,14 +380,14 @@ export default function MapScreen() {
                 style={styles.map}
                 provider={useDefaultProvider ? PROVIDER_DEFAULT : PROVIDER_GOOGLE}
                 initialRegion={{
-                  latitude: locationCoords.latitude,
-                  longitude: locationCoords.longitude,
+              latitude: (locationCoords || DEFAULT_COORDS).latitude,
+              longitude: (locationCoords || DEFAULT_COORDS).longitude,
                   latitudeDelta: 0.01,
                   longitudeDelta: 0.01,
                 }}
                 region={{
-                  latitude: locationCoords.latitude,
-                  longitude: locationCoords.longitude,
+                  latitude: (locationCoords || DEFAULT_COORDS).latitude,
+                  longitude: (locationCoords || DEFAULT_COORDS).longitude,
                   latitudeDelta: 0.01,
                   longitudeDelta: 0.01,
                 }}
@@ -530,7 +447,7 @@ export default function MapScreen() {
               >
         {/* User's current location marker */}
                 <Marker
-                  coordinate={locationCoords}
+                  coordinate={(locationCoords || DEFAULT_COORDS) as { latitude: number; longitude: number }}
                   title="Your Location"
           description="You are here"
                 >
@@ -539,27 +456,37 @@ export default function MapScreen() {
                   </View>
                 </Marker>
 
-        {/* Delivery points markers */}
+        {/* Delivery point zones and markers */}
         {deliveryPoints.map((point) => {
           const distance = locationCoords ? calculateDistance(locationCoords, point) : 0;
           return (
-                  <Marker
-              key={point._id}
-                    coordinate={{
-                latitude: point.latitude,
-                longitude: point.longitude,
-              }}
-              title={point.name}
-              description={`${distance.toFixed(1)} km away`}
-              onPress={() => handleDeliveryPointPress(point)}
-            >
-              <View style={[
-                styles.deliveryPointMarker,
-                selectedDeliveryPoint?._id === point._id && styles.selectedDeliveryPointMarker
-              ]}>
-                <Ionicons name="storefront" size={20} color="#fff" />
-                    </View>
-                  </Marker>
+            <React.Fragment key={point._id}>
+              <Circle
+                key={`${point._id}-zone`}
+                center={{ latitude: point.latitude, longitude: point.longitude }}
+                radius={300}
+                strokeColor={'#4CAF50'}
+                strokeWidth={2}
+                fillColor={'rgba(76, 175, 80, 0.15)'}
+              />
+              <Marker
+                key={point._id}
+                coordinate={{
+                  latitude: point.latitude,
+                  longitude: point.longitude,
+                }}
+                title={point.name}
+                description={`${distance.toFixed(1)} km away`}
+                onPress={() => handleDeliveryPointPress(point)}
+              >
+                <View style={[
+                  styles.deliveryPointMarker,
+                  selectedDeliveryPoint?._id === point._id && styles.selectedDeliveryPointMarker
+                ]}>
+                  <Ionicons name="location" size={20} color="#fff" />
+                </View>
+              </Marker>
+            </React.Fragment>
           );
         })}
       </MapView>

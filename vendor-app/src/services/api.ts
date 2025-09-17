@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-export const API_URL = 'https://trafficfrnd-2.onrender.com';
+export const API_URL = (process as any).env?.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
 console.log('Using API URL:', API_URL);
 
@@ -37,6 +37,12 @@ api.interceptors.request.use(
   },
   (error) => {
     console.error('Request interceptor error:', error);
+    // Map invalid credentials to friendly message
+    const status = error.response?.status;
+    const msg = (error.response?.data?.message || error.message || '').toLowerCase();
+    if (status === 400 || status === 401 || msg.includes('invalid') || msg.includes('not found')) {
+      return Promise.reject({ message: 'User not found. Please sign up in the user app.' });
+    }
     return Promise.reject(error);
   }
 );
@@ -96,6 +102,11 @@ export const authService = {
       console.error('Login Error:', error);
       if (error.message === 'Network Error') {
         throw new Error('Unable to connect to the server. Please check your internet connection.');
+      }
+      const status = error.response?.status;
+      const msg = (error.response?.data?.message || error.message || '').toLowerCase();
+      if (status === 400 || status === 401 || msg.includes('invalid') || msg.includes('not found')) {
+        throw new Error('User not found. Please sign up in the user app.');
       }
       throw error.response?.data || { message: 'An error occurred during login' };
     }
@@ -178,5 +189,5 @@ export const updateVendorPushToken = async (expoPushToken: string) => {
 export default api; 
 
 class SocketService {
-  private readonly SOCKET_URL = 'https://trafficfrnd-2.onrender.com'; // Updated backend socket URL
+  private readonly SOCKET_URL = ((process as any).env?.EXPO_PUBLIC_API_URL || 'http://localhost:3000'); // Updated backend socket URL
 } 
