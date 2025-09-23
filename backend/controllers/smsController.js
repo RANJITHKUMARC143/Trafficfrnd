@@ -1,4 +1,4 @@
-const { sendSMS } = require('../services/cashfreeService');
+const { sendSMS } = require('../services/smsService');
 
 // Send payment link via SMS
 async function sendPaymentLink(req, res) {

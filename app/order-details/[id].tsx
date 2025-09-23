@@ -17,10 +17,10 @@ import { ThemedView } from '@cmp/ThemedView';
 import { useLocalSearchParams, router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker } from 'react-native-maps';
+// Removed Ionicons usage to avoid JSX type issues in this module
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { fetchOrderDetails } from '../../services/orderService';
+import { fetchOrderDetails, fetchUserOrders } from '../../services/orderService';
 import chatService from '../../services/chatService';
 import { sendClickToCall } from '../../services/callService';
 
@@ -71,6 +71,9 @@ interface Order {
     status: string;
     amount: number;
   };
+  user?: {
+    phone?: string;
+  };
 }
 
 export default function OrderDetailsScreen() {
@@ -78,6 +81,7 @@ export default function OrderDetailsScreen() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeOrders, setActiveOrders] = useState<Array<{ _id: string; status: string; updatedAt?: string | number; timestamp?: string | number }>>([]);
   const [messages, setMessages] = useState<Array<{
     id: string;
     text: string;
@@ -89,12 +93,31 @@ export default function OrderDetailsScreen() {
   const [deliveryBoyLocation, setDeliveryBoyLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isChatConnected, setIsChatConnected] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const [lastDeliveryUpdate, setLastDeliveryUpdate] = useState<number | null>(null);
+  const [heartbeat, setHeartbeat] = useState<number>(Date.now());
+
+  const isWithinLast24h = (d?: string | number) => {
+    if (!d) return false;
+    const ts = new Date(d).getTime();
+    if (isNaN(ts)) return false;
+    const now = Date.now();
+    return now - ts <= 24 * 60 * 60 * 1000;
+  };
 
   useEffect(() => {
     const fetchOrder = async () => {
       try {
         const data = await fetchOrderDetails(id as string);
         setOrder(data);
+        // If order is completed > 24h ago, exit tracking
+        try {
+          const completed = String(data?.status || '').toLowerCase() === 'completed';
+          const updated = data?.updatedAt || data?.timestamp;
+          if (completed && !isWithinLast24h(updated)) {
+            Alert.alert('Order archived', 'This order was completed more than a day ago. You can still find it in your profile/orders.');
+            router.replace('/orders');
+          }
+        } catch {}
         // Normalize delivery boy currentLocation from GeoJSON if available
         try {
           const coords = data?.deliveryBoyId?.currentLocation?.coordinates;
@@ -114,6 +137,54 @@ export default function OrderDetailsScreen() {
     };
     if (id) fetchOrder();
   }, [id]);
+
+  // Load user's active orders for switching
+  useFocusEffect(
+    React.useCallback(() => {
+      let mounted = true;
+      const loadActive = async () => {
+        try {
+          const all = await fetchUserOrders();
+          const active = (Array.isArray(all) ? all : []).filter((o: any) =>
+            {
+              const s = String(o?.status || '').toLowerCase();
+              if (['pending', 'confirmed', 'preparing', 'enroute', 'ready'].includes(s)) return true;
+              // Keep completed orders for 24h in the tracker
+              if (s === 'completed') {
+                const updated = o?.updatedAt || o?.timestamp;
+                return isWithinLast24h(updated);
+              }
+              return false;
+            }
+          );
+          // Sort latest first by updatedAt (fallback to timestamp)
+          active.sort((a: any, b: any) => {
+            const ad = new Date(a?.updatedAt || a?.timestamp || 0).getTime();
+            const bd = new Date(b?.updatedAt || b?.timestamp || 0).getTime();
+            return bd - ad;
+          });
+          if (mounted) setActiveOrders(active.map((o: any) => ({ _id: String(o._id), status: String(o.status || ''), updatedAt: o?.updatedAt, timestamp: o?.timestamp })));
+        } catch {}
+      };
+      loadActive();
+      return () => { mounted = false; };
+    }, [])
+  );
+
+  // If current order transitions to completed and becomes older than 24h, auto-exit on next mount
+  useEffect(() => {
+    if (!order) return;
+    const s = String(order.status || '').toLowerCase();
+    if (s === 'completed') {
+      const updated = order.updatedAt || order.timestamp;
+      if (!isWithinLast24h(updated)) {
+        try {
+          Alert.alert('Order archived', 'This order has been archived from tracking. View it in your profile/orders.');
+        } catch {}
+        router.replace('/orders');
+      }
+    }
+  }, [order?.status, order?.updatedAt]);
 
   const messageListenerRef = useRef<((message: any) => void) | null>(null);
   const historyKeyRef = useRef<string | null>(null);
@@ -166,18 +237,18 @@ export default function OrderDetailsScreen() {
 
         console.log('Chat socket connected, joining room:', id);
         setIsChatConnected(true);
-        // Join order-specific room
+        // Join order-specific room immediately for realtime status updates
         chatService.joinOrderRoom(id as string);
 
         // Set up event listeners
         chatService.onOrderStatusUpdate(({ orderId, status }) => {
           if (orderId === id) {
-            setOrder(prev => prev ? { ...prev, status } : null);
+            setOrder(prev => prev ? { ...prev, status } : prev);
           }
         });
 
         chatService.onLocationUpdate(({ deliveryBoyId, location }) => {
-          if (order?.deliveryBoyId?._id === deliveryBoyId) {
+          if (order?.deliveryBoyId?._id && String(order.deliveryBoyId._id) === String(deliveryBoyId)) {
             try {
               const coords = location?.coordinates || location?.coords || location;
               if (Array.isArray(coords) && coords.length >= 2) {
@@ -185,9 +256,11 @@ export default function OrderDetailsScreen() {
                 const lng = Number(coords[0]);
                 if (!isNaN(lat) && !isNaN(lng)) {
                   setDeliveryBoyLocation({ latitude: lat, longitude: lng });
+                  setLastDeliveryUpdate(Date.now());
                 }
               } else if (typeof location?.latitude === 'number' && typeof location?.longitude === 'number') {
                 setDeliveryBoyLocation({ latitude: location.latitude, longitude: location.longitude });
+                setLastDeliveryUpdate(Date.now());
               }
             } catch {}
           }
@@ -220,13 +293,10 @@ export default function OrderDetailsScreen() {
       }
     };
 
-    if (order?.deliveryBoyId?._id) {
-      console.log('Delivery boy assigned, initializing chat');
+    if (id) {
       initializeChat();
-    } else {
-      console.log('No delivery boy assigned yet, chat not initialized');
     }
-  }, [order?.deliveryBoyId, id]);
+  }, [id, order?.deliveryBoyId?._id]);
 
   useEffect(() => {
     const getCurrentLocation = async () => {
@@ -245,6 +315,39 @@ export default function OrderDetailsScreen() {
     };
 
     getCurrentLocation();
+  }, []);
+
+  // Live user location every 1s
+  useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
+    const start = async () => {
+      try {
+        const perm = await Location.getForegroundPermissionsAsync();
+        if (perm.status !== 'granted') return;
+        sub = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 1000,
+            distanceInterval: 0,
+          },
+          (loc) => {
+            const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+            setCurrentLocation(coords);
+            try {
+              if (id) chatService.updateUserLocation(String(id), coords);
+            } catch {}
+          }
+        );
+      } catch {}
+    };
+    start();
+    return () => { try { (sub as any)?.remove?.(); } catch {} };
+  }, []);
+
+  // Heartbeat for staleness UI
+  useEffect(() => {
+    const t = setInterval(() => setHeartbeat(Date.now()), 1000);
+    return () => clearInterval(t);
   }, []);
 
   const onRefresh = async () => {
@@ -374,7 +477,7 @@ export default function OrderDetailsScreen() {
   if (!order) {
     return (
       <ThemedView style={styles.centered}>
-        <Ionicons name="alert-circle" size={48} color="#F44336" />
+        <ThemedText style={{ fontSize: 48 }}>⚠️</ThemedText>
         <ThemedText style={styles.errorText}>Order not found</ThemedText>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ThemedText style={styles.backButtonText}>Go Back</ThemedText>
@@ -385,12 +488,47 @@ export default function OrderDetailsScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      {/* Compact banner when completed */}
+      {String(order.status || '').toLowerCase() === 'completed' && (
+        <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
+          <View style={{ backgroundColor: '#e8f5e9', borderColor: '#c8e6c9', borderWidth: 1, borderRadius: 10, padding: 12 }}>
+            <ThemedText style={{ color: '#2e7d32', fontWeight: '700' }}>Order delivered</ThemedText>
+            <ThemedText style={{ color: '#2e7d32' }}>
+              {`Completed at ${new Date(order.updatedAt || order.timestamp).toLocaleString()}`}
+            </ThemedText>
+          </View>
+        </View>
+      )}
       <ScrollView 
         style={styles.scrollView}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
+        {/* Active Orders Switcher */}
+        {activeOrders && activeOrders.length > 0 && (
+          <View style={styles.switcherContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {activeOrders.map((o) => {
+                const isActive = String(o._id) === String(id);
+                return (
+                  <TouchableOpacity
+                    key={o._id}
+                    style={[styles.switcherChip, isActive ? styles.switcherChipActive : null]}
+                    onPress={() => {
+                      if (!isActive) router.replace({ pathname: '/order-details/[id]', params: { id: o._id } });
+                    }}
+                  >
+                    <ThemedText style={[styles.switcherChipText, isActive ? styles.switcherChipTextActive : null]}
+                    >
+                      #{o._id.slice(-6)} • {String(o.status).toUpperCase()}
+                    </ThemedText>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
         {/* Order Status Header */}
         <View style={styles.statusHeader}>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
@@ -399,8 +537,8 @@ export default function OrderDetailsScreen() {
           <ThemedText style={styles.orderId}>Order #{order._id.slice(-8)}</ThemedText>
         </View>
 
-        {/* Map View */}
-        {(currentLocation || deliveryBoyLocation || (order.selectedDeliveryPoint?.latitude && order.selectedDeliveryPoint?.longitude)) && (
+        {/* Map View (hidden when completed) */}
+        {String(order.status || '').toLowerCase() !== 'completed' && (currentLocation || deliveryBoyLocation || (order.selectedDeliveryPoint?.latitude && order.selectedDeliveryPoint?.longitude)) && (
           <View style={styles.mapContainer}>
             <MapView
               style={styles.map}
@@ -426,7 +564,14 @@ export default function OrderDetailsScreen() {
                 <Marker
                   coordinate={deliveryBoyLocation}
                   title={`${order.deliveryBoyId?.fullName || 'Delivery Partner'}`}
-                  pinColor="#FF5722"
+                  description={(() => {
+                    const stale = lastDeliveryUpdate ? (Date.now() - lastDeliveryUpdate) > 30000 : true;
+                    return stale ? 'Location unavailable' : 'Live location';
+                  })()}
+                  pinColor={(() => {
+                    const stale = lastDeliveryUpdate ? (Date.now() - lastDeliveryUpdate) > 30000 : true;
+                    return stale ? '#9e9e9e' : '#FF5722';
+                  })()}
                 />
               )}
               {(typeof order.selectedDeliveryPoint?.latitude === 'number' && typeof order.selectedDeliveryPoint?.longitude === 'number') && (
@@ -439,7 +584,45 @@ export default function OrderDetailsScreen() {
                   pinColor="#2196F3"
                 />
               )}
+              {/* Polyline route between user and partner when both available and fresh */}
+              {(currentLocation && deliveryBoyLocation && lastDeliveryUpdate && (Date.now() - lastDeliveryUpdate) <= 30000) && (
+                <Polyline
+                  coordinates={[deliveryBoyLocation, currentLocation]}
+                  strokeColor="#1976D2"
+                  strokeWidth={4}
+                />
+              )}
             </MapView>
+            {/* Map gestures hint */}
+            <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}>
+              <ThemedText style={{ color: '#fff', fontSize: 12 }}>
+                🤏 Pinch to zoom • ☝️ Drag to move
+              </ThemedText>
+            </View>
+            {(currentLocation && deliveryBoyLocation) && (
+              <View style={{ position: 'absolute', bottom: 8, left: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', padding: 10, borderRadius: 8 }}>
+                <ThemedText style={{ color: '#fff', fontWeight: '700' }}>
+                  {(() => {
+                    const R = 6371e3;
+                    const toRad = (d: number) => (d * Math.PI) / 180;
+                    const φ1 = toRad(deliveryBoyLocation.latitude);
+                    const φ2 = toRad(currentLocation.latitude);
+                    const Δφ = toRad(currentLocation.latitude - deliveryBoyLocation.latitude);
+                    const Δλ = toRad(currentLocation.longitude - deliveryBoyLocation.longitude);
+                    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                    const d = R * c;
+                    const km = d / 1000;
+                    const speed = 6.94;
+                    const secs = Math.max(0, Math.round(d / speed));
+                    const mins = Math.floor(secs / 60);
+                    const rem = secs % 60;
+                    const stale = lastDeliveryUpdate ? (Date.now() - lastDeliveryUpdate) > 30000 : true;
+                    return `${km.toFixed(2)} km • ETA ${mins}m ${rem}s${stale ? ' • partner location stale' : ''}`;
+                  })()}
+                </ThemedText>
+              </View>
+            )}
           </View>
         )}
 
@@ -493,7 +676,7 @@ export default function OrderDetailsScreen() {
                 <View style={styles.deliveryPartnerHeader}>
                   <ThemedText style={styles.deliveryPartnerName}>{order.deliveryBoyId.fullName}</ThemedText>
                   <View style={styles.ratingContainer}>
-                    <Ionicons name="star" size={16} color="#FFD700" />
+                    <ThemedText style={{ color: '#FFD700', fontSize: 16 }}>★</ThemedText>
                     <ThemedText style={styles.rating}>{order.deliveryBoyId.rating.toFixed(1)}</ThemedText>
                   </View>
                 </View>
@@ -505,7 +688,7 @@ export default function OrderDetailsScreen() {
                 </ThemedText>
               </View>
               <TouchableOpacity style={styles.callButton} onPress={callDeliveryPartner}>
-                <Ionicons name="call" size={20} color="#fff" />
+                <ThemedText style={{ color: '#fff', fontSize: 18 }}>📞</ThemedText>
               </TouchableOpacity>
             </View>
           </View>
@@ -516,7 +699,7 @@ export default function OrderDetailsScreen() {
           <ThemedText style={styles.sectionTitle}>Delivery Details</ThemedText>
           {order.selectedDeliveryPoint && (
             <View style={styles.deliveryDetailRow}>
-              <Ionicons name="location" size={20} color="#2196F3" />
+              <ThemedText style={{ color: '#2196F3', fontSize: 18 }}>📍</ThemedText>
               <View style={styles.deliveryDetailInfo}>
                 <ThemedText style={styles.deliveryDetailTitle}>Delivery Point</ThemedText>
                 <ThemedText style={styles.deliveryDetailText}>{order.selectedDeliveryPoint.name}</ThemedText>
@@ -526,7 +709,7 @@ export default function OrderDetailsScreen() {
           )}
           {order.vehicleNumber && (
             <View style={styles.deliveryDetailRow}>
-              <Ionicons name="car" size={20} color="#4CAF50" />
+              <ThemedText style={{ color: '#4CAF50', fontSize: 18 }}>🚗</ThemedText>
               <View style={styles.deliveryDetailInfo}>
                 <ThemedText style={styles.deliveryDetailTitle}>Vehicle Number</ThemedText>
                 <ThemedText style={styles.deliveryDetailText}>{order.vehicleNumber}</ThemedText>
@@ -535,7 +718,7 @@ export default function OrderDetailsScreen() {
           )}
           {order.specialInstructions && (
             <View style={styles.deliveryDetailRow}>
-              <Ionicons name="document-text" size={20} color="#FF9800" />
+              <ThemedText style={{ color: '#FF9800', fontSize: 18 }}>📝</ThemedText>
               <View style={styles.deliveryDetailInfo}>
                 <ThemedText style={styles.deliveryDetailTitle}>Special Instructions</ThemedText>
                 <ThemedText style={styles.deliveryDetailText}>{order.specialInstructions}</ThemedText>
@@ -544,8 +727,8 @@ export default function OrderDetailsScreen() {
           )}
         </View>
 
-        {/* Chat Section */}
-        {order.deliveryBoyId && (
+        {/* Chat Section (hidden when completed) */}
+        {String(order.status || '').toLowerCase() !== 'completed' && order.deliveryBoyId && (
           <View style={styles.section}>
             <View style={styles.chatHeader}>
               <ThemedText style={styles.sectionTitle}>Send message to Delivery Partner</ThemedText>
@@ -554,7 +737,7 @@ export default function OrderDetailsScreen() {
                   styles.statusDot, 
                   { backgroundColor: isChatConnected ? '#4CAF50' : '#F44336' }
                 ]} />
-                <ThemedText style={styles.statusText}>
+                <ThemedText style={styles.connectionStatusText}>
                   {isChatConnected ? 'Connected' : 'Disconnected'}
                 </ThemedText>
               </View>
@@ -603,7 +786,7 @@ export default function OrderDetailsScreen() {
                   multiline
                 />
                 <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-                  <Ionicons name="send" size={20} color="#fff" />
+                  <ThemedText style={{ color: '#fff', fontSize: 16 }}>✈︎</ThemedText>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={[styles.sendButton, { backgroundColor: '#FF9800', marginLeft: 8 }]} 
@@ -618,7 +801,7 @@ export default function OrderDetailsScreen() {
                     console.log('Added test message:', testMessage);
                   }}
                 >
-                  <Ionicons name="chatbubble" size={20} color="#fff" />
+                  <ThemedText style={{ color: '#fff', fontSize: 16 }}>💬</ThemedText>
                 </TouchableOpacity>
               </View>
             </View>
@@ -633,6 +816,32 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  switcherContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  switcherChip: {
+    backgroundColor: '#e9ecef',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#dbe0e5',
+  },
+  switcherChipActive: {
+    backgroundColor: '#2196F3',
+    borderColor: '#2196F3',
+  },
+  switcherChipText: {
+    color: '#333',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  switcherChipTextActive: {
+    color: '#fff',
   },
   scrollView: {
     flex: 1,
@@ -695,7 +904,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   mapContainer: {
-    height: 200,
+    height: 320,
     marginHorizontal: 16,
     marginBottom: 10,
     borderRadius: 12,
@@ -743,7 +952,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginRight: 6,
   },
-  statusText: {
+  connectionStatusText: {
     fontSize: 12,
     color: '#666',
   },

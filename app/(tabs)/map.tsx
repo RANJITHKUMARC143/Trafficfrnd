@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, TouchableOpacity, Alert, Text, ScrollView, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, Circle, PROVIDER_GOOGLE, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { Marker, Circle, PROVIDER_GOOGLE, PROVIDER_DEFAULT, Polyline } from 'react-native-maps';
 import { router } from 'expo-router';
 import BottomNavigationBar from '@cmp/_components/BottomNavigationBar';
 import * as Location from 'expo-location';
-import { fetchDeliveryPoints } from '@lib/services/orderService';
+import { fetchDeliveryPoints, fetchUserOrders, fetchOrderDetails } from '@lib/services/orderService';
+import chatService from '../../services/chatService';
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAW74HcfPLqNz7kmr7EK4LM6TTmCnJ3pXM';
 
@@ -46,6 +47,10 @@ export default function MapScreen() {
   const [useWebMap, setUseWebMap] = useState(false);
   const [mapProvider, setMapProvider] = useState<'google' | 'default' | 'openstreetmap' | 'mapbox'>('google');
   const mapRef = useRef<MapView>(null);
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [deliveryBoyLocation, setDeliveryBoyLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [lastDeliveryUpdate, setLastDeliveryUpdate] = useState<number | null>(null);
+  const [deliveryPoint, setDeliveryPoint] = useState<{ latitude: number; longitude: number; name?: string } | null>(null);
 
   // Initialize location and fetch delivery points
   useEffect(() => {
@@ -77,6 +82,58 @@ export default function MapScreen() {
             await fetchAllDeliveryPoints();
           } catch {}
         })();
+
+        // Detect user's active order and wire realtime tracking on map
+        (async () => {
+          try {
+            const orders = await fetchUserOrders();
+            const list = Array.isArray(orders) ? orders : (orders?.orders || []);
+            const normalizeStatus = (s: any) => String(s || '').toLowerCase();
+            const candidates = (list || []).filter((o: any) => ['pending','confirmed','preparing','enroute','ready'].includes(normalizeStatus(o?.status)));
+            if (candidates.length > 0) {
+              // pick most recently updated
+              candidates.sort((a: any, b: any) => new Date(b?.updatedAt || b?.timestamp || 0).getTime() - new Date(a?.updatedAt || a?.timestamp || 0).getTime());
+              const chosen = candidates[0];
+              const chosenId = String(chosen?._id || chosen?.id || '');
+              if (chosenId) {
+                setActiveOrderId(chosenId);
+                // fetch order details to get selectedDeliveryPoint
+                try {
+                  const detail = await fetchOrderDetails(chosenId);
+                  const dp = detail?.selectedDeliveryPoint;
+                  const lat = Number(dp?.latitude ?? dp?.location?.coordinates?.[1]);
+                  const lng = Number(dp?.longitude ?? dp?.location?.coordinates?.[0]);
+                  if (!isNaN(lat) && !isNaN(lng)) {
+                    setDeliveryPoint({ latitude: lat, longitude: lng, name: String(dp?.name || 'Delivery Point') });
+                  }
+                } catch {}
+                try {
+                  const socket = await chatService.connect();
+                  if (socket) {
+                    chatService.joinOrderRoom(chosenId);
+                    // Subscribe to partner location updates
+                    chatService.onLocationUpdate(({ deliveryBoyId, location }) => {
+                      try {
+                        const coords = location?.coordinates || location?.coords || location;
+                        if (Array.isArray(coords) && coords.length >= 2) {
+                          const lat = Number(coords[1]);
+                          const lng = Number(coords[0]);
+                          if (!isNaN(lat) && !isNaN(lng)) {
+                            setDeliveryBoyLocation({ latitude: lat, longitude: lng });
+                            setLastDeliveryUpdate(Date.now());
+                          }
+                        } else if (typeof location?.latitude === 'number' && typeof location?.longitude === 'number') {
+                          setDeliveryBoyLocation({ latitude: location.latitude, longitude: location.longitude });
+                          setLastDeliveryUpdate(Date.now());
+                        }
+                      } catch {}
+                    });
+                  }
+                } catch {}
+              }
+            }
+          } catch {}
+        })();
       } catch (error) {
         console.error('MapScreen: Error initializing map:', error);
         // Fall back gracefully
@@ -86,6 +143,37 @@ export default function MapScreen() {
 
     initializeMap();
   }, []);
+
+  // Live user location every 1s and emit to socket when tracking active order
+  useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
+    let mounted = true;
+    (async () => {
+      try {
+        const perm = await Location.requestForegroundPermissionsAsync();
+        if (perm.status !== 'granted') return;
+        sub = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 1000,
+            distanceInterval: 0,
+          },
+          (loc) => {
+            if (!mounted) return;
+            const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+            setLocationCoords(coords);
+            if (activeOrderId) {
+              try { chatService.updateUserLocation(activeOrderId, coords); } catch {}
+            }
+          }
+        );
+      } catch {}
+    })();
+    return () => {
+      mounted = false;
+      try { (sub as any)?.remove?.(); } catch {}
+    };
+  }, [activeOrderId]);
 
   // Re-sort delivery points when location changes
   useEffect(() => {
@@ -196,7 +284,7 @@ export default function MapScreen() {
       `Do you want to explore items at ${point.name}?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Explore', onPress: () => router.push('/explore') }
+        { text: 'Search', onPress: () => router.push('/search') }
       ]
     );
   };
@@ -374,7 +462,7 @@ export default function MapScreen() {
       
 
 
-              <MapView
+      <MapView
                 key={`map-${useDefaultProvider ? 'default' : 'google'}-${forceRender}`}
                 ref={mapRef}
                 style={styles.map}
@@ -444,51 +532,96 @@ export default function MapScreen() {
                   console.log('🗺️ Map region change complete:', region);
                   console.log('🗺️ Map should be fully rendered now');
                 }}
-              >
-        {/* User's current location marker */}
-                <Marker
-                  coordinate={(locationCoords || DEFAULT_COORDS) as { latitude: number; longitude: number }}
-                  title="Your Location"
-          description="You are here"
-                >
-          <View style={styles.userLocationMarker}>
-            <Ionicons name="person" size={20} color="#fff" />
-                  </View>
-                </Marker>
-
-        {/* Delivery point zones and markers */}
-        {deliveryPoints.map((point) => {
-          const distance = locationCoords ? calculateDistance(locationCoords, point) : 0;
-          return (
-            <React.Fragment key={point._id}>
-              <Circle
-                key={`${point._id}-zone`}
-                center={{ latitude: point.latitude, longitude: point.longitude }}
-                radius={300}
-                strokeColor={'#4CAF50'}
-                strokeWidth={2}
-                fillColor={'rgba(76, 175, 80, 0.15)'}
-              />
+      >
+        {/* Live tracking when user has an active order */}
+        {activeOrderId ? (
+          <>
+            {locationCoords && (
               <Marker
-                key={point._id}
-                coordinate={{
-                  latitude: point.latitude,
-                  longitude: point.longitude,
-                }}
-                title={point.name}
-                description={`${distance.toFixed(1)} km away`}
-                onPress={() => handleDeliveryPointPress(point)}
+                coordinate={locationCoords}
+                title="Your Location"
+                description="You are here"
               >
-                <View style={[
-                  styles.deliveryPointMarker,
-                  selectedDeliveryPoint?._id === point._id && styles.selectedDeliveryPointMarker
-                ]}>
-                  <Ionicons name="location" size={20} color="#fff" />
+                <View style={styles.userLocationMarker}>
+                  <Ionicons name="person" size={20} color="#fff" />
                 </View>
               </Marker>
-            </React.Fragment>
-          );
-        })}
+            )}
+            {deliveryBoyLocation && (
+              <Marker
+                coordinate={deliveryBoyLocation}
+                title="Delivery Partner"
+                description={lastDeliveryUpdate && (Date.now() - lastDeliveryUpdate) > 30000 ? 'Location unavailable' : 'Live location'}
+              >
+                <View style={styles.partnerMarker}>
+                  <Ionicons name="bicycle" size={18} color="#fff" />
+                </View>
+              </Marker>
+            )}
+            {locationCoords && deliveryBoyLocation && lastDeliveryUpdate && (Date.now() - lastDeliveryUpdate) <= 30000 && (
+              <Polyline
+                coordinates={[deliveryBoyLocation, locationCoords]}
+                strokeColor="#1976D2"
+                strokeWidth={4}
+              />
+            )}
+            {deliveryPoint && (
+              <Marker
+                coordinate={deliveryPoint}
+                title={deliveryPoint.name || 'Delivery Point'}
+              >
+                <View style={styles.deliveryPointMarker}>
+                  <Ionicons name="flag" size={18} color="#fff" />
+                </View>
+              </Marker>
+            )}
+          </>
+        ) : (
+          // Default: show delivery points discovery map
+          <>
+            <Marker
+              coordinate={(locationCoords || DEFAULT_COORDS) as { latitude: number; longitude: number }}
+              title="Your Location"
+              description="You are here"
+            >
+              <View style={styles.userLocationMarker}>
+                <Ionicons name="person" size={20} color="#fff" />
+              </View>
+            </Marker>
+            {deliveryPoints.map((point) => {
+              const distance = locationCoords ? calculateDistance(locationCoords, point) : 0;
+              return (
+                <React.Fragment key={point._id}>
+                  <Circle
+                    key={`${point._id}-zone`}
+                    center={{ latitude: point.latitude, longitude: point.longitude }}
+                    radius={300}
+                    strokeColor={'#4CAF50'}
+                    strokeWidth={2}
+                    fillColor={'rgba(76, 175, 80, 0.15)'}
+                  />
+                  <Marker
+                    key={point._id}
+                    coordinate={{
+                      latitude: point.latitude,
+                      longitude: point.longitude,
+                    }}
+                    title={point.name}
+                    description={`${distance.toFixed(1)} km away`}
+                    onPress={() => handleDeliveryPointPress(point)}
+                  >
+                    <View style={[
+                      styles.deliveryPointMarker,
+                      selectedDeliveryPoint?._id === point._id && styles.selectedDeliveryPointMarker
+                    ]}>
+                      <Ionicons name="location" size={20} color="#fff" />
+                    </View>
+                  </Marker>
+                </React.Fragment>
+              );
+            })}
+          </>
+        )}
       </MapView>
 
       {/* Web-based map when native maps fail */}
@@ -575,7 +708,7 @@ export default function MapScreen() {
       )}
 
       {/* Delivery points list overlay */}
-      {showOverlay && (
+      {showOverlay && !activeOrderId && (
       <View style={styles.overlay}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Delivery Points</Text>

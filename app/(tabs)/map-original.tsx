@@ -1189,7 +1189,7 @@ export default function MapScreen() {
       'Do you want to explore items now?',
       [
         { text: 'No', style: 'cancel' },
-        { text: 'Yes', onPress: () => router.push('/explore') }
+        { text: 'Yes', onPress: () => router.push('/search') }
       ]
     );
   };

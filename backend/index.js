@@ -928,6 +928,8 @@ app.get('/api/test', (req, res) => {
 });
 
 app.use('/api/delivery-points', require('./routes/deliveryPointRoutes'));
+// Payments
+app.use('/api/payments', require('./routes/paymentRoutes'));
 
 // Click-to-call proxy route
 app.use('/api/call', require('./routes/callRoutes'));

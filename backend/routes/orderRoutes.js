@@ -2,7 +2,7 @@ console.log('[DEBUG] orderRoutes.js loaded');
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const { getOrders, getOrderById, updateOrderStatus, getOrdersByStatus, createOrder, getAvailableOrders } = require('../controllers/orderController');
+const { getOrders, getOrderById, updateOrderStatus, getOrdersByStatus, createOrder, getAvailableOrders, startTowardsDeliveryPoint } = require('../controllers/orderController');
 const { quoteDeliveryFee } = require('../services/quoteService');
 const Order = require('../models/Order');
 const User = require('../models/User');
@@ -164,5 +164,8 @@ router.post('/admin', auth, (req, res, next) => {
   }
   next();
 }, createOrder);
+
+// Driver starts movement towards selected delivery point (Let's Go)
+router.post('/:orderId/checkpoint', auth, startTowardsDeliveryPoint);
 
 module.exports = router; 

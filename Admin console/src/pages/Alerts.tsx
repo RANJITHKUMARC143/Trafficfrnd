@@ -20,7 +20,7 @@ const RECIPIENT_TYPES = [
   { value: 'delivery', label: 'Delivery Boy' },
 ];
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = 'http://localhost:3000';
 
 function getInitials(name) {
   if (!name) return '?';

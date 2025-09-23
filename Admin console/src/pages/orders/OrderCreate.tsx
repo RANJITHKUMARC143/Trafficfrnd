@@ -27,7 +27,7 @@ const OrderCreate: React.FC = () => {
   const [paymentLink, setPaymentLink] = useState('');
   const [generatingPaymentLink, setGeneratingPaymentLink] = useState(false);
 
-  const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  const API = 'http://localhost:3000';
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -111,7 +111,7 @@ const OrderCreate: React.FC = () => {
         method: paymentMethod,
         status: 'pending',
         amount: totalAmount,
-        gateway: paymentMethod === 'online' ? 'cashfree' : null
+        gateway: paymentMethod === 'online' ? 'razorpay' : null
       };
       
       const res = await fetch(`${API}/api/orders/admin`, {
@@ -180,26 +180,19 @@ const OrderCreate: React.FC = () => {
   };
 
   const sendPaymentLinkViaSMS = async () => {
-    if (!paymentLink || !customerPhone) return;
-    
+    if (!createdOrder?._id) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${API}/api/sms/send-payment-link`, {
+      const res = await fetch(`${API}/api/payments/payment-link/notify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-        body: JSON.stringify({ 
-          phone: customerPhone, 
-          paymentLink, 
-          orderId: createdOrder?._id,
-          customerName: customerName || 'Customer'
-        })
+        body: JSON.stringify({ orderId: createdOrder._id, medium: 'sms' })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to send SMS');
-      
-      alert('Payment link sent successfully via SMS!');
+      if (!res.ok) throw new Error(data.message || 'Failed to notify via Razorpay');
+      alert('Razorpay is sending the payment link via SMS.');
     } catch (e: any) {
-      alert(`Failed to send SMS: ${e.message}`);
+      alert(`Failed to request SMS via Razorpay: ${e.message}`);
     }
   };
 

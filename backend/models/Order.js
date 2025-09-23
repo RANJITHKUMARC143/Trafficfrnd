@@ -165,19 +165,20 @@ const orderSchema = new mongoose.Schema({
   },
   // Payment information
   payment: {
-    method: { type: String, enum: ['cod', 'online', 'cashfree'], default: 'cod' },
+    method: { type: String, enum: ['cod', 'online', 'razorpay'], default: 'cod' },
     status: { type: String, enum: ['pending', 'paid', 'failed', 'refunded'], default: 'pending' },
     amount: { type: Number, default: 0 },
-    gateway: { type: String, enum: ['cashfree', null], default: null },
+    gateway: { type: String, enum: ['razorpay', null], default: null },
     gatewayOrderId: { type: String },
     gatewayPaymentId: { type: String },
     signature: { type: String },
     paidAt: { type: Date },
-    // Cashfree specific fields
-    paymentLink: { type: String }, // For UPI payment links
+    // Razorpay specific fields
+    paymentLink: { type: String }, // For payment links
+    paymentLinkId: { type: String }, // Razorpay payment link id
     paymentSessionId: { type: String }, // For mobile SDK sessions
     upiId: { type: String }, // Customer's UPI ID
-    cfPaymentId: { type: String }, // Cashfree payment ID
+    razorpayPaymentId: { type: String }, // Razorpay payment ID
     refund: {
       amount: { type: Number, default: 0 },
       id: { type: String },

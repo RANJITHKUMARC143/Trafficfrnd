@@ -47,11 +47,12 @@ CORS_ORIGIN=*
 CORS_ORIGIN=https://yourdomain.com,https://admin.yourdomain.com
 ```
 
-### 5. Optional: Payment Integration (Cashfree)
+### 5. Optional: Payment Integration (Razorpay)
 ```
-CASHFREE_APP_ID=your_cashfree_app_id
-CASHFREE_SECRET_KEY=your_cashfree_secret_key
-CASHFREE_ENVIRONMENT=sandbox
+RAZORPAY_KEY_ID=your_razorpay_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+RAZORPAY_ENVIRONMENT=sandbox
+RAZORPAY_WEBHOOK_SECRET=your_razorpay_webhook_secret
 ```
 
 ### 6. Optional: SMS Integration
@@ -76,9 +77,10 @@ PORT=10000
 MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/trafficfrnd?retryWrites=true&w=majority
 JWT_SECRET=your_very_secure_random_string_here_make_it_long_and_complex_at_least_32_characters
 CORS_ORIGIN=*
-CASHFREE_APP_ID=your_cashfree_app_id
-CASHFREE_SECRET_KEY=your_cashfree_secret_key
-CASHFREE_ENVIRONMENT=sandbox
+RAZORPAY_KEY_ID=your_razorpay_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+RAZORPAY_ENVIRONMENT=sandbox
+RAZORPAY_WEBHOOK_SECRET=your_razorpay_webhook_secret
 SMS_API_KEY=your_sms_api_key
 SMS_SENDER_ID=your_sender_id
 MAX_FILE_SIZE=5242880

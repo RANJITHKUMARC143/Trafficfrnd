@@ -455,6 +455,17 @@ const createOrder = async (req, res) => {
       };
     }
 
+    // Normalize/guard payment payload
+    const paymentPayload = (() => {
+      const base = payment && typeof payment === 'object' ? { ...payment } : {};
+      if (!base.method) base.method = 'cod';
+      if (!base.status) base.status = 'pending';
+      if (typeof base.amount !== 'number') base.amount = 0;
+      if (base.method === 'online') base.gateway = 'razorpay'; // enforce Razorpay for online flow
+      if (!base.refund || typeof base.refund !== 'object') base.refund = { amount: 0, id: null, at: null };
+      return base;
+    })();
+
     const order = new Order({
       vendorId: vendorObjectId || undefined,
       routeId: routeObjectId || undefined,
@@ -477,13 +488,7 @@ const createOrder = async (req, res) => {
       updatedAt: new Date(),
       user: orderUserId,
       selectedDeliveryPoint: processedDeliveryPoint || undefined,
-      payment: payment || { 
-        method: 'cod', 
-        status: 'pending', 
-        amount: 0, 
-        gateway: null,
-        refund: { amount: 0, id: null, at: null }
-      }
+      payment: paymentPayload
     });
 
     await order.save();
@@ -675,6 +680,53 @@ const getAvailableOrders = async (req, res) => {
   }
 };
 
+// Driver starts towards the selected delivery point ("Let's Go")
+const startTowardsDeliveryPoint = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { location, checkpoint } = req.body || {};
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Unauthorized: No user found' });
+    }
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    // Only assigned delivery boy or vendor can trigger movement; prefer delivery boy
+    const isAssignedDeliveryBoy = order.deliveryBoyId && order.deliveryBoyId.toString() === String(req.user._id);
+    const isVendorOwner = order.vendorId && order.vendorId.toString() === String(req.user._id);
+    if (!isAssignedDeliveryBoy && !isVendorOwner && req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ message: 'Forbidden: Not your order' });
+    }
+    // Update driver location if provided
+    if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
+      order.locations.deliveryBoy = {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        address: location.address || await getAddressFromCoordinates(location.latitude, location.longitude),
+        timestamp: new Date()
+      };
+    }
+    // Transition to enroute when driver starts
+    if (checkpoint === 'driver_started') {
+      order.status = 'enroute';
+      order.updatedAt = Date.now();
+    }
+    await order.save();
+    // Emit event for realtime consumers
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`order_${String(order._id)}`).emit('orderStatusUpdated', { orderId: String(order._id), status: order.status });
+        if (order.deliveryBoyId) io.to(`deliveryBoy:${String(order.deliveryBoyId)}`).emit('orderStatusUpdated', { orderId: String(order._id), status: order.status });
+        io.emit('adminOrderStatusUpdated', { orderId: String(order._id), status: order.status });
+      }
+    } catch {}
+    res.json({ success: true, order });
+  } catch (error) {
+    console.error('startTowardsDeliveryPoint error:', error);
+    res.status(500).json({ message: 'Failed to update checkpoint', error: error.message });
+  }
+};
+
 module.exports = {
   getOrders,
   getOrderById,
@@ -684,4 +736,5 @@ module.exports = {
   getUserOrders,
   updateDeliveryBoyLocation,
   getAvailableOrders,
+  startTowardsDeliveryPoint,
 }; 

@@ -46,7 +46,7 @@ const Payments: React.FC = () => {
       try {
         setLoading(true);
         setError('');
-        const baseUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+        const baseUrl = 'http://localhost:3000';
         const token = localStorage.getItem('token') || '';
 
         // Use vendor orders as transactions proxy for now

@@ -13,6 +13,8 @@ export default function MapScreen() {
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
+  const [customerLocation, setCustomerLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const mapRef = React.useRef<MapView | null>(null);
 
   // Extract delivery location from params if present
   const deliveryLat = params.deliveryLat ? Number(params.deliveryLat) : null;
@@ -21,7 +23,9 @@ export default function MapScreen() {
 
   useEffect(() => {
     // Connect to socket with user info
-    connectSocket(user);
+    try {
+      connectSocket(user);
+    } catch {}
 
     // Request location permissions
     (async () => {
@@ -50,8 +54,8 @@ export default function MapScreen() {
     const locationSubscription = Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.High,
-        timeInterval: 5000,
-        distanceInterval: 10,
+        timeInterval: 1000,
+        distanceInterval: 0,
       },
       (newLocation) => {
         setLocation(newLocation);
@@ -83,14 +87,36 @@ export default function MapScreen() {
           )
         );
       });
+
+      socket.on('userLocationUpdated', ({ orderId: oId, location }: any) => {
+        try {
+          if (!location || typeof location.latitude !== 'number' || typeof location.longitude !== 'number') return;
+          setCustomerLocation({ latitude: Number(location.latitude), longitude: Number(location.longitude) });
+          try {
+            // Fit map to both markers for quick visual recognition
+            if (mapRef.current && location && (location.latitude || location.longitude) && (location.latitude !== null)) {
+              const coords = [
+                { latitude: location.latitude, longitude: location.longitude },
+                location && location.latitude ? { latitude: location.latitude, longitude: location.longitude } : undefined,
+              ].filter(Boolean) as any;
+              // include current device (delivery) location if available
+              if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
+                // currentLocation is from state
+                if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {}
+              }
+            }
+          } catch {}
+        } catch {}
+      });
     }
 
     // Cleanup
     return () => {
-      locationSubscription.then((sub) => sub.remove());
+      try { locationSubscription.then((sub) => sub.remove()); } catch {}
       if (socket) {
         socket.off('orderCreated');
         socket.off('orderStatusUpdated');
+        socket.off('userLocationUpdated');
       }
     };
   }, [user?.id]);
@@ -101,7 +127,8 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
-          <MapView
+      <MapView
+        ref={(r) => (mapRef.current = r)}
         provider={PROVIDER_GOOGLE}
             style={styles.map}
         initialRegion={{
@@ -123,6 +150,15 @@ export default function MapScreen() {
           description="You are here"
         />
 
+        {/* Customer live location marker (when provided) */}
+        {customerLocation && (
+          <Marker
+            coordinate={customerLocation}
+            title="Customer Location"
+            pinColor="#2196F3"
+          />
+        )}
+
         {/* Delivery location marker if params present */}
         {deliveryLat && deliveryLng && (
           <Marker
@@ -133,19 +169,31 @@ export default function MapScreen() {
           />
         )}
 
-        {/* Order markers (fallback for all orders) */}
-        {!deliveryLat && !deliveryLng && orders.map((order) => (
-            <Marker
-            key={order._id}
-            coordinate={{
-              latitude: order.pickupLocation.coordinates[1],
-              longitude: order.pickupLocation.coordinates[0],
-            }}
-            title={`Order #${order._id}`}
-            description={`Status: ${order.status}`}
-            pinColor={order.status === 'pending' ? 'red' : 'green'}
-          />
-        ))}
+        {/* Order markers (fallback for all orders) - guard missing coordinates */}
+        {!deliveryLat && !deliveryLng && !customerLocation && orders.map((order) => {
+          const anyOrder: any = order as any;
+          // Prefer explicit pickupLocation if available
+          let coords: any = anyOrder?.pickupLocation?.coordinates;
+          // Fallbacks: vendor location or selected delivery point GeoJSON if available
+          if (!Array.isArray(coords)) coords = anyOrder?.vendorId?.location?.coordinates;
+          if (!Array.isArray(coords)) coords = anyOrder?.selectedDeliveryPoint?.location?.coordinates;
+          if (Array.isArray(coords) && coords.length >= 2) {
+            const lng = Number(coords[0]);
+            const lat = Number(coords[1]);
+            if (!isNaN(lat) && !isNaN(lng)) {
+              return (
+                <Marker
+                  key={order._id}
+                  coordinate={{ latitude: lat, longitude: lng }}
+                  title={`Order #${order._id}`}
+                  description={`Status: ${order.status}`}
+                  pinColor={order.status === 'pending' ? 'red' : 'green'}
+                />
+              );
+            }
+          }
+          return null;
+        })}
       </MapView>
       </View>
   );

@@ -28,7 +28,7 @@ const Settings: React.FC = () => {
 
   const loadRestaurantPhoneNumber = async () => {
     try {
-      const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+      const API_URL = 'http://localhost:3000';
       const response = await fetch(`${API_URL}/api/settings/phone-number`);
       if (response.ok) {
         const data = await response.json();
@@ -42,7 +42,7 @@ const Settings: React.FC = () => {
   const saveRestaurantPhoneNumber = async () => {
     setSaveStatus('saving');
     try {
-      const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+      const API_URL = 'http://localhost:3000';
       const response = await fetch(`${API_URL}/api/settings/phone-number`, {
         method: 'PUT',
         headers: {

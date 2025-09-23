@@ -41,11 +41,15 @@ export default function OrdersScreen() {
   if (activeTab === 'active') {
     // Active: orders assigned to me and not in a terminal state
     const activeStatuses = ['pending', 'confirmed', 'enroute', 'preparing', 'ready'];
-    filteredOrders = orders.filter(order => toId(order.deliveryBoyId) === myId && activeStatuses.includes(normStatus(order.status)));
+    filteredOrders = orders
+      .filter(order => toId(order.deliveryBoyId) === myId && activeStatuses.includes(normStatus(order.status)))
+      .sort((a, b) => new Date(b.updatedAt || b.timestamp || 0).getTime() - new Date(a.updatedAt || a.timestamp || 0).getTime());
   } else if (activeTab === 'completed') {
     // Completed: terminal states
     const completedStatuses = ['completed', 'delivered', 'canceled', 'cancelled'];
-    filteredOrders = orders.filter(order => toId(order.deliveryBoyId) === myId && completedStatuses.includes(normStatus(order.status)));
+    filteredOrders = orders
+      .filter(order => toId(order.deliveryBoyId) === myId && completedStatuses.includes(normStatus(order.status)))
+      .sort((a, b) => new Date(b.updatedAt || b.timestamp || 0).getTime() - new Date(a.updatedAt || a.timestamp || 0).getTime());
   } else if (activeTab === 'available') {
     // Available: unassigned AND pending only (defensive against odd API values)
     filteredOrders = orders.filter(order => {

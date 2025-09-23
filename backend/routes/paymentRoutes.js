@@ -2,35 +2,27 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const { 
-  createCashfreeUPIOrder,
-  createCashfreePaymentSession,
-  verifyCashfreePayment,
-  cashfreeWebhook,
-  createPaymentLinkController,
-  getPaymentMethods
+  createRazorpayOrderController,
+  verifyRazorpayPaymentController,
+  razorpayWebhook,
+  getPaymentMethods,
+  getPaymentConfig,
+  generatePaymentLinkController,
+  notifyPaymentLinkController
 } = require('../controllers/paymentController');
 
-// Client needs key id to init SDK (no secret)
-router.get('/config', (req, res) => {
-  res.json({ 
-    cashfreeClientId: process.env.CASHFREE_CLIENT_ID || '',
-    environment: process.env.CASHFREE_ENVIRONMENT || 'sandbox'
-  });
-});
+// Get payment configuration
+router.get('/config', getPaymentConfig);
 
-// Cashfree routes
-router.post('/cashfree/upi/order', auth, createCashfreeUPIOrder);
-router.post('/cashfree/session', auth, createCashfreePaymentSession);
-router.post('/cashfree/verify', auth, verifyCashfreePayment);
-router.post('/cashfree/webhook', cashfreeWebhook);
+// Razorpay routes
+router.post('/razorpay/order', auth, createRazorpayOrderController);
+router.post('/razorpay/verify', auth, verifyRazorpayPaymentController);
+// Razorpay requires raw body to verify signature
+router.post('/razorpay/webhook', express.raw({ type: 'application/json' }), razorpayWebhook);
+
+// Payment link route
+router.post('/payment-link', auth, generatePaymentLinkController);
+router.post('/payment-link/notify', auth, notifyPaymentLinkController);
 router.get('/methods', getPaymentMethods);
 
-// UPI Payment Link route for admin console (legacy)
-router.post('/upi-link', auth, createCashfreeUPIOrder);
-
-// Official Payment Links API route
-router.post('/payment-link', auth, createPaymentLinkController);
-
 module.exports = router;
-
-

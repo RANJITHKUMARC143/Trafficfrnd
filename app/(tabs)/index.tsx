@@ -581,7 +581,7 @@ export default function HomeScreen() {
     // Only allow navigation for the first 4 categories
     if ([1, 2, 3, 4].includes(category.id)) {
       router.push({
-        pathname: '/explore',
+        pathname: '/search',
         params: { category: category.name }
       });
     }
@@ -1653,7 +1653,7 @@ export default function HomeScreen() {
         <View style={styles.modernRecommendedSection}> 
           <View style={styles.sectionHeader}>
             <ThemedText style={styles.modernSectionTitle}>Recommended for You</ThemedText>
-            <TouchableOpacity onPress={() => router.push('/explore')}>
+            <TouchableOpacity onPress={() => router.push('/search')}>
               <ThemedText style={styles.viewAllText}>View All</ThemedText>
             </TouchableOpacity>
           </View>
@@ -1748,7 +1748,7 @@ export default function HomeScreen() {
         <View style={styles.modernTopRatedSection}> 
           <View style={styles.sectionHeader}>
             <ThemedText style={styles.modernSectionTitle}>Top Rated Items</ThemedText>
-            <TouchableOpacity onPress={() => router.push('/explore')}>
+            <TouchableOpacity onPress={() => router.push('/search')}>
               <ThemedText style={styles.viewAllText}>View All</ThemedText>
             </TouchableOpacity>
           </View>

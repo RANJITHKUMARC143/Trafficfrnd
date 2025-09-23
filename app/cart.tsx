@@ -52,18 +52,18 @@ export default function CartScreen() {
   const [suggestedDeliveryPoints, setSuggestedDeliveryPoints] = useState<any[]>([]);
   const [deliveryFeeQuote, setDeliveryFeeQuote] = useState<{ fee?: number; breakdown?: any } | null>(null);
   const [quoting, setQuoting] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'cashfree'>('cod');
-  const [cashfreeClientId, setCashfreeClientId] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'razorpay'>('cod');
+  const [razorpayKeyId, setRazorpayKeyId] = useState<string | null>(null);
 
   // Load payment configuration to decide which payment options to enable
   useEffect(() => {
     (async () => {
       try {
         const cfg = await getPaymentConfig();
-        const cashfreeClientId = cfg?.cashfreeClientId || '';
-        setCashfreeClientId(cashfreeClientId || null);
+        const razorpayKeyId = cfg?.razorpayKeyId || '';
+        setRazorpayKeyId(razorpayKeyId || null);
       } catch {
-        setCashfreeClientId(null);
+        setRazorpayKeyId(null);
       }
     })();
   }, []);
@@ -480,8 +480,8 @@ export default function CartScreen() {
         selectedDeliveryPoint: deliveryPoint // Add selected delivery point to order data
       };
       console.log('Order payload:', orderData);
-      if (paymentMethod === 'cashfree' && !cashfreeClientId) {
-        Alert.alert('UPI payment unavailable', 'Cashfree key not configured. Please select Cash on Delivery.');
+      if (paymentMethod === 'razorpay' && !razorpayKeyId) {
+        Alert.alert('Online payment unavailable', 'Razorpay key not configured. Please select Cash on Delivery.');
         return;
       }
       const order = await createOrder({ ...orderData, payment: { method: paymentMethod } });
@@ -489,7 +489,7 @@ export default function CartScreen() {
       setCartItems([]);
       setVehicleNumber('');
       // Navigate to appropriate order confirmation page based on payment method
-      const confirmationPath = paymentMethod === 'cashfree' ? '/order-confirmation-cashfree' : '/order-confirmation';
+      const confirmationPath = paymentMethod === 'razorpay' ? '/order-confirmation-razorpay' : '/order-confirmation';
       router.push({
         pathname: confirmationPath,
         params: {
@@ -578,7 +578,7 @@ export default function CartScreen() {
             data={cartItems}
             renderItem={renderItem}
             keyExtractor={item => item.id}
-            contentContainerStyle={[styles.cartList, { paddingBottom: 220 }]}
+            contentContainerStyle={[styles.cartList, { paddingBottom: 24 }]}
             ListFooterComponent={() => (
               <View style={{ paddingBottom: 8 }}>
                 <View style={styles.couponRow}>
@@ -701,23 +701,23 @@ export default function CartScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => {
-                        if (!cashfreeClientId) {
-                          Alert.alert('UPI payment unavailable', 'Cashfree key not configured. Please choose Cash on Delivery.');
+                        if (!razorpayKeyId) {
+                          Alert.alert('Online payment unavailable', 'Razorpay key not configured. Please choose Cash on Delivery.');
                           return;
                         }
-                        setPaymentMethod('cashfree');
+                        setPaymentMethod('razorpay');
                       }}
                       style={{ 
                         paddingVertical: 8, 
                         paddingHorizontal: 12, 
                         borderRadius: 10, 
                         borderWidth: 1, 
-                        borderColor: paymentMethod==='cashfree' ? '#4CAF50' : '#e5e7eb', 
-                        backgroundColor: paymentMethod==='cashfree' ? '#e8f5e8' : (!cashfreeClientId ? '#f9fafb' : '#fff'), 
-                        opacity: !cashfreeClientId ? 0.6 : 1 
+                        borderColor: paymentMethod==='razorpay' ? '#4CAF50' : '#e5e7eb', 
+                        backgroundColor: paymentMethod==='razorpay' ? '#e8f5e8' : (!razorpayKeyId ? '#f9fafb' : '#fff'), 
+                        opacity: !razorpayKeyId ? 0.6 : 1 
                       }}
                     >
-                      <ThemedText>UPI (Cashfree){!cashfreeClientId ? ' — coming soon' : ''}</ThemedText>
+                      <ThemedText>Online Payment (Razorpay){!razorpayKeyId ? ' — coming soon' : ''}</ThemedText>
                     </TouchableOpacity>
                   </View>
                   <TextInput
@@ -736,30 +736,29 @@ export default function CartScreen() {
                     <ThemedText style={styles.confirmButtonText}>Confirm & Place Order</ThemedText>
                   </TouchableOpacity>
                 </View>
+                {/* Price breakdown moved into scrollable footer */}
+                <View style={{ paddingHorizontal: 20, paddingTop: 10 }}>
+                  <View style={styles.breakdownRow}><ThemedText style={styles.breakdownLabel}>MRP</ThemedText><ThemedText style={styles.breakdownValue}>₹{calculateMrpTotal().toFixed(2)}</ThemedText></View>
+                  <View style={styles.breakdownRow}><ThemedText style={styles.breakdownLabel}>Discount</ThemedText><ThemedText style={[styles.breakdownValue, { color: '#2e7d32' }]}>-₹{calculateSavings().toFixed(2)}</ThemedText></View>
+                  <View style={styles.breakdownRow}>
+                    <ThemedText style={styles.breakdownLabel}>Delivery Fee</ThemedText>
+                    <ThemedText style={styles.breakdownValue}>
+                      {typeof deliveryFeeQuote?.fee === 'number' ? `₹${deliveryFeeQuote.fee.toFixed(2)}` : '—'}
+                    </ThemedText>
+                  </View>
+                  <View style={[styles.totalContainer, { marginTop: 6 }]}>
+                    <ThemedText style={styles.totalLabel}>Grand Total</ThemedText>
+                    <ThemedText style={styles.totalAmount}>
+                      ₹{(
+                        calculateTotal() + (typeof deliveryFeeQuote?.fee === 'number' ? deliveryFeeQuote.fee : 0)
+                      ).toFixed(2)}
+                    </ThemedText>
+                  </View>
+                </View>
               </View>
             )}
           />
-          <View style={styles.footerSticky}>
-            <View style={styles.breakdownRow}><ThemedText style={styles.breakdownLabel}>MRP</ThemedText><ThemedText style={styles.breakdownValue}>₹{calculateMrpTotal().toFixed(2)}</ThemedText></View>
-            <View style={styles.breakdownRow}><ThemedText style={styles.breakdownLabel}>Discount</ThemedText><ThemedText style={[styles.breakdownValue, { color: '#2e7d32' }]}>-₹{calculateSavings().toFixed(2)}</ThemedText></View>
-            {/* Delivery Fee (separate) */}
-            <View style={styles.breakdownRow}>
-              <ThemedText style={styles.breakdownLabel}>Delivery Fee</ThemedText>
-              <ThemedText style={styles.breakdownValue}>
-                {typeof deliveryFeeQuote?.fee === 'number' ? `₹${deliveryFeeQuote.fee.toFixed(2)}` : '—'}
-              </ThemedText>
-            </View>
-            {/* Grand Total: subtotal + delivery fee when available */}
-            <View style={styles.totalContainer}>
-              <ThemedText style={styles.totalLabel}>Grand Total</ThemedText>
-              <ThemedText style={styles.totalAmount}>
-                ₹{(
-                  calculateTotal() + (typeof deliveryFeeQuote?.fee === 'number' ? deliveryFeeQuote.fee : 0)
-                ).toFixed(2)}
-              </ThemedText>
-            </View>
-            {/* Footer action removed to avoid duplicate with inline Confirm & Place Order */}
-          </View>
+          {/* Sticky footer removed; totals live in scrollable list footer now */}
         </View>
       )}
       {/* Removed old inline overlay confirm; using inline section above */}

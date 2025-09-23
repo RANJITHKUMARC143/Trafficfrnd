@@ -15,7 +15,7 @@ const Dashboard: React.FC = () => {
       try {
         setLoading(true);
         setError('');
-        const baseUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+        const baseUrl = 'http://localhost:3000';
         const token = localStorage.getItem('token') || '';
 
         const [usersRes, vendorsRes, deliveryRes, ordersRes] = await Promise.all([

@@ -131,8 +131,8 @@ export default function EnhancedPaymentModal({
     setSelectedApp(app);
     
     try {
-      // Create Cashfree UPI order
-      const response = await fetch(`${API_URL}/api/payments/cashfree/upi/order`, {
+      // Create Razorpay order
+      const response = await fetch(`${API_URL}/api/payments/razorpay/order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -173,8 +173,8 @@ export default function EnhancedPaymentModal({
     setLoading(true);
     
     try {
-      // Create Cashfree UPI order with a generic UPI ID
-      const response = await fetch(`${API_URL}/api/payments/cashfree/upi/order`, {
+      // Create Razorpay order with a generic UPI ID
+      const response = await fetch(`${API_URL}/api/payments/razorpay/order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -223,7 +223,7 @@ export default function EnhancedPaymentModal({
     setLoading(true);
     
     try {
-      const response = await fetch(`${API_URL}/api/payments/cashfree/upi/order`, {
+      const response = await fetch(`${API_URL}/api/payments/razorpay/order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -120,7 +120,7 @@ const DeliveryPartnerDetailEnhanced: React.FC = () => {
   const fetchPartnerDetails = async () => {
     try {
       const token = localStorage.getItem('token');
-      const url = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/delivery/${id}`;
+      const url = `http://localhost:3000/api/delivery/${id}`;
       
       const res = await fetch(url, {
         headers: { 
@@ -152,7 +152,7 @@ const DeliveryPartnerDetailEnhanced: React.FC = () => {
     setSaving(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/delivery/${id}`, {
+      const res = await fetch(`http://localhost:3000/api/delivery/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
         body: JSON.stringify({ status: 'active', isActive: true })
@@ -173,7 +173,7 @@ const DeliveryPartnerDetailEnhanced: React.FC = () => {
     setSaveMessage('');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/delivery/${id}`, {
+      const res = await fetch(`http://localhost:3000/api/delivery/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
         body: JSON.stringify({ bankDetails })
@@ -203,7 +203,7 @@ const DeliveryPartnerDetailEnhanced: React.FC = () => {
   const fetchPartnerOrders = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/delivery/${id}/orders`, {
+      const res = await fetch(`http://localhost:3000/api/delivery/${id}/orders`, {
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
       if (!res.ok) throw new Error('Failed to fetch partner orders');

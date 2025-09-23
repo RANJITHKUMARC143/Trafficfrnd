@@ -32,7 +32,7 @@ const PREDEFINED_CATEGORIES = [
 ];
 
 const Items: React.FC = () => {
-  const API = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+  const API = 'http://localhost:3000';
   const [items, setItems] = useState<Item[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);

@@ -110,6 +110,14 @@ class ChatService {
     }
   }
 
+  public updateUserLocation(orderId: string, location: { latitude: number; longitude: number }): void {
+    if (this.socket && this.isConnected && orderId && typeof location?.latitude === 'number' && typeof location?.longitude === 'number') {
+      try {
+        this.socket.emit('updateUserLocation', { orderId, location });
+      } catch {}
+    }
+  }
+
   public onOrderStatusUpdate(callback: (data: { orderId: string; status: string }) => void): void {
     if (this.socket) {
       this.socket.on('orderStatusUpdated', callback);

@@ -81,6 +81,8 @@ const corsOptions = {
 
 // Middleware
 app.use(cors(corsOptions));
+// Razorpay webhook must read raw body before JSON parser
+app.use('/api/payments/razorpay/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
 // Log all requests
@@ -230,6 +232,27 @@ io.on('connection', (socket) => {
       io.emit('locationUpdated', { deliveryBoyId, location });
     } catch (error) {
       console.error('Error updating location:', error);
+    }
+  });
+
+  // Handle user location updates (broadcast to order room and assigned delivery boy if known)
+  socket.on('updateUserLocation', async (data) => {
+    try {
+      const { orderId, location } = data || {};
+      if (!orderId || !location) return;
+      const { latitude, longitude } = location || {};
+      if (typeof latitude !== 'number' || typeof longitude !== 'number') return;
+      // Broadcast to order room for customer/anyone tracking
+      io.to(`order_${orderId}`).emit('userLocationUpdated', { orderId, location });
+      // Also try to emit to assigned deliveryBoy personal room
+      try {
+        const Order = require('./models/Order');
+        const ord = await Order.findById(orderId).select('deliveryBoyId');
+        const assigned = ord && ord.deliveryBoyId ? String(ord.deliveryBoyId) : '';
+        if (assigned) io.to(`deliveryBoy:${assigned}`).emit('userLocationUpdated', { orderId, location });
+      } catch {}
+    } catch (e) {
+      console.error('Error handling updateUserLocation:', e?.message || e);
     }
   });
 

@@ -81,44 +81,38 @@ export async function quoteDeliveryFee(params: {
   return res.json();
 }
 
-// Payments (Cashfree)
+// Payments (Razorpay)
 export async function getPaymentConfig() {
   const res = await fetch(`${API_BASE_URL.replace(/\/api$/, '')}/api/payments/config`);
   if (!res.ok) throw new Error('Failed to load payment config');
   return res.json();
 }
 
-// Cashfree UPI Payment functions
-export async function createCashfreeUPIOrder(orderId: string, upiId?: string) {
+// Razorpay Payment functions
+export async function createRazorpayOrder(orderId: string) {
   const token = await AsyncStorage.getItem('token');
-  const res = await fetch(`${API_BASE_URL}/payments/cashfree/upi/order`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ orderId, upiId })
-  });
-  if (!res.ok) throw new Error('Failed to create Cashfree UPI order');
-  return res.json();
-}
-
-export async function createCashfreePaymentSession(orderId: string) {
-  const token = await AsyncStorage.getItem('token');
-  const res = await fetch(`${API_BASE_URL}/payments/cashfree/session`, {
+  const res = await fetch(`${API_BASE_URL}/payments/razorpay/order`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ orderId })
   });
-  if (!res.ok) throw new Error('Failed to create Cashfree payment session');
+  if (!res.ok) throw new Error('Failed to create Razorpay order');
   return res.json();
 }
 
-export async function verifyCashfreePayment(orderId: string) {
+export async function verifyRazorpayPayment(orderId: string, razorpayOrderId: string, razorpayPaymentId: string, razorpaySignature: string) {
   const token = await AsyncStorage.getItem('token');
-  const res = await fetch(`${API_BASE_URL}/payments/cashfree/verify`, {
+  const res = await fetch(`${API_BASE_URL}/payments/razorpay/verify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ orderId })
+    body: JSON.stringify({ 
+      orderId, 
+      razorpayOrderId, 
+      razorpayPaymentId, 
+      razorpaySignature 
+    })
   });
-  if (!res.ok) throw new Error('Failed to verify Cashfree payment');
+  if (!res.ok) throw new Error('Failed to verify Razorpay payment');
   return res.json();
 }
 
@@ -127,3 +121,19 @@ export async function getAvailablePaymentMethods() {
   if (!res.ok) throw new Error('Failed to fetch payment methods');
   return res.json();
 }
+
+// Default export for the service
+const orderService = {
+  createOrder,
+  fetchUserOrders,
+  fetchOrderDetails,
+  updatePushToken,
+  fetchDeliveryPoints,
+  quoteDeliveryFee,
+  getPaymentConfig,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
+  getAvailablePaymentMethods
+};
+
+export default orderService;
