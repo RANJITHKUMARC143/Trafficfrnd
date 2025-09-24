@@ -3,6 +3,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const alertController = require('../controllers/alertController');
 const userAuth = require('../controllers/userAuth');
+const { sendToUser } = require('../services/pushService');
 
 // Get all alerts for the current user
 router.get('/', auth, alertController.getAlerts);
@@ -18,5 +19,15 @@ router.put('/:id/read', auth, alertController.markAlertRead);
 
 // Register/update push token (reuses userAuth.updatePushToken)
 router.post('/register-token', auth, userAuth.updatePushToken);
+
+// Test push to current user
+router.post('/test-push', auth, async (req, res) => {
+  try {
+    await sendToUser(req.user._id, req.body?.title || 'Test', req.body?.body || 'This is a test push');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 module.exports = router; 

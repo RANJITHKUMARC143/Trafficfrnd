@@ -30,7 +30,10 @@ async function sendToUser(userId, title, body, data = {}) {
     if (!userId) return;
     const user = await User.findById(userId).select('expoPushToken');
     const token = user && user.expoPushToken ? user.expoPushToken : '';
-    if (!isValidExpoToken(token)) return;
+    if (!isValidExpoToken(token)) {
+      console.log('[PUSH] No valid Expo token for user', String(userId));
+      return;
+    }
     const message = {
       to: token,
       sound: 'default',
@@ -40,6 +43,7 @@ async function sendToUser(userId, title, body, data = {}) {
       priority: 'high'
     };
     await sendPushMessages([message]);
+    console.log('[PUSH] Sent to user', String(userId));
   } catch (e) {
     console.warn('sendToUser error:', e?.message || e);
   }
