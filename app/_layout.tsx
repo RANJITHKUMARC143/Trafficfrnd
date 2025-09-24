@@ -6,6 +6,8 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { registerPushToken } from '@lib/services/alertService';
 import { useColorScheme } from 'react-native';
 import { socketService } from '@lib/services/socketService';
@@ -42,6 +44,11 @@ export default function RootLayout() {
     (async () => {
       try {
         if (!Device.isDevice) return;
+        // Avoid calling remote push APIs on Android Expo Go (SDK 53+) — requires dev build
+        if (Platform.OS === 'android' && Constants.appOwnership === 'expo') {
+          console.log('Skipping push token on Android Expo Go. Use a dev build.');
+          return;
+        }
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
         if (existingStatus !== 'granted') {
@@ -49,7 +56,8 @@ export default function RootLayout() {
           finalStatus = status;
         }
         if (finalStatus !== 'granted') return;
-        const token = (await Notifications.getExpoPushTokenAsync()).data;
+        const projectId = (Constants?.expoConfig?.extra as any)?.eas?.projectId || (Constants as any)?.easConfig?.projectId;
+        const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
         await registerPushToken(token);
       } catch (e) {
         // ignore
