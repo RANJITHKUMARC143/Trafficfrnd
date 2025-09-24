@@ -4,6 +4,9 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import { registerPushToken } from '@lib/services/alertService';
 import { useColorScheme } from 'react-native';
 import { socketService } from '@lib/services/socketService';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -34,6 +37,25 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!Device.isDevice) return;
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        if (finalStatus !== 'granted') return;
+        const token = (await Notifications.getExpoPushTokenAsync()).data;
+        await registerPushToken(token);
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     // Socket service will be initialized when user logs in

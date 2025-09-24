@@ -131,3 +131,21 @@ const alertService = {
 };
 
 export default alertService; 
+
+// Register device push token with backend
+export async function registerPushToken(token: string) {
+  try {
+    const auth = await AsyncStorage.getItem('token');
+    if (!auth) return;
+    await fetch(`${API_URL}/api/alerts/register-token`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${auth}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ expoPushToken: token })
+    });
+  } catch (e) {
+    console.log('registerPushToken error:', e);
+  }
+}
