@@ -298,9 +298,16 @@ exports.updatePushToken = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    user.expoPushToken = req.body.expoPushToken;
+    const token = req.body.expoPushToken || '';
+    let valid = false;
+    try {
+      const { Expo } = require('expo-server-sdk');
+      valid = typeof token === 'string' && Expo.isExpoPushToken(token);
+    } catch {}
+    user.expoPushToken = token;
     await user.save();
-    res.json({ message: 'Expo push token updated successfully' });
+    console.log('[PUSH] updatePushToken user', String(user._id), 'token', token ? token.substring(0, 12) + '...' : '(empty)', 'valid=', valid);
+    res.json({ message: 'Expo push token updated successfully', token, valid });
   } catch (error) {
     res.status(500).json({ message: 'Error updating push token', error: error.message });
   }
