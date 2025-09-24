@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, Modal, ScrollView, Text } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ScrollView, Text } from 'react-native';
 import { ThemedText } from '@cmp/ThemedText';
 import { ThemedView } from '@cmp/ThemedView';
-import { Ionicons } from '@expo/vector-icons';
+// Icons replaced with emoji for compatibility
 import { router, useLocalSearchParams } from 'expo-router';
 import LottieView from '@cmp/LottieFallback';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -14,18 +14,11 @@ export default function OrderConfirmationScreen() {
   const params = useLocalSearchParams();
   const { total, itemCount, orderId, routeId } = params;
 
-  const [showLetsGoModal, setShowLetsGoModal] = useState(false);
-  const [loadingCheckpoint, setLoadingCheckpoint] = useState(false);
-  const [checkpointError, setCheckpointError] = useState('');
+  // Removed modal-related state
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [deliveryPoint, setDeliveryPoint] = useState<{ latitude: number; longitude: number; name: string } | null>(null);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowLetsGoModal(true);
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, []);
+  // Removed auto-opening modal after confirmation
 
   useEffect(() => {
     // Fetch current location and delivery point for map
@@ -45,37 +38,7 @@ export default function OrderConfirmationScreen() {
     })();
   }, []);
 
-  const handleLetsGo = async () => {
-    setLoadingCheckpoint(true);
-    setCheckpointError('');
-    try {
-      // Get selected delivery point from AsyncStorage
-      const dp = await AsyncStorage.getItem('selectedDeliveryPoint');
-      if (!dp) {
-        setCheckpointError('Selected delivery point not found.');
-        setLoadingCheckpoint(false);
-        return;
-      }
-      const selectedDeliveryPoint = JSON.parse(dp);
-      // Get current location
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setCheckpointError('Location permission denied.');
-        setLoadingCheckpoint(false);
-        return;
-      }
-      const currentLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const origin = `${currentLocation.coords.latitude},${currentLocation.coords.longitude}`;
-      const destination = `${selectedDeliveryPoint.latitude},${selectedDeliveryPoint.longitude}`;
-      const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
-      Linking.openURL(url);
-      setShowLetsGoModal(false);
-    } catch (error) {
-      setCheckpointError('Failed to open Google Maps.');
-    } finally {
-      setLoadingCheckpoint(false);
-    }
-  };
+  // Removed modal action handler
 
   const handleContinueShopping = async () => {
     await AsyncStorage.removeItem('selectedDeliveryPoint');
@@ -85,9 +48,19 @@ export default function OrderConfirmationScreen() {
   return (
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Small Map showing current and destination */}
+        {/* Success Header */}
+        <View style={styles.successHeader}>
+          <View style={styles.successIconWrap}>
+            <Text style={{ fontSize: 40 }}>✅</Text>
+          </View>
+          <ThemedText style={styles.successTitle}>Order Confirmed</ThemedText>
+          <ThemedText style={styles.successSubtitle}>Cash on Delivery</ThemedText>
+          <View style={styles.methodChip}><Text style={{ fontSize: 14 }}>💵</Text><Text style={styles.methodChipText}>Pay at Delivery</Text></View>
+        </View>
+
+        {/* Map Preview */}
         {currentLocation && deliveryPoint && (
-          <View style={{ width: '100%', height: 180, borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
+          <View style={styles.mapPreview}>
             <MapView
               style={{ flex: 1 }}
               initialRegion={{
@@ -98,89 +71,46 @@ export default function OrderConfirmationScreen() {
               }}
               pointerEvents="none"
             >
-              <Marker
-                coordinate={currentLocation}
-                title="Your Location"
-                pinColor="#4CAF50"
-              />
-              <Marker
-                coordinate={deliveryPoint}
-                title={deliveryPoint.name || 'Delivery Point'}
-                pinColor="#D32F2F"
-              />
+              <Marker coordinate={currentLocation} title="Your Location" pinColor="#4CAF50" />
+              <Marker coordinate={deliveryPoint} title={deliveryPoint.name || 'Delivery Point'} pinColor="#D32F2F" />
             </MapView>
           </View>
         )}
 
-        <ThemedText style={styles.title}>Order Placed Successfully!</ThemedText>
-        <ThemedText style={styles.subtitle}>
-          Thank you for your order. Your items will be delivered soon.
-        </ThemedText>
-
-        <View style={styles.orderDetails}>
-          {orderId && (
-            <View style={styles.detailRow}>
-              <ThemedText style={styles.detailLabel}>Order ID:</ThemedText>
-              <ThemedText style={styles.detailValue}>{orderId}</ThemedText>
+        {/* Order Summary */}
+        <View style={styles.summaryCard}>
+          {orderId ? (
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryLeft}><Text style={{ fontSize: 16 }}>🧾</Text><Text style={styles.summaryLabel}>Order ID</Text></View>
+              <Text style={styles.summaryValue}>{orderId}</Text>
             </View>
-          )}
-          <View style={styles.detailRow}>
-            <ThemedText style={styles.detailLabel}>Order Amount:</ThemedText>
-            <ThemedText style={styles.detailValue}>₹{total}</ThemedText>
+          ) : null}
+          <View style={styles.divider} />
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryLeft}><Text style={{ fontSize: 16 }}>🛍️</Text><Text style={styles.summaryLabel}>Items</Text></View>
+            <Text style={styles.summaryValue}>{itemCount}</Text>
           </View>
-          <View style={styles.detailRow}>
-            <ThemedText style={styles.detailLabel}>Items:</ThemedText>
-            <ThemedText style={styles.detailValue}>{itemCount}</ThemedText>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryLeft}><Text style={{ fontSize: 16 }}>🏷️</Text><Text style={styles.summaryLabel}>Amount</Text></View>
+            <Text style={styles.amountValue}>₹{total}</Text>
           </View>
-          <View style={styles.detailRow}>
-            <ThemedText style={styles.detailLabel}>Status:</ThemedText>
-            <ThemedText style={[styles.detailValue, styles.statusText]}>Confirmed</ThemedText>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryLeft}><Text style={{ fontSize: 16 }}>✅</Text><Text style={styles.summaryLabel}>Status</Text></View>
+            <Text style={styles.statusValue}>Confirmed</Text>
           </View>
         </View>
 
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={[styles.continueButton, { marginRight: 10 }]}
-            onPress={() => router.push(`/order-details/${orderId}`)}
-          >
-            <Text style={styles.continueButtonText}>View Order Details</Text>
+        {/* Actions */}
+        <View style={styles.actions}>
+          <TouchableOpacity style={[styles.primaryBtn]} onPress={() => router.push(`/order-details/${orderId}`)}>
+            <Text style={styles.primaryBtnText}>📍 Track Order</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.continueButton, { backgroundColor: '#FF9800' }]}
-            onPress={handleContinueShopping}
-          >
-            <Text style={styles.continueButtonText}>Continue Shopping</Text>
+          <TouchableOpacity style={[styles.secondaryBtn]} onPress={handleContinueShopping}>
+            <Text style={styles.secondaryBtnText}>🏠 Continue Shopping</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
-      <Modal
-        visible={showLetsGoModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowLetsGoModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <ThemedText style={styles.title}>Order Confirmed!</ThemedText>
-            <ThemedText style={styles.subtitle}>Let's go to the delivery point</ThemedText>
-            <TouchableOpacity style={styles.continueButton} onPress={handleLetsGo}>
-              <Text style={styles.modalButtonText}>Let's Go</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.continueButton, { backgroundColor: '#FF9800', marginTop: 10 }]}
-              onPress={() => setShowLetsGoModal(false)}
-            >
-              <Text style={styles.modalButtonText}>Close</Text>
-            </TouchableOpacity>
-            {loadingCheckpoint && (
-              <ThemedText style={styles.subtitle}>Loading Delivery Point...</ThemedText>
-            )}
-            {checkpointError ? (
-              <ThemedText style={[styles.subtitle, { color: 'red' }]}>{checkpointError}</ThemedText>
-            ) : null}
-          </View>
-        </View>
-      </Modal>
+      {/* Modal removed as per request */}
     </ThemedView>
   );
 }
@@ -193,72 +123,136 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
     padding: 20,
   },
-  iconContainer: {
-    marginBottom: 30,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 30,
-  },
-  orderDetails: {
+  successHeader: {
     width: '100%',
-    backgroundColor: '#f8f8f8',
-    borderRadius: 12,
+    backgroundColor: '#4CAF50',
+    borderRadius: 16,
     padding: 20,
-    marginBottom: 30,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 16,
   },
-  detailLabel: {
-    fontSize: 16,
-    color: '#666',
+  successIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
-  detailValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+  successTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#fff',
   },
-  statusText: {
-    color: '#4CAF50',
+  successSubtitle: {
+    marginTop: 4,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
   },
-  buttonContainer: {
+  methodChip: {
+    marginTop: 10,
+    backgroundColor: '#E8F5E9',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     flexDirection: 'row',
-    width: '100%',
+    alignItems: 'center',
+    gap: 6,
   },
-  continueButton: {
+  methodChipText: {
+    color: '#2E7D32',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  mapPreview: {
+    width: '100%',
+    height: 160,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  summaryCard: {
+    width: '100%',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  summaryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  summaryLabel: {
+    color: '#6B7280',
+    fontSize: 14,
+  },
+  summaryValue: {
+    color: '#111827',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  amountValue: {
+    color: '#111827',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  statusValue: {
+    color: '#4CAF50',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 4,
+  },
+  actions: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  primaryBtn: {
+    flex: 1,
     backgroundColor: '#4CAF50',
     borderRadius: 12,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    flex: 1,
+    paddingVertical: 14,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
   },
-  modalButtonText: {
+  primaryBtnText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center'
+    fontWeight: '800',
   },
-  continueButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  secondaryBtn: {
+    flex: 1,
+    backgroundColor: '#E8F5E9',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  secondaryBtnText: {
+    color: '#2E7D32',
+    fontWeight: '800',
   },
   modalOverlay: {
     flex: 1,
@@ -272,5 +266,11 @@ const styles = StyleSheet.create({
     padding: 24,
     width: '80%',
     alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center'
   },
 }); 

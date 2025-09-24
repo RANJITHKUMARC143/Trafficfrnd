@@ -4,6 +4,10 @@ const User = require('../models/User');
 // Get all alerts for the current user (global + user-specific)
 exports.getAlerts = async (req, res) => {
   try {
+    // Prevent client/proxy caching so new admin-created alerts appear immediately
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     const userId = req.user?._id;
     const userRole = req.user?.role;
     
@@ -70,6 +74,12 @@ exports.markAlertRead = async (req, res) => {
     if (!alert) return res.status(404).json({ message: 'Alert not found' });
     // Only the user who owns the alert or admin can mark as read
     if (req.user.role !== 'admin' && (!alert.userId || alert.userId.toString() !== req.user._id.toString())) {
+      // Allow read on global alerts; just mark locally when user attempts
+      if (!alert.userId) {
+        alert.read = true;
+        await alert.save();
+        return res.json({ message: 'Alert marked as read' });
+      }
       return res.status(403).json({ message: 'Not authorized to mark this alert as read' });
     }
     alert.read = true;

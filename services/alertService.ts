@@ -95,10 +95,14 @@ export async function deleteAlert(id: string) {
   }
 }
 
-export async function clearAllAlerts(alerts: { _id: string }[]) {
+export async function clearAllAlerts(alertsOrIds: Array<{ _id?: string; id?: string } | string>) {
   try {
-    for (const alert of alerts) {
-      await deleteAlert(alert._id);
+    const ids: string[] = (alertsOrIds || [])
+      .map((a: any) => typeof a === 'string' ? a : (a?._id || a?.id))
+      .filter((v: any): v is string => typeof v === 'string' && v.length > 0);
+
+    for (const id of ids) {
+      await deleteAlert(id);
     }
   } catch (error) {
     console.error('Error in clearAllAlerts:', error);
@@ -122,6 +126,10 @@ export async function markAlertRead(id: string) {
     });
     
     if (!res.ok) {
+      // If backend forbids (e.g., system/global alert), treat as soft success
+      if (res.status === 403) {
+        return;
+      }
       const errorText = await res.text();
       console.error('Mark alert read error:', res.status, errorText);
       throw new Error(`Failed to mark alert as read: ${res.status} ${errorText}`);

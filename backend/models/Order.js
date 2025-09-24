@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+// Lazy require to avoid circular issues in some environments
+let AlertModel = null;
 
 const orderSchema = new mongoose.Schema({
   vendorId: {
@@ -50,7 +52,7 @@ const orderSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'confirmed', 'enroute', 'preparing', 'ready', 'completed', 'cancelled'],
+    enum: ['pending', 'confirmed', 'enroute', 'ready', 'completed', 'cancelled'],
     default: 'pending'
   },
   deliveryAddress: {
@@ -191,28 +193,29 @@ const orderSchema = new mongoose.Schema({
 
 // Update the updatedAt timestamp before saving
 orderSchema.pre('save', function(next) {
-  if (this.status === 'preparing' && !this.deliveryBoyId) {
-    return next(new Error('Cannot set status to preparing without a delivery boy assigned.'));
-  }
   this.updatedAt = Date.now();
   next();
 });
 
-function checkPreparing(next) {
-  if (this.getUpdate) {
-    const update = this.getUpdate();
-    const status = update.status || (update.$set && update.$set.status);
-    const deliveryBoyId = update.deliveryBoyId || (update.$set && update.$set.deliveryBoyId);
-    if (status === 'preparing' && !deliveryBoyId) {
-      return next(new Error('Cannot set status to preparing without a delivery boy assigned.'));
-    }
+// Create a user alert whenever an update explicitly changes status via findOneAndUpdate (e.g., admin panel)
+orderSchema.post('findOneAndUpdate', async function(doc) {
+  try {
+    if (!doc) return;
+    const update = this.getUpdate ? this.getUpdate() : {};
+    const newStatus = update.status || (update.$set && update.$set.status);
+    if (!newStatus) return;
+    if (!AlertModel) AlertModel = require('./Alert');
+    await AlertModel.create({
+      title: 'Order Update',
+      message: `Order #${String(doc._id).slice(-8)}: ${newStatus === 'enroute' ? 'On the way' : (newStatus.charAt(0).toUpperCase() + newStatus.slice(1))}`,
+      type: 'order-update',
+      userId: doc.user || null,
+    });
+  } catch (e) {
+    // Non-fatal
+    console.warn('Order post-update alert failed:', e?.message || e);
   }
-  next();
-}
-
-orderSchema.pre('findOneAndUpdate', checkPreparing);
-orderSchema.pre('updateOne', checkPreparing);
-orderSchema.pre('updateMany', checkPreparing);
+});
 
 // Create 2dsphere index for selectedDeliveryPoint for geo queries
 orderSchema.index({ 

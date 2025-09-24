@@ -16,7 +16,14 @@ export default function OrdersScreen() {
   const loadOrders = useCallback(async () => {
     try {
       const data = await fetchUserOrders();
-      setOrders(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      // Sort latest first by updatedAt, fallback to timestamp/createdAt
+      list.sort((a: any, b: any) => {
+        const ad = new Date(a?.updatedAt || a?.timestamp || a?.createdAt || 0).getTime();
+        const bd = new Date(b?.updatedAt || b?.timestamp || b?.createdAt || 0).getTime();
+        return bd - ad;
+      });
+      setOrders(list);
     } catch (error) {
       Alert.alert('Error', 'Failed to fetch orders');
     } finally {
@@ -140,7 +147,7 @@ export default function OrdersScreen() {
             </View>
             <ThemedText style={styles.emptyTitle}>No orders yet</ThemedText>
             <ThemedText style={styles.emptySubtitle}>Start exploring and place your first order.</ThemedText>
-            <TouchableOpacity style={styles.ctaBtn} onPress={() => router.push('/search')} activeOpacity={0.9}>
+            <TouchableOpacity style={styles.ctaBtn} onPress={() => router.push('/(tabs)/search')} activeOpacity={0.9}>
               <Ionicons name="search" size={18} color="#fff" />
               <ThemedText style={styles.ctaBtnText}>Browse Menu</ThemedText>
             </TouchableOpacity>

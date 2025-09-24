@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, usePathname } from 'expo-router';
 import { ThemedText } from './ThemedText';
+import { fetchAlerts } from '@lib/services/alertService';
 
 interface TabItem {
   name: string;
@@ -13,7 +14,7 @@ interface TabItem {
 
 const tabs: TabItem[] = [
   { name: 'home', icon: 'home', route: '/(tabs)', label: 'Home' },
-  { name: 'search', icon: 'search', route: '/search', label: 'Search' },
+  { name: 'search', icon: 'search', route: '/(tabs)/search', label: 'Search' },
   { name: 'map', icon: 'map', route: '/map', label: 'Map' },
   { name: 'alerts', icon: 'notifications', route: '/alerts', label: 'Alerts' },
   { name: 'profile', icon: 'person', route: '/profile', label: 'Profile' },
@@ -25,6 +26,7 @@ interface BottomNavigationBarProps {
 
 export default function BottomNavigationBar({ keyboardOpen = false }: BottomNavigationBarProps) {
   const pathname = usePathname();
+  const [unreadAlerts, setUnreadAlerts] = useState<number>(0);
 
   const isActiveTab = (route: string) => {
     if (route === '/(tabs)') {
@@ -36,6 +38,21 @@ export default function BottomNavigationBar({ keyboardOpen = false }: BottomNavi
   if (keyboardOpen) {
     return null;
   }
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const alerts = await fetchAlerts();
+        if (!mounted) return;
+        const unread = (alerts || []).filter((a: any) => a && a.read === false).length;
+        setUnreadAlerts(unread);
+      } catch {}
+    };
+    load();
+    const t = setInterval(load, 15000);
+    return () => { mounted = false; clearInterval(t); };
+  }, [pathname]);
 
   return (
     <View style={styles.enhancedBottomNavBar} pointerEvents="box-none">
@@ -51,11 +68,20 @@ export default function BottomNavigationBar({ keyboardOpen = false }: BottomNavi
             >
               <View style={styles.navTabContent}>
                 {isActive && <View style={styles.activeTabIndicator} />}
-                <Ionicons 
-                  name={tab.icon} 
-                  size={24} 
-                  color={isActive ? '#4CAF50' : '#666'} 
-                />
+                <View>
+                  <Ionicons 
+                    name={tab.icon} 
+                    size={24} 
+                    color={isActive ? '#4CAF50' : '#666'} 
+                  />
+                  {tab.name === 'alerts' && unreadAlerts > 0 && (
+                    <View style={styles.alertBadge}>
+                      <ThemedText style={styles.alertBadgeText}>
+                        {unreadAlerts > 9 ? '9+' : String(unreadAlerts)}
+                      </ThemedText>
+                    </View>
+                  )}
+                </View>
                 <ThemedText style={[
                   styles.navTabLabel,
                   isActive && styles.activeTabLabel
@@ -125,6 +151,23 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: '#4CAF50',
+  },
+  alertBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -10,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    backgroundColor: '#E53935',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alertBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
   activeTabLabel: {
     fontSize: 11,

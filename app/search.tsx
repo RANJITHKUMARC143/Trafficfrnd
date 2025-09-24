@@ -14,6 +14,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 
 const { width, height } = Dimensions.get('window');
+const GRID_PADDING = 16;
+const GRID_GUTTER = 12;
+const CARD_WIDTH = (width - GRID_PADDING * 2 - GRID_GUTTER) / 2;
 
 export default function SearchScreen() {
   const { q } = useLocalSearchParams();
@@ -289,81 +292,63 @@ export default function SearchScreen() {
   ), [searchQuery, suggestions, recentSearches]);
 
   const renderResultItem = useCallback(({ item, index }: { item: MenuItem; index: number }) => {
-    const ITEM_SIZE = 140; // safer approximate row height including margins
+    const ITEM_SIZE = 220;
     const start = index * ITEM_SIZE;
     const inputRange = [start - ITEM_SIZE * 2, start, start + ITEM_SIZE * 2];
     const scale = scrollY.interpolate({
       inputRange,
-      outputRange: [0.997, 1, 0.997],
+      outputRange: [0.995, 1, 0.995],
       extrapolate: 'clamp',
     });
     return (
-    <Animated.View
-      style={[
-        styles.resultCard,
-        {
-          opacity: 1,
-          transform: [{
-            translateY: (cardAnimations[index] || slideAnim).interpolate({
-              inputRange: [0, 1],
-              outputRange: [50 + (index * 20), 0]
-            })
-          }, { scale }]
-        }
-      ]}
-    >
-      <TouchableOpacity
-        style={styles.resultCardContent}
-        onPress={() => router.push({ pathname: '/item/[id]', params: { id: (item as any)._id } })}
-        activeOpacity={0.8}
+      <Animated.View
+        style={[
+          styles.gridCard,
+          {
+            transform: [
+              { translateY: (cardAnimations[index] || slideAnim).interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) },
+              { scale },
+            ],
+          },
+        ]}
       >
-        <View style={styles.resultImageContainer}>
-          <Image
-            source={{ uri: item.image || 'https://via.placeholder.com/150' }}
-            style={styles.resultImage}
-            defaultSource={{ uri: 'https://via.placeholder.com/150' }}
-          />
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.7)']}
-            style={styles.resultImageGradient}
-          />
-          <View style={styles.resultImageOverlay}>
-            <View style={styles.ratingBadge}>
-              <Ionicons name="star" size={12} color="#FFD700" />
-              <ThemedText style={styles.ratingText}>{item.rating?.toFixed(1) || '4.0'}</ThemedText>
-            </View>
-            <View style={styles.categoryBadge}>
-              <ThemedText style={styles.categoryBadgeText}>{item.category}</ThemedText>
-            </View>
-          </View>
-        </View>
-        
-        <View style={styles.resultInfo}>
-          <ThemedText style={styles.resultName} numberOfLines={1}>
-            {item.name}
-          </ThemedText>
-          <ThemedText style={styles.resultDescription} numberOfLines={2}>
-            {item.description}
-          </ThemedText>
-          
-          <View style={styles.resultFooter}>
-            <View style={styles.priceContainer}>
-              <ThemedText style={styles.resultPrice}>₹{item.price}</ThemedText>
-              <View style={styles.priceSubtext}>
-                <Ionicons name="time-outline" size={12} color="#999" />
-                <ThemedText style={styles.deliveryTime}>15-20 min</ThemedText>
+        <TouchableOpacity
+          style={styles.gridCardContent}
+          onPress={() => router.push({ pathname: '/item/[id]', params: { id: (item as any)._id } })}
+          activeOpacity={0.9}
+        >
+          <View style={styles.gridImageContainer}>
+            <Image
+              source={{ uri: item.image || 'https://via.placeholder.com/300' }}
+              style={styles.gridImage}
+            />
+            <View style={styles.gridOverlay}>
+              <View style={styles.ratingBadge}>
+                <Ionicons name="star" size={12} color="#FFD700" />
+                <ThemedText style={styles.ratingText}>{item.rating?.toFixed(1) || '4.0'}</ThemedText>
+              </View>
+              <View style={styles.gridTopRight}>
+                <View style={styles.categoryBadge} pointerEvents="none">
+                  <ThemedText style={styles.categoryBadgeText} numberOfLines={1}>{item.category}</ThemedText>
+                </View>
               </View>
             </View>
-            
-            <TouchableOpacity style={styles.addButton} activeOpacity={0.8} onPress={() => handleAddToCart(item)}>
-              <Ionicons name="add" size={20} color="#fff" />
-            </TouchableOpacity>
           </View>
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-  }, [fadeAnim, slideAnim, cardAnimations, scrollY]);
+          <View style={styles.gridInfo}>
+            <ThemedText style={styles.gridName} numberOfLines={2}>{item.name}</ThemedText>
+            <View style={styles.gridFooter}>
+              <View style={styles.pricePill}>
+                <ThemedText style={styles.pricePillText}>₹{item.price}</ThemedText>
+              </View>
+              <TouchableOpacity style={styles.addFab} onPress={() => handleAddToCart(item)} activeOpacity={0.9}>
+                <Ionicons name="add" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  }, [slideAnim, cardAnimations, scrollY]);
 
   if (loading) {
     return (
@@ -380,117 +365,7 @@ export default function SearchScreen() {
     <ThemedView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
       
-      {/* Enhanced Header with Glassmorphism */}
-      <Animated.View 
-        style={[
-          styles.header,
-          {
-            opacity: headerAnim,
-            transform: [{ translateY: headerAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [-50, 0]
-            })}]
-          }
-        ]}
-      >
-        <LinearGradient
-          colors={['#48C774', '#3DB160', '#2E7D32']}
-          style={styles.headerGradient}
-        >
-          <BlurView intensity={20} tint="light" style={styles.headerBlur}>
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: 16,
-              paddingTop: Platform.OS === 'ios' ? 8 : 0,
-              paddingBottom: 8,
-            }}>
-              <View>
-                <ThemedText style={{ color: '#fff', fontSize: 22, fontWeight: '700' }}>Search</ThemedText>
-                <ThemedText style={{ color: '#fff', fontSize: 16, fontWeight: '800', marginTop: 4, letterSpacing: 0.5 }}>Tap · Grab · Go</ThemedText>
-              </View>
-              <TouchableOpacity
-                style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}
-                onPress={() => router.push('/cart')}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="cart-outline" size={22} color="#fff" />
-                {cartCount > 0 && (
-                  <View style={{ position: 'absolute', top: -4, right: -4, backgroundColor: '#FF5252', minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
-                    <ThemedText style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{cartCount}</ThemedText>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
-            <View style={styles.headerContent}>
-              <TouchableOpacity 
-                style={styles.backButton}
-                onPress={() => router.back()}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="arrow-back" size={24} color="#fff" />
-              </TouchableOpacity>
-              
-              <Animated.View style={[styles.searchContainer, { transform: [{ scale: headerAnim.interpolate({ inputRange: [0,1], outputRange: [0.95, 1] }) }]} ]}>
-                <View style={styles.searchIconContainer}>
-                  <Ionicons name="search" size={20} color="#4CAF50" />
-                </View>
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search for delicious food..."
-                  placeholderTextColor="#9CA3AF"
-                  value={inputValue}
-                  onChangeText={(text) => {
-                    // Update input instantly for smooth typing
-                    setInputValue(text);
-                    setShowSuggestions(text.length > 0);
-                    // Build quick suggestions from prebuilt index without filtering results yet
-                    const ql = text.toLowerCase();
-                    if (!ql) {
-                      setSuggestions([]);
-                    } else {
-                      const out: { name: string; image?: string }[] = [];
-                      for (let i = 0; i < nameIndex.current.length && out.length < 6; i++) {
-                        const n = nameIndex.current[i];
-                        if (n.lower.includes(ql)) {
-                          if (!out.find(s => s.name === n.original)) out.push({ name: n.original, image: n.image });
-                        }
-                      }
-                      setSuggestions(out);
-                    }
-                    // Debounce actual search/filtering work
-                    if (inputDebounceRef.current) clearTimeout(inputDebounceRef.current);
-                    inputDebounceRef.current = setTimeout(() => {
-                      handleSearch(text);
-                    }, 120);
-                  }}
-                  onFocus={handleSearchFocus}
-                  onBlur={handleSearchBlur}
-                  returnKeyType="search"
-                />
-                {searchQuery.length > 0 && (
-                  <TouchableOpacity 
-                    onPress={() => handleSearch('')}
-                    style={styles.clearButton}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="close-circle" size={20} color="#9CA3AF" />
-                  </TouchableOpacity>
-                )}
-              </Animated.View>
-
-              <TouchableOpacity 
-                style={styles.filterButton}
-                onPress={() => setShowFilters(!showFilters)}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="options-outline" size={24} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          </BlurView>
-        </LinearGradient>
-      </Animated.View>
+      {/* Header moved into list header to make it scrollable with content */}
 
       {/* Category chips moved into list header so they scroll with products */}
 
@@ -646,12 +521,16 @@ export default function SearchScreen() {
             data={results}
             keyExtractor={(item: any) => item._id}
             renderItem={renderResultItem}
-            contentContainerStyle={styles.resultsContent}
+            contentContainerStyle={[styles.resultsContent, { paddingHorizontal: GRID_PADDING }]}
             showsVerticalScrollIndicator={false}
+            numColumns={2}
+            columnWrapperStyle={styles.gridRow}
+            key={'grid-2'}
+            ListHeaderComponentStyle={{ marginHorizontal: -GRID_PADDING }}
             initialNumToRender={10}
-            windowSize={7}
-            maxToRenderPerBatch={10}
-            updateCellsBatchingPeriod={50}
+            windowSize={9}
+            maxToRenderPerBatch={12}
+            updateCellsBatchingPeriod={40}
             removeClippedSubviews={false}
             onScroll={Animated.event(
               [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -659,6 +538,109 @@ export default function SearchScreen() {
             )}
             ListHeaderComponent={
               <View>
+                {/* Scrollable Header (unchanged UI) */}
+                <Animated.View 
+                  style={[
+                    styles.header,
+                    {
+                      opacity: headerAnim,
+                      transform: [{ translateY: headerAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-50, 0]
+                      })}]
+                    }
+                  ]}
+                >
+                  <View style={[styles.headerGradient, { backgroundColor: '#4CAF50' }]}>
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingHorizontal: 16,
+                      paddingTop: Platform.OS === 'ios' ? 8 : 0,
+                      paddingBottom: 8,
+                    }}>
+                      <View>
+                        <ThemedText style={{ color: '#fff', fontSize: 22, fontWeight: '700' }}>Search</ThemedText>
+                        <ThemedText style={{ color: '#fff', fontSize: 16, fontWeight: '800', marginTop: 4, letterSpacing: 0.5 }}>Tap · Grab · Go</ThemedText>
+                      </View>
+                      <TouchableOpacity
+                        style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}
+                        onPress={() => router.push('/cart')}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="cart-outline" size={22} color="#fff" />
+                        {cartCount > 0 && (
+                          <View style={{ position: 'absolute', top: -4, right: -4, backgroundColor: '#FF5252', minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
+                            <ThemedText style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{cartCount}</ThemedText>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.headerContent}>
+                      <TouchableOpacity 
+                        style={styles.backButton}
+                        onPress={() => router.back()}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="arrow-back" size={24} color="#fff" />
+                      </TouchableOpacity>
+                      
+                      <Animated.View style={[styles.searchContainer, { transform: [{ scale: headerAnim.interpolate({ inputRange: [0,1], outputRange: [0.95, 1] }) }]} ]}>
+                        <View style={styles.searchIconContainer}>
+                          <Ionicons name="search" size={20} color="#4CAF50" />
+                        </View>
+                        <TextInput
+                          style={styles.searchInput}
+                          placeholder="Search for delicious food..."
+                          placeholderTextColor="#9CA3AF"
+                          value={inputValue}
+                          onChangeText={(text) => {
+                            setInputValue(text);
+                            setShowSuggestions(text.length > 0);
+                            const ql = text.toLowerCase();
+                            if (!ql) {
+                              setSuggestions([]);
+                            } else {
+                              const out: { name: string; image?: string }[] = [];
+                              for (let i = 0; i < nameIndex.current.length && out.length < 6; i++) {
+                                const n = nameIndex.current[i];
+                                if (n.lower.includes(ql)) {
+                                  if (!out.find(s => s.name === n.original)) out.push({ name: n.original, image: n.image });
+                                }
+                              }
+                              setSuggestions(out);
+                            }
+                            if (inputDebounceRef.current) clearTimeout(inputDebounceRef.current);
+                            inputDebounceRef.current = setTimeout(() => {
+                              handleSearch(text);
+                            }, 120);
+                          }}
+                          onFocus={handleSearchFocus}
+                          onBlur={handleSearchBlur}
+                          returnKeyType="search"
+                        />
+                        {searchQuery.length > 0 && (
+                          <TouchableOpacity 
+                            onPress={() => handleSearch('')}
+                            style={styles.clearButton}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+                          </TouchableOpacity>
+                        )}
+                      </Animated.View>
+
+                      <TouchableOpacity 
+                        style={styles.filterButton}
+                        onPress={() => setShowFilters(!showFilters)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="options-outline" size={24} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </Animated.View>
                 {/* Category chips that scroll with list */}
                 <Animated.View 
                   style={[
@@ -672,6 +654,7 @@ export default function SearchScreen() {
                   <ScrollView 
                     horizontal 
                     showsHorizontalScrollIndicator={false}
+                    style={styles.categoryScrollView}
                     contentContainerStyle={styles.categoryScroll}
                   >
                     {categories.map((category, index) => (
@@ -845,6 +828,7 @@ const styles = StyleSheet.create({
   header: {
     paddingTop: Platform.OS === 'ios' ? 44 : 8,
     paddingBottom: 12,
+    backgroundColor: '#4CAF50',
   },
   headerGradient: {
     paddingHorizontal: 16,
@@ -867,11 +851,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
   },
   searchContainer: {
     flex: 1,
@@ -881,11 +860,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
     borderWidth: 1,
     borderColor: '#f0f0f0',
   },
@@ -909,21 +883,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
   },
 
   // Enhanced Category Styles
   categoryContainer: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    paddingHorizontal: 0,
     backgroundColor: '#fff',
   },
   categoryScroll: {
+    paddingLeft: 0,
     paddingRight: 16,
+  },
+  categoryScrollView: {
+    marginLeft: 0,
+    paddingLeft: 0,
   },
   categoryChip: {
     flexDirection: 'row',
@@ -932,7 +907,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 24,
     backgroundColor: '#fff',
-    marginRight: 10,
+    marginRight: 6,
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
@@ -1068,48 +1043,48 @@ const styles = StyleSheet.create({
   },
 
   // Enhanced Result Card Styles
-  resultCard: {
-    marginBottom: 20,
-  },
-  resultCardContent: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-  },
-  resultImageContainer: {
-    position: 'relative',
-    marginRight: 16,
-  },
-  resultImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 16,
-    backgroundColor: '#f8f9fa',
-  },
-  resultImageGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 16,
-  },
-  resultImageOverlay: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    left: 8,
-    bottom: 8,
+  gridRow: {
     justifyContent: 'space-between',
+    marginBottom: GRID_GUTTER,
+  },
+  gridCard: {
+    width: CARD_WIDTH,
+    marginBottom: GRID_GUTTER,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#eef0f2',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  gridCardContent: {
+    flex: 1,
+  },
+  gridImageContainer: {
+    position: 'relative',
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: '#f2f4f7',
+  },
+  gridImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  gridOverlay: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    right: 6,
+    bottom: 6,
+    justifyContent: 'space-between',
+  },
+  gridTopRight: {
+    alignSelf: 'flex-end',
   },
   ratingBadge: {
     flexDirection: 'row',
@@ -1127,69 +1102,61 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   categoryBadge: {
-    backgroundColor: 'rgba(76, 175, 80, 0.9)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
     alignSelf: 'flex-end',
+    maxWidth: 90,
   },
   categoryBadgeText: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#fff',
     fontWeight: '600',
     textTransform: 'uppercase',
   },
-  resultInfo: {
-    flex: 1,
-    justifyContent: 'space-between',
+  gridInfo: {
+    paddingHorizontal: 10,
+    paddingVertical: 10,
   },
-  resultName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: 6,
-  },
-  resultDescription: {
+  gridName: {
     fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-    marginBottom: 12,
+    fontWeight: '700',
+    color: '#262626',
+    lineHeight: 18,
+    minHeight: 36,
   },
-  resultFooter: {
+  gridFooter: {
+    marginTop: 8,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
   },
-  priceContainer: {
-    flex: 1,
+  pricePill: {
+    backgroundColor: '#e8f5e8',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#cfead0',
   },
-  resultPrice: {
-    fontSize: 20,
-    color: '#4CAF50',
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  priceSubtext: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  deliveryTime: {
-    marginLeft: 4,
+  pricePillText: {
+    color: '#2e7d32',
+    fontWeight: '800',
     fontSize: 12,
-    color: '#999',
   },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  addFab: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: '#4CAF50',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowRadius: 6,
+    elevation: 5,
   },
 
   // Enhanced Empty State Styles

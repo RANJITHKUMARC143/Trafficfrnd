@@ -10,7 +10,8 @@ import {
   TextInput,
   Linking,
   RefreshControl,
-  Dimensions
+  Dimensions,
+  Platform
 } from 'react-native';
 import { ThemedText } from '@cmp/ThemedText';
 import { ThemedView } from '@cmp/ThemedView';
@@ -109,13 +110,12 @@ export default function OrderDetailsScreen() {
       try {
         const data = await fetchOrderDetails(id as string);
         setOrder(data);
-        // If order is completed > 24h ago, exit tracking
+        // If order is completed, do not show in tracking page — redirect to Orders list
         try {
           const completed = String(data?.status || '').toLowerCase() === 'completed';
-          const updated = data?.updatedAt || data?.timestamp;
-          if (completed && !isWithinLast24h(updated)) {
-            Alert.alert('Order archived', 'This order was completed more than a day ago. You can still find it in your profile/orders.');
+          if (completed) {
             router.replace('/orders');
+            return;
           }
         } catch {}
         // Normalize delivery boy currentLocation from GeoJSON if available
@@ -145,25 +145,25 @@ export default function OrderDetailsScreen() {
       const loadActive = async () => {
         try {
           const all = await fetchUserOrders();
-          const active = (Array.isArray(all) ? all : []).filter((o: any) =>
-            {
-              const s = String(o?.status || '').toLowerCase();
-              if (['pending', 'confirmed', 'preparing', 'enroute', 'ready'].includes(s)) return true;
-              // Keep completed orders for 24h in the tracker
-              if (s === 'completed') {
-                const updated = o?.updatedAt || o?.timestamp;
-                return isWithinLast24h(updated);
-              }
-              return false;
-            }
-          );
+          const active = (Array.isArray(all) ? all : []).filter((o: any) => {
+            const s = String(o?.status || '').toLowerCase();
+            // Only show truly active orders in tracker; exclude completed and cancelled
+            return ['pending', 'confirmed', 'preparing', 'enroute', 'ready'].includes(s);
+          });
           // Sort latest first by updatedAt (fallback to timestamp)
           active.sort((a: any, b: any) => {
             const ad = new Date(a?.updatedAt || a?.timestamp || 0).getTime();
             const bd = new Date(b?.updatedAt || b?.timestamp || 0).getTime();
             return bd - ad;
           });
-          if (mounted) setActiveOrders(active.map((o: any) => ({ _id: String(o._id), status: String(o.status || ''), updatedAt: o?.updatedAt, timestamp: o?.timestamp })));
+          if (mounted) {
+            setActiveOrders(active.map((o: any) => ({ _id: String(o._id), status: String(o.status || ''), updatedAt: o?.updatedAt, timestamp: o?.timestamp })));
+            // If current route is missing or not the latest, jump to the latest active order
+            const latest = active[0];
+            if (latest && String(latest._id) !== String(id)) {
+              router.replace({ pathname: '/order-details/[id]', params: { id: String(latest._id) } });
+            }
+          }
         } catch {}
       };
       loadActive();
@@ -171,18 +171,12 @@ export default function OrderDetailsScreen() {
     }, [])
   );
 
-  // If current order transitions to completed and becomes older than 24h, auto-exit on next mount
+  // If current order transitions to completed, exit tracking to Orders list
   useEffect(() => {
     if (!order) return;
     const s = String(order.status || '').toLowerCase();
     if (s === 'completed') {
-      const updated = order.updatedAt || order.timestamp;
-      if (!isWithinLast24h(updated)) {
-        try {
-          Alert.alert('Order archived', 'This order has been archived from tracking. View it in your profile/orders.');
-        } catch {}
-        router.replace('/orders');
-      }
+      router.replace('/orders');
     }
   }, [order?.status, order?.updatedAt]);
 
@@ -480,7 +474,7 @@ export default function OrderDetailsScreen() {
         <ThemedText style={{ fontSize: 48 }}>⚠️</ThemedText>
         <ThemedText style={styles.errorText}>Order not found</ThemedText>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ThemedText style={styles.backButtonText}>Go Back</ThemedText>
+          <ThemedText style={styles.backNavButtonText}>Go Back</ThemedText>
         </TouchableOpacity>
       </ThemedView>
     );
@@ -531,10 +525,17 @@ export default function OrderDetailsScreen() {
         )}
         {/* Order Status Header */}
         <View style={styles.statusHeader}>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
-            <ThemedText style={styles.statusText}>{getStatusText(order.status)}</ThemedText>
+          <TouchableOpacity style={styles.backNavButton} onPress={() => router.back()}>
+            <ThemedText style={styles.backNavButtonText}>← Back</ThemedText>
+          </TouchableOpacity>
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
+              <ThemedText style={styles.statusText}>{getStatusText(order.status)}</ThemedText>
+            </View>
+            <ThemedText style={styles.orderId}>Order #{order._id.slice(-8)}</ThemedText>
           </View>
-          <ThemedText style={styles.orderId}>Order #{order._id.slice(-8)}</ThemedText>
+          {/* right spacer to balance back button width */}
+          <View style={{ width: 68 }} />
         </View>
 
         {/* Map View (hidden when completed) */}
@@ -593,6 +594,26 @@ export default function OrderDetailsScreen() {
                 />
               )}
             </MapView>
+            {(typeof order.selectedDeliveryPoint?.latitude === 'number' && typeof order.selectedDeliveryPoint?.longitude === 'number') && (
+              <TouchableOpacity
+                style={styles.navigateButton}
+                onPress={() => {
+                  try {
+                    const lat = order.selectedDeliveryPoint.latitude;
+                    const lng = order.selectedDeliveryPoint.longitude;
+                    const label = encodeURIComponent(order.selectedDeliveryPoint.name || 'Delivery Point');
+                    const url = Platform.select({
+                      ios: `http://maps.apple.com/?ll=${lat},${lng}&q=${label}`,
+                      android: `geo:${lat},${lng}?q=${lat},${lng}(${label})`,
+                      default: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
+                    });
+                    if (url) Linking.openURL(url as string);
+                  } catch {}
+                }}
+              >
+                <ThemedText style={styles.navigateButtonText}>Go to delivery point</ThemedText>
+              </TouchableOpacity>
+            )}
             {/* Map gestures hint */}
             <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}>
               <ThemedText style={{ color: '#fff', fontSize: 12 }}>
@@ -870,14 +891,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 20,
   },
-  backButtonText: {
+  backButtonLegacyText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },
   statusHeader: {
     backgroundColor: '#fff',
-    padding: 20,
+    padding: 16,
     marginBottom: 10,
     borderRadius: 12,
     shadowColor: '#000',
@@ -885,13 +906,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  backNavButton: {
+    paddingHorizontal: 14,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E8F5E9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backNavButtonText: {
+    color: '#2E7D32',
+    fontSize: 16,
+    fontWeight: '800',
   },
   statusBadge: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    alignSelf: 'flex-start',
-    marginBottom: 10,
   },
   statusText: {
     color: '#fff',
@@ -917,6 +953,20 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  navigateButton: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    elevation: 2,
+  },
+  navigateButtonText: {
+    color: '#fff',
+    fontWeight: '800',
   },
   section: {
     backgroundColor: '#fff',

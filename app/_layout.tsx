@@ -13,7 +13,7 @@ export {
 } from 'expo-router';
 
 export const unstable_settings = {
-  initialRouteName: 'mode-selection',
+  initialRouteName: '(tabs)',
 };
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -62,7 +62,7 @@ function RootLayoutNav() {
           headerShown: false,
         }}
       >
-        <Stack.Screen name="mode-selection" options={{ headerShown: false }} />
+        {/* Mode selection disabled to go straight to home */}
         <Stack.Screen 
           name="(tabs)" 
           options={{ 

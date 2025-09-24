@@ -8,6 +8,7 @@ const Order = require('../models/Order');
 const User = require('../models/User');
 const Vendor = require('../models/Vendor');
 const DeliveryBoy = require('../models/DeliveryBoy');
+const Alert = require('../models/Alert');
 
 // --- ADMIN ORDER MANAGEMENT ENDPOINTS ---
 // List all orders (admin)
@@ -48,7 +49,8 @@ router.get('/admin/:orderId', auth, async (req, res) => {
 router.patch('/admin/:orderId/status', auth, async (req, res) => {
   try {
     console.log('PATCH /admin/:orderId/status called by user:', req.user);
-    const { status } = req.body;
+    let { status } = req.body;
+    if (status === 'preparing') status = 'confirmed';
     // Only allow admin or super_admin
     if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'super_admin')) {
       return res.status(403).json({ message: 'Forbidden: Only admins can update order status' });
@@ -77,6 +79,27 @@ router.patch('/admin/:orderId/status', auth, async (req, res) => {
       }
     } catch (e) {
       console.warn('Admin status emit failed:', e?.message || e);
+    }
+    // Create user alert for admin-driven status changes as well
+    try {
+      const statusTextMap = {
+        pending: 'Pending',
+        confirmed: 'Confirmed',
+        preparing: 'Preparing',
+        enroute: 'On the way',
+        ready: 'Ready for pickup',
+        completed: 'Delivered',
+        cancelled: 'Cancelled'
+      };
+      const created = await Alert.create({
+        title: 'Order Update',
+        message: `Order #${String(order._id).slice(-8)}: ${statusTextMap[order.status] || order.status}`,
+        type: 'order-update',
+        userId: order.user,
+      });
+      console.log('[ALERT] Admin status alert created:', created && created._id, 'for user', String(order.user), 'order', String(order._id), 'status', order.status);
+    } catch (e) {
+      console.warn('Admin status alert failed:', e?.message || e);
     }
     res.json(order);
   } catch (error) {

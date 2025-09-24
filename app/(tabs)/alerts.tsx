@@ -3,18 +3,18 @@ import { StyleSheet, FlatList, View, TouchableOpacity, RefreshControl, Alert as 
 import { ThemedText } from '@cmp/ThemedText';
 import { ThemedView } from '@cmp/ThemedView';
 import BottomNavigationBar from '@cmp/_components/BottomNavigationBar';
-import { Ionicons } from '@expo/vector-icons';
 import { fetchAlerts, deleteAlert, clearAllAlerts, markAlertRead } from '../../services/alertService';
 import { Audio } from 'expo-av';
 import { Swipeable } from 'react-native-gesture-handler';
 import { router } from 'expo-router';
 
 const alertTypeIcon = (type: string) => {
+  const style = { marginRight: 12, fontSize: 24 } as const;
   switch (type) {
-    case 'traffic': return <Ionicons name="car-sport-outline" size={28} color="#FF9800" style={{ marginRight: 12 }} />;
-    case 'delivery': return <Ionicons name="cube-outline" size={28} color="#4CAF50" style={{ marginRight: 12 }} />;
-    case 'system': return <Ionicons name="alert-circle-outline" size={28} color="#2196F3" style={{ marginRight: 12 }} />;
-    default: return <Ionicons name="notifications-outline" size={28} color="#888" style={{ marginRight: 12 }} />;
+    case 'traffic': return <Text style={style}>🚗</Text>;
+    case 'delivery': return <Text style={style}>📦</Text>;
+    case 'system': return <Text style={style}>⚠️</Text>;
+    default: return <Text style={style}>🔔</Text>;
   }
 };
 
@@ -68,14 +68,16 @@ export default function AlertsScreen() {
 
       // Map backend fields to UI fields and sort by creation time
       const mappedAlerts = uniqueAlerts
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .map(alert => ({
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .map((alert: any) => ({
           id: alert._id,
           type: alert.type,
           title: alert.title,
           message: alert.message,
           timestamp: new Date(alert.createdAt).getTime(),
           read: alert.read,
+          userId: alert.userId || null,
+          deletable: !!alert.userId, // only user-owned alerts can be deleted (backend policy)
         }));
 
       setAlerts(mappedAlerts);
@@ -150,9 +152,16 @@ export default function AlertsScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Clear All', style: 'destructive', onPress: async () => {
         try {
-          await clearAllAlerts(alerts);
+          // Only delete alerts the user owns. System/global alerts are not deletable by users.
+          const deletable = alerts.filter(a => a.deletable).map(a => a.id);
+          if (deletable.length > 0) {
+            await clearAllAlerts(deletable);
+          }
+          // Clear the screen immediately (also hides system/global alerts locally)
           setAlerts([]);
-          previousAlertCount.current = 0; // Reset counter
+          previousAlertCount.current = 0; // Reset counter for new-alert sound logic
+          // Prevent auto-refresh from re-adding immediately
+          lastFetchTime.current = Date.now();
         } catch (error) {
           console.error('Error clearing alerts:', error);
           RNAlert.alert('Error', 'Failed to clear alerts.');
@@ -173,12 +182,19 @@ export default function AlertsScreen() {
   };
 
   const handleMarkRead = async (id: string) => {
+    const target = alerts.find(a => a.id === id);
+    // If system/global (non-deletable), mark read locally without API
+    if (target && !target.deletable) {
+      setAlerts(prev => prev.map(alert => alert.id === id ? { ...alert, read: true } : alert));
+      return;
+    }
     try {
       await markAlertRead(id);
       setAlerts(prev => prev.map(alert => alert.id === id ? { ...alert, read: true } : alert));
     } catch (error) {
       console.error('Error marking alert as read:', error);
-      RNAlert.alert('Error', 'Failed to mark alert as read.');
+      // Fallback: mark locally so UI doesn't block
+      setAlerts(prev => prev.map(alert => alert.id === id ? { ...alert, read: true } : alert));
     }
   };
 
@@ -186,32 +202,45 @@ export default function AlertsScreen() {
     loadAlerts();
   };
 
-  const renderItem = ({ item }: { item: any }) => (
-    <Swipeable
-      renderRightActions={() => (
-        <View style={{ justifyContent: 'center', alignItems: 'center', width: 80, backgroundColor: '#FF5252', borderRadius: 14, marginVertical: 7 }}>
-          <Ionicons name="trash" size={28} color="#fff" />
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 12 }}>Delete</Text>
-        </View>
-      )}
-      rightThreshold={80}
-      onSwipeableRightOpen={() => handleDelete(item.id)}
-    >
-      <View style={[styles.alertCard, !item.read && styles.unreadCard]}> 
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          {alertTypeIcon(item.type)}
-          <View style={{ flex: 1 }}>
-            <ThemedText style={styles.alertTitle}>{item.title}</ThemedText>
-            <ThemedText style={styles.alertMessage}>{item.message}</ThemedText>
-            <View style={styles.alertFooter}>
-              <ThemedText style={styles.alertType}>{item.type.charAt(0).toUpperCase() + item.type.slice(1)}</ThemedText>
-              <ThemedText style={styles.alertTime}>{formatTime(item.timestamp)}</ThemedText>
+  const renderItem = ({ item }: { item: any }) => {
+    const Card = (
+      <TouchableOpacity activeOpacity={0.8} onPress={() => handleMarkRead(item.id)}>
+        <View style={[styles.alertCard, !item.read && styles.unreadCard]}> 
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {alertTypeIcon(item.type)}
+            <View style={{ flex: 1 }}>
+              <ThemedText style={styles.alertTitle}>{item.title}</ThemedText>
+              <ThemedText style={styles.alertMessage}>{item.message}</ThemedText>
+              <View style={styles.alertFooter}>
+                <ThemedText style={styles.alertType}>{item.type.charAt(0).toUpperCase() + item.type.slice(1)}</ThemedText>
+                <ThemedText style={styles.alertTime}>{formatTime(item.timestamp)}</ThemedText>
+              </View>
             </View>
           </View>
         </View>
-      </View>
-    </Swipeable>
-  );
+      </TouchableOpacity>
+    );
+
+    if (!item.deletable) {
+      // System/global alert: no swipe delete
+      return Card;
+    }
+
+    return (
+      <Swipeable
+        renderRightActions={() => (
+          <View style={{ justifyContent: 'center', alignItems: 'center', width: 80, backgroundColor: '#FF5252', borderRadius: 14, marginVertical: 7 }}>
+            <Text style={{ fontSize: 24, color: '#fff' }}>🗑️</Text>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 12 }}>Delete</Text>
+          </View>
+        )}
+        rightThreshold={80}
+        onSwipeableRightOpen={() => handleDelete(item.id)}
+      >
+        {Card}
+      </Swipeable>
+    );
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -219,33 +248,33 @@ export default function AlertsScreen() {
         <ThemedText style={styles.title}>Alerts</ThemedText>
         {alerts.length > 0 && (
           <TouchableOpacity onPress={handleClearAll} style={styles.clearAllBtn}>
-            <Ionicons name="trash-outline" size={20} color="#FF5252" />
+            <Text style={{ color: '#FF5252', fontSize: 16, marginRight: 4 }}>🗑️</Text>
             <ThemedText style={styles.clearAllText}>Clear All</ThemedText>
           </TouchableOpacity>
         )}
       </View>
       {loading ? (
         <View style={styles.loadingState}>
-          <Ionicons name="hourglass-outline" size={48} color="#4CAF50" style={{ marginBottom: 10 }} />
+          <Text style={{ fontSize: 40, marginBottom: 10 }}>⏳</Text>
           <ThemedText style={styles.loadingText}>Loading alerts...</ThemedText>
         </View>
       ) : alerts.length === 0 ? (
         <View style={styles.emptyState}>
           {authError ? (
             <>
-              <Ionicons name="lock-closed-outline" size={48} color="#FF9800" style={{ marginBottom: 10 }} />
+              <Text style={{ fontSize: 40, marginBottom: 10 }}>🔒</Text>
               <ThemedText style={styles.emptyText}>Please log in to view your alerts.</ThemedText>
               <TouchableOpacity 
                 style={styles.loginButton}
                 onPress={() => router.push('/(tabs)/profile')}
               >
-                <Ionicons name="log-in-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+                <Text style={{ color: '#fff', fontSize: 16, marginRight: 8 }}>➡️</Text>
                 <ThemedText style={styles.loginButtonText}>Go to Login</ThemedText>
               </TouchableOpacity>
             </>
           ) : (
             <>
-              <Ionicons name="notifications-off-outline" size={48} color="#bbb" style={{ marginBottom: 10 }} />
+              <Text style={{ fontSize: 40, marginBottom: 10 }}>🔕</Text>
               <ThemedText style={styles.emptyText}>No alerts yet. You'll see traffic, delivery, and system alerts here.</ThemedText>
             </>
           )}
@@ -273,7 +302,7 @@ export default function AlertsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
-              <Ionicons name="lock-closed-outline" size={48} color="#FF9800" style={{ marginBottom: 16 }} />
+              <Text style={{ fontSize: 40, marginBottom: 16 }}>🔒</Text>
               <ThemedText style={styles.modalTitle}>Authentication Required</ThemedText>
               <ThemedText style={styles.modalMessage}>Please log in to view your alerts.</ThemedText>
               
@@ -292,7 +321,7 @@ export default function AlertsScreen() {
                     router.push('/(tabs)/profile');
                   }}
                 >
-                  <Ionicons name="log-in-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+                  <Text style={{ color: '#fff', fontSize: 16, marginRight: 8 }}>➡️</Text>
                   <ThemedText style={styles.loginButtonText}>Go to Login</ThemedText>
                 </TouchableOpacity>
               </View>

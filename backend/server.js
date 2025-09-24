@@ -71,6 +71,8 @@ io.use((socket, next) => {
 
 // Make io accessible to routes
 app.set('io', io);
+// Disable ETag to prevent 304 caching interfering with fresh alert lists
+app.set('etag', false);
 
 // CORS configuration
 const corsOptions = {

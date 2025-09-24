@@ -15,7 +15,4 @@ router.delete('/:id', auth, alertController.deleteAlert);
 // Mark an alert as read
 router.put('/:id/read', auth, alertController.markAlertRead);
 
-// Mark an alert as read
-router.put('/:id/read', auth, alertController.markAlertRead);
-
 module.exports = router; 

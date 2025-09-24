@@ -495,7 +495,7 @@ export default function ProfileScreen() {
 
   if (authState.isLoading) {
     return (
-      <ThemedView style={styles.container}>
+      <ThemedView style={{ flex: 1, backgroundColor: '#f7f8fa', justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#4CAF50" />
       </ThemedView>
     );
@@ -866,11 +866,11 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#f7f8fa',
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#f7f8fa',
   },
   headerSafeArea: {
     backgroundColor: '#4CAF50',

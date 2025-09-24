@@ -284,7 +284,7 @@ export default function MapScreen() {
       `Do you want to explore items at ${point.name}?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Search', onPress: () => router.push('/search') }
+        { text: 'Search', onPress: () => router.push('/(tabs)/search') }
       ]
     );
   };

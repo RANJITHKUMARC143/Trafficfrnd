@@ -5,7 +5,7 @@ import { ThemedView } from '@cmp/ThemedView';
 import BottomNavigationBar from '@cmp/_components/BottomNavigationBar';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import * as Location from 'expo-location';
 import { router, useLocalSearchParams } from 'expo-router';
 import MapView, { Marker, Polyline } from 'react-native-maps';
@@ -182,7 +182,7 @@ export default function HomeScreen() {
         try {
           const orders = await fetchUserOrders();
           const active = (orders || []).find((o: any) =>
-            ['confirmed','preparing','enroute','ready'].includes(String(o?.status || '').toLowerCase())
+            ['pending','confirmed','enroute','ready'].includes(String(o?.status || '').toLowerCase())
           );
           if (mounted) setActiveOrderId(active?._id || null);
         } catch (e) {
@@ -190,10 +190,19 @@ export default function HomeScreen() {
         }
       };
       loadActiveOrder();
-      const t = setInterval(loadActiveOrder, 20000);
+      const t = setInterval(loadActiveOrder, 10000);
       return () => { mounted = false; clearInterval(t); };
     }, [])
   );
+
+  // Animate Track button visibility based on active order presence
+  useEffect(() => {
+    Animated.timing(callButtonAnimation, {
+      toValue: activeOrderId ? 1 : 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [activeOrderId]);
 
   const [searchFilters, setSearchFilters] = useState({
     category: '',
@@ -204,6 +213,7 @@ export default function HomeScreen() {
   const [showFilters, setShowFilters] = useState(false);
   const [searchBarFloating, setSearchBarFloating] = useState(false);
   const [searchBarAnimation] = useState(new Animated.Value(0));
+  const [searchDebounceTimeout, setSearchDebounceTimeout] = useState<NodeJS.Timeout | null>(null);
 
   // Fallback menu items for when API is down
   const fallbackMenuItems: MenuItem[] = [
@@ -278,6 +288,62 @@ export default function HomeScreen() {
       updatedAt: new Date().toISOString(),
     }
   ];
+
+  // Source list for search and filtering (fix for runtime error when referenced)
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [filteredMenuItems, setFilteredMenuItems] = useState<MenuItem[]>([]);
+  const [recentlyViewedIds, setRecentlyViewedIds] = useState<string[]>([]);
+  const [recentlyViewedItems, setRecentlyViewedItems] = useState<MenuItem[]>([]);
+
+  // Load all menu items once for searching/filtering and set initial filtered list
+  useEffect(() => {
+    let isActive = true;
+    menuService.getAllMenuItems().then((items) => {
+      if (!isActive) return;
+      const list = items && items.length > 0 ? items : fallbackMenuItems;
+      setMenuItems(list);
+      setFilteredMenuItems(list);
+    }).catch(() => {
+      if (!isActive) return;
+      setMenuItems(fallbackMenuItems);
+      setFilteredMenuItems(fallbackMenuItems);
+    });
+    return () => { isActive = false; };
+  }, []);
+
+  // Recently viewed
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem('recentlyViewed');
+        const ids: string[] = raw ? JSON.parse(raw) : [];
+        setRecentlyViewedIds(ids);
+      } catch {}
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (recentlyViewedIds.length && menuItems.length) {
+      const index = new Map(menuItems.map((m) => [String(m._id), m]));
+      const items: MenuItem[] = recentlyViewedIds
+        .map((id) => index.get(String(id)))
+        .filter(Boolean) as MenuItem[];
+      setRecentlyViewedItems(items);
+    } else {
+      setRecentlyViewedItems([]);
+    }
+  }, [recentlyViewedIds, menuItems]);
+
+  const addRecentlyViewed = useCallback(async (id: string) => {
+    try {
+      const raw = await AsyncStorage.getItem('recentlyViewed');
+      let ids: string[] = raw ? JSON.parse(raw) : [];
+      ids = [id, ...ids.filter((x) => x !== id)];
+      if (ids.length > 12) ids = ids.slice(0, 12);
+      await AsyncStorage.setItem('recentlyViewed', JSON.stringify(ids));
+      setRecentlyViewedIds(ids);
+    } catch {}
+  }, []);
 
   useEffect(() => {
     getCurrentLocation();
@@ -377,6 +443,13 @@ export default function HomeScreen() {
       ]).start(() => createPulseAnimation());
     };
     createPulseAnimation();
+    
+    // Cleanup debounce timeout on unmount
+    return () => {
+      if (searchDebounceTimeout) {
+        clearTimeout(searchDebounceTimeout);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -581,7 +654,7 @@ export default function HomeScreen() {
     // Only allow navigation for the first 4 categories
     if ([1, 2, 3, 4].includes(category.id)) {
       router.push({
-        pathname: '/search',
+        pathname: '/(tabs)/search',
         params: { category: category.name }
       });
     }
@@ -601,15 +674,100 @@ export default function HomeScreen() {
     });
   };
 
-  const handleSearch = () => {
+  const handleSearch = useCallback(() => {
     if (searchQuery.trim()) {
       saveSearchHistory(searchQuery.trim());
       router.push({
-        pathname: '/search' as any,
+        pathname: '/(tabs)/search' as any,
         params: { q: searchQuery }
       });
     }
-  };
+  }, [searchQuery]);
+
+  // Debounced search handler for floating search bar
+  const handleFloatingSearchInputChange = useCallback((text: string) => {
+    setSearchQuery(text);
+    
+    // Clear existing timeout
+    if (searchDebounceTimeout) {
+      clearTimeout(searchDebounceTimeout);
+    }
+    
+    // Set new timeout for debounced search
+    const timeout = setTimeout(() => {
+      if (text.trim()) {
+        const filtered = menuItems.filter(item =>
+          item.name.toLowerCase().includes(text.toLowerCase()) ||
+          item.description.toLowerCase().includes(text.toLowerCase()) ||
+          item.category.toLowerCase().includes(text.toLowerCase())
+        );
+        setFilteredMenuItems(filtered);
+      } else {
+        setFilteredMenuItems(menuItems);
+      }
+    }, 300); // 300ms debounce
+    
+    setSearchDebounceTimeout(timeout);
+  }, [menuItems, searchDebounceTimeout]);
+
+  // Memoized Floating Search Bar Component
+  const FloatingSearchBar = memo(({ 
+    searchQuery, 
+    onSearchInputChange, 
+    onSearch, 
+    onClearSearch,
+    searchBarAnimation 
+  }: {
+    searchQuery: string;
+    onSearchInputChange: (text: string) => void;
+    onSearch: () => void;
+    onClearSearch: () => void;
+    searchBarAnimation: Animated.Value;
+  }) => (
+    <Animated.View 
+      style={[
+        styles.floatingSearchContainer,
+        {
+          opacity: searchBarAnimation,
+          transform: [{
+            translateY: searchBarAnimation.interpolate({
+              inputRange: [0, 1],
+              outputRange: [100, 0],
+            })
+          }]
+        }
+      ]}
+    >
+      <View style={styles.floatingSearchBar}>
+        <Ionicons name="search" size={20} color="#4CAF50" />
+        <TextInput
+          style={styles.floatingSearchInput}
+          placeholder="Search..."
+          value={searchQuery}
+          onChangeText={onSearchInputChange}
+          onSubmitEditing={onSearch}
+          placeholderTextColor="#9CA3AF"
+          returnKeyType="search"
+          autoCorrect={false}
+          autoCapitalize="none"
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity
+            onPress={onClearSearch}
+            style={styles.floatingClearButton}
+          >
+            <Ionicons name="close" size={18} color="#9CA3AF" />
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity 
+          style={styles.floatingSearchActionButton}
+          onPress={onSearch}
+        >
+          <Ionicons name="search" size={16} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  ));
 
   const handleSearchFocus = () => {
     setSearchFocused(true);
@@ -632,6 +790,16 @@ export default function HomeScreen() {
     }, 150);
   };
 
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    setSearchSuggestions([]);
+    setFilteredMenuItems(menuItems);
+    if (searchDebounceTimeout) {
+      clearTimeout(searchDebounceTimeout);
+      setSearchDebounceTimeout(null);
+    }
+  }, [menuItems, searchDebounceTimeout]);
+
   const handleSuggestionPress = (item: MenuItem) => {
     setSearchQuery(item.name);
     setSearchSuggestions([]);
@@ -643,7 +811,7 @@ export default function HomeScreen() {
     setSearchQuery(query);
     setSearchSuggestions([]);
     router.push({
-      pathname: '/search' as any,
+      pathname: '/(tabs)/search' as any,
       params: { q: query }
     });
   };
@@ -653,7 +821,7 @@ export default function HomeScreen() {
     setSearchSuggestions([]);
     saveSearchHistory(query);
     router.push({
-      pathname: '/search' as any,
+      pathname: '/(tabs)/search' as any,
       params: { q: query }
     });
   };
@@ -1045,25 +1213,15 @@ export default function HomeScreen() {
     requestAnimationFrame(() => {
       const scrollY = capturedY;
 
-      // Show floating search bar when scrolled down
-      if (scrollY > 100) {
-        if (!searchBarFloating) {
-          setSearchBarFloating(true);
-          Animated.timing(searchBarAnimation, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }).start();
-        }
-      } else {
-        if (searchBarFloating) {
-          setSearchBarFloating(false);
-          Animated.timing(searchBarAnimation, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }).start();
-        }
+      // Show floating search bar when scrolled down - optimized with throttling
+      const shouldShowFloating = scrollY > 100;
+      if (shouldShowFloating !== searchBarFloating) {
+        setSearchBarFloating(shouldShowFloating);
+        Animated.timing(searchBarAnimation, {
+          toValue: shouldShowFloating ? 1 : 0,
+          duration: 200, // Reduced duration for snappier response
+          useNativeDriver: true,
+        }).start();
       }
 
       if (!isScrolling) {
@@ -1653,7 +1811,7 @@ export default function HomeScreen() {
         <View style={styles.modernRecommendedSection}> 
           <View style={styles.sectionHeader}>
             <ThemedText style={styles.modernSectionTitle}>Recommended for You</ThemedText>
-            <TouchableOpacity onPress={() => router.push('/search')}>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/search')}>
               <ThemedText style={styles.viewAllText}>View All</ThemedText>
             </TouchableOpacity>
           </View>
@@ -1684,7 +1842,7 @@ export default function HomeScreen() {
                   key={item._id}
                   style={styles.modernRecommendedCard}
                   activeOpacity={0.9}
-                  onPress={() => router.push({ pathname: '/item/[id]', params: { id: item._id } })}
+                  onPress={async () => { await addRecentlyViewed(String(item._id)); router.push({ pathname: '/item/[id]', params: { id: item._id } }); }}
                 >
                   <View style={styles.cardImageContainer}>
                   <Image
@@ -1705,10 +1863,7 @@ export default function HomeScreen() {
                     {item.description && (
                       <ThemedText style={styles.modernItemDescription} numberOfLines={2}>{item.description}</ThemedText>
                     )}
-                    <View style={styles.modernInfoRow}>
-                      <Ionicons name="time-outline" size={14} color="#6B7280" />
-                      <ThemedText style={styles.modernInfoText}>{item.preparationTime ? `${item.preparationTime} min` : 'N/A'}</ThemedText>
-                    </View>
+                    {/* Removed estimated time from home product card */}
                     <TouchableOpacity
                       style={styles.modernAddButton}
                       onPress={async () => {
@@ -1744,11 +1899,79 @@ export default function HomeScreen() {
           )}
         </View>
 
+        {/* Recently Viewed */}
+        {recentlyViewedItems.length > 0 && (
+          <View style={styles.modernTopRatedSection}>
+            <View style={styles.sectionHeader}>
+              <ThemedText style={styles.modernSectionTitle}>Continue Ordering</ThemedText>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/search')}>
+                <ThemedText style={styles.viewAllText}>View All</ThemedText>
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.modernScrollView}
+              contentContainerStyle={styles.modernScrollContent}
+            >
+              {recentlyViewedItems.map((item: MenuItem) => (
+                <TouchableOpacity
+                  key={`rv-${item._id}`}
+                  style={styles.modernTopRatedCard}
+                  activeOpacity={0.9}
+                  onPress={async () => { await addRecentlyViewed(String(item._id)); router.push({ pathname: '/item/[id]', params: { id: item._id } }); }}
+                >
+                  <View style={styles.cardImageContainer}>
+                    <Image source={{ uri: item.image || 'https://via.placeholder.com/300' }} style={styles.modernRecommendedImage} resizeMode="cover" />
+                  </View>
+                  <View style={styles.modernCardContent}>
+                    <ThemedText style={styles.modernItemName} numberOfLines={1}>{item.name}</ThemedText>
+                    <ThemedText style={styles.modernItemPrice}>₹{item.price}</ThemedText>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Budget Picks Under ₹100 */}
+        <View style={styles.modernTopRatedSection}>
+          <View style={styles.sectionHeader}>
+            <ThemedText style={styles.modernSectionTitle}>Budget Picks • Under ₹100</ThemedText>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/search')}>
+              <ThemedText style={styles.viewAllText}>Explore</ThemedText>
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.modernScrollView}
+            contentContainerStyle={styles.modernScrollContent}
+          >
+            {(menuItems.filter((m) => (m.price || 0) <= 100).slice(0, 12)).map((item: MenuItem) => (
+              <TouchableOpacity
+                key={`bp-${item._id}`}
+                style={styles.modernRecommendedCard}
+                activeOpacity={0.9}
+                onPress={async () => { await addRecentlyViewed(String(item._id)); router.push({ pathname: '/item/[id]', params: { id: item._id } }); }}
+              >
+                <View style={styles.cardImageContainer}>
+                  <Image source={{ uri: item.image || 'https://via.placeholder.com/300' }} style={styles.modernRecommendedImage} resizeMode="cover" />
+                </View>
+                <View style={styles.modernCardContent}>
+                  <ThemedText style={styles.modernItemName} numberOfLines={1}>{item.name}</ThemedText>
+                  <ThemedText style={styles.modernItemPrice}>₹{item.price}</ThemedText>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
         {/* Modern Top Rated Section */}
         <View style={styles.modernTopRatedSection}> 
           <View style={styles.sectionHeader}>
             <ThemedText style={styles.modernSectionTitle}>Top Rated Items</ThemedText>
-            <TouchableOpacity onPress={() => router.push('/search')}>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/search')}>
               <ThemedText style={styles.viewAllText}>View All</ThemedText>
             </TouchableOpacity>
           </View>
@@ -1779,7 +2002,7 @@ export default function HomeScreen() {
                   key={item._id}
                   style={styles.modernTopRatedCard}
                   activeOpacity={0.9}
-                  onPress={() => router.push({ pathname: '/item/[id]', params: { id: item._id } })}
+                  onPress={async () => { await addRecentlyViewed(String(item._id)); router.push({ pathname: '/item/[id]', params: { id: item._id } }); }}
                 >
                   <View style={styles.cardImageContainer}>
                   <Image
@@ -1804,10 +2027,7 @@ export default function HomeScreen() {
                     {item.description && (
                       <ThemedText style={styles.modernItemDescription} numberOfLines={2}>{item.description}</ThemedText>
                     )}
-                    <View style={styles.modernInfoRow}>
-                      <Ionicons name="time-outline" size={14} color="#6B7280" />
-                      <ThemedText style={styles.modernInfoText}>{item.preparationTime ? `${item.preparationTime} min` : 'N/A'}</ThemedText>
-                    </View>
+                    {/* Removed estimated time from home product card */}
                     <TouchableOpacity
                       style={styles.modernAddButton}
                       onPress={async () => {
@@ -2067,51 +2287,15 @@ export default function HomeScreen() {
         </Modal>
       )}
 
-      {/* Floating Search Bar */}
-      {searchBarFloating && (
-        <Animated.View 
-          style={[
-            styles.floatingSearchContainer,
-            {
-              opacity: searchBarAnimation,
-              transform: [{
-                translateY: searchBarAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [100, 0],
-                })
-              }]
-            }
-          ]}
-        >
-          <View style={styles.floatingSearchBar}>
-            <Ionicons name="search" size={20} color="#4CAF50" />
-            <TextInput
-              style={styles.floatingSearchInput}
-              placeholder="Search..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              onFocus={handleSearchFocus}
-              onBlur={handleSearchBlur}
-              onSubmitEditing={handleSearch}
-              placeholderTextColor="#9CA3AF"
-              returnKeyType="search"
-            />
-            {searchQuery.length > 0 && (
-        <TouchableOpacity
-                onPress={() => { setSearchQuery(''); setSearchSuggestions([]); }} 
-                style={styles.floatingClearButton}
-              >
-                <Ionicons name="close" size={18} color="#9CA3AF" />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity 
-              style={styles.floatingSearchActionButton}
-              onPress={handleSearch}
-            >
-              <Ionicons name="search" size={16} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
+      {/* Floating Search Bar (hidden when fixed bar is focused/visible) */}
+      {searchBarFloating && !searchFocused && (
+        <FloatingSearchBar
+          searchQuery={searchQuery}
+          onSearchInputChange={handleFloatingSearchInputChange}
+          onSearch={handleSearch}
+          onClearSearch={handleClearSearch}
+          searchBarAnimation={searchBarAnimation}
+        />
       )}
 
       {/* Floating Action Buttons */}
@@ -3733,6 +3917,9 @@ const styles = StyleSheet.create({
     color: '#333',
     marginLeft: 12,
     marginRight: 8,
+    // Performance optimizations
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   floatingClearButton: {
     padding: 4,

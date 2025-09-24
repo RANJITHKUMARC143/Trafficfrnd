@@ -191,7 +191,8 @@ const updateOrderStatus = async (req, res) => {
       out_for_delivery: 'enroute',
       en_route: 'enroute',
       on_the_way: 'enroute',
-      delivered: 'completed'
+      delivered: 'completed',
+      preparing: 'confirmed'
     };
     if (typeof status === 'string' && statusAliasMap[status]) {
       status = statusAliasMap[status];
@@ -235,6 +236,27 @@ const updateOrderStatus = async (req, res) => {
       order.status = 'confirmed';
       order.updatedAt = Date.now();
       await order.save();
+      // Alert user: delivery partner assigned
+      try {
+        let driverName = 'Delivery partner';
+        let driverPhone = '';
+        try {
+          const driver = await DeliveryBoy.findById(req.user._id).lean();
+          if (driver) {
+            driverName = driver.fullName || driverName;
+            driverPhone = driver.phone || '';
+          }
+        } catch {}
+        const details = driverPhone ? `${driverName} (${driverPhone})` : driverName;
+        await Alert.create({
+          title: 'Delivery Partner Assigned',
+          message: `We assigned ${details} to your order #${String(order._id).slice(-8)}`,
+          type: 'order-update',
+          userId: order.user,
+        });
+      } catch (e) {
+        console.warn('Failed to create alert for driver assignment:', e?.message || e);
+      }
       // Emit real-time update to all delivery boys
       const io = req.app.get('io');
       if (io) {
@@ -250,10 +272,8 @@ const updateOrderStatus = async (req, res) => {
       }
       return res.json({ success: true, order });
     }
-    // Prevent moving to 'preparing' unless a delivery boy is assigned
-    if (status === 'preparing' && !order.deliveryBoyId) {
-      return res.status(400).json({ message: 'Cannot move to preparing before a delivery boy is assigned.' });
-    }
+    // Remove legacy preparing status entirely
+    if (status === 'preparing') status = 'confirmed';
     // Otherwise, only allow vendor or assigned delivery boy to update
     const isVendorOwner = order.vendorId && order.vendorId.toString() === req.user._id.toString();
     const isAssignedDeliveryBoy = order.deliveryBoyId && order.deliveryBoyId.toString() === req.user._id.toString();
@@ -266,7 +286,6 @@ const updateOrderStatus = async (req, res) => {
       'pending',
       'confirmed',
       'enroute',
-      'preparing',
       'ready',
       'completed',
       'cancelled'
@@ -301,6 +320,26 @@ const updateOrderStatus = async (req, res) => {
       });
     }
     console.log('updateOrderStatus: success', { orderId, currentStatus: order.status, requestedStatus: status, deliveryBoyId: order.deliveryBoyId, user: req.user._id, role: req.user.role });
+    // Create alert for user on status change
+    try {
+      const statusTextMap = {
+        pending: 'Pending',
+        confirmed: 'Confirmed',
+        preparing: 'Preparing',
+        enroute: 'On the way',
+        ready: 'Ready for pickup',
+        completed: 'Delivered',
+        cancelled: 'Cancelled'
+      };
+      await Alert.create({
+        title: 'Order Update',
+        message: `Order #${String(order._id).slice(-8)}: ${statusTextMap[order.status] || order.status}`,
+        type: 'order-update',
+        userId: order.user,
+      });
+    } catch (e) {
+      console.warn('Failed to create alert for status update:', e?.message || e);
+    }
     // Return freshly loaded order to ensure client sees persisted changes
     const fresh = await Order.findById(orderId);
     res.json({ success: true, order: fresh || order });
@@ -533,7 +572,7 @@ const createOrder = async (req, res) => {
         }).limit(10).lean();
 
         // Current-load counts should match our canonical in-progress statuses
-        const activeStatuses = ['confirmed', 'preparing', 'enroute'];
+        const activeStatuses = ['confirmed', 'enroute'];
         // Compute current load for each candidate
         const candidatesWithLoad = await Promise.all(candidates.map(async (c, index) => {
           const load = await Order.countDocuments({ deliveryBoyId: c._id, status: { $in: activeStatuses } });
@@ -565,6 +604,18 @@ const createOrder = async (req, res) => {
       }
     } catch (assignErr) {
       console.error('Smart assignment failed. Not broadcasting to pool:', assignErr);
+    }
+
+    // Create a user alert for order creation
+    try {
+      await Alert.create({
+        title: 'Order Placed',
+        message: `Your order #${String(order._id).slice(-8)} has been placed successfully` ,
+        type: 'order-update',
+        userId: order.user,
+      });
+    } catch (e) {
+      console.warn('Failed to create alert for order creation:', e?.message || e);
     }
 
     // Admin console global notification for new order
@@ -720,6 +771,17 @@ const startTowardsDeliveryPoint = async (req, res) => {
         io.emit('adminOrderStatusUpdated', { orderId: String(order._id), status: order.status });
       }
     } catch {}
+    // Alert user: driver started towards delivery point
+    try {
+      await Alert.create({
+        title: 'On the way',
+        message: `Your friend is on the way for order #${String(order._id).slice(-8)}`,
+        type: 'order-update',
+        userId: order.user,
+      });
+    } catch (e) {
+      console.warn('Failed to create alert for driver started:', e?.message || e);
+    }
     res.json({ success: true, order });
   } catch (error) {
     console.error('startTowardsDeliveryPoint error:', error);
