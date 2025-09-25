@@ -29,8 +29,6 @@ const alertSchema = new mongoose.Schema({
   }
 });
 
-module.exports = mongoose.model('Alert', alertSchema); 
-
 // Post-save hook to send a push notification to the alert's user
 try {
   const push = require('../services/pushService');
@@ -48,3 +46,5 @@ try {
 } catch (e) {
   // ignore require errors in environments without push service
 }
+
+module.exports = mongoose.model('Alert', alertSchema);
