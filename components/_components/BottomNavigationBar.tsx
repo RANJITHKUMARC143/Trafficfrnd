@@ -35,10 +35,7 @@ export default function BottomNavigationBar({ keyboardOpen = false }: BottomNavi
     return pathname === route || pathname.startsWith(route);
   };
 
-  if (keyboardOpen) {
-    return null;
-  }
-
+  // Load unread alerts count on interval and route changes
   useEffect(() => {
     let mounted = true;
     const load = async () => {
@@ -53,6 +50,10 @@ export default function BottomNavigationBar({ keyboardOpen = false }: BottomNavi
     const t = setInterval(load, 15000);
     return () => { mounted = false; clearInterval(t); };
   }, [pathname]);
+
+  if (keyboardOpen) {
+    return null;
+  }
 
   return (
     <View style={styles.enhancedBottomNavBar} pointerEvents="box-none">

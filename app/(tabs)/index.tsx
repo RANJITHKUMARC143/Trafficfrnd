@@ -1926,7 +1926,37 @@ export default function HomeScreen() {
                   </View>
                   <View style={styles.modernCardContent}>
                     <ThemedText style={styles.modernItemName} numberOfLines={1}>{item.name}</ThemedText>
-                    <ThemedText style={styles.modernItemPrice}>₹{item.price}</ThemedText>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <ThemedText style={styles.modernItemPrice}>₹{item.price}</ThemedText>
+                      <TouchableOpacity
+                        style={styles.modernAddButton}
+                        onPress={async () => {
+                          try {
+                            const cartData = await AsyncStorage.getItem('cart');
+                            let cartItems = cartData ? JSON.parse(cartData) : [];
+                            const existingItemIndex = cartItems.findIndex((i: any) => i.id === item._id);
+                            if (existingItemIndex !== -1) {
+                              cartItems[existingItemIndex].quantity += 1;
+                            } else {
+                              cartItems.push({
+                                id: item._id,
+                                name: item.name,
+                                price: item.price,
+                                quantity: 1,
+                                imageUrl: item.image,
+                                vendorId: item.vendorId,
+                              });
+                            }
+                            await AsyncStorage.setItem('cart', JSON.stringify(cartItems));
+                            Alert.alert('Added to Cart', `${item.name} has been added to your cart.`);
+                          } catch (error) {
+                            Alert.alert('Error', 'Failed to add item to cart');
+                          }
+                        }}
+                      >
+                        <Ionicons name="add" size={18} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -1960,7 +1990,37 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.modernCardContent}>
                   <ThemedText style={styles.modernItemName} numberOfLines={1}>{item.name}</ThemedText>
-                  <ThemedText style={styles.modernItemPrice}>₹{item.price}</ThemedText>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <ThemedText style={styles.modernItemPrice}>₹{item.price}</ThemedText>
+                    <TouchableOpacity
+                      style={styles.modernAddButton}
+                      onPress={async () => {
+                        try {
+                          const cartData = await AsyncStorage.getItem('cart');
+                          let cartItems = cartData ? JSON.parse(cartData) : [];
+                          const existingItemIndex = cartItems.findIndex((i: any) => i.id === item._id);
+                          if (existingItemIndex !== -1) {
+                            cartItems[existingItemIndex].quantity += 1;
+                          } else {
+                            cartItems.push({
+                              id: item._id,
+                              name: item.name,
+                              price: item.price,
+                              quantity: 1,
+                              imageUrl: item.image,
+                              vendorId: item.vendorId,
+                            });
+                          }
+                          await AsyncStorage.setItem('cart', JSON.stringify(cartItems));
+                          Alert.alert('Added to Cart', `${item.name} has been added to your cart.`);
+                        } catch (error) {
+                          Alert.alert('Error', 'Failed to add item to cart');
+                        }
+                      }}
+                    >
+                      <Ionicons name="add" size={18} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </TouchableOpacity>
             ))}

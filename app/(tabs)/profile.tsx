@@ -8,6 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { API_URL } from '@src/config';
+import { registerPushToken } from '@lib/services/alertService';
+import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -291,6 +293,74 @@ export default function ProfileScreen() {
       const storedUser = await AsyncStorage.getItem('user');
       console.log('After login: stored token:', storedToken);
       console.log('After login: stored user:', storedUser);
+      // Register push token after login (dev/production builds)
+      try {
+        console.log('=== Post-login Push Token Registration ===');
+        const Notifications = await import('expo-notifications');
+        const Device = await import('expo-device');
+        const { Platform } = await import('react-native');
+        const isDevice = (Device as any).default?.isDevice ?? Device?.isDevice;
+        
+        console.log('Is physical device:', isDevice);
+        if (!isDevice) {
+          console.log('Skipping push token registration - not a physical device');
+          return;
+        }
+        
+        // Skip on Android Expo Go
+        if (Platform.OS === 'android' && Constants.appOwnership === 'expo') {
+          console.log('Skipping push token on Android Expo Go');
+          return;
+        }
+        
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        console.log('Current permission status:', existingStatus);
+        
+        let finalStatus = existingStatus;
+        if (existingStatus !== 'granted') {
+          console.log('Requesting notification permissions...');
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+          console.log('Permission request result:', status);
+        }
+        
+        if (finalStatus === 'granted') {
+          console.log('Permission granted, fetching push token...');
+          const projectId = (Constants?.expoConfig?.extra as any)?.eas?.projectId || (Constants as any)?.easConfig?.projectId;
+          console.log('Using projectId:', projectId);
+          
+          let tokenResp: any;
+          try {
+            tokenResp = await Notifications.getExpoPushTokenAsync();
+            console.log('Successfully got token without projectId');
+          } catch (err) {
+            console.error('Failed without projectId, trying with projectId:', err);
+            try {
+              tokenResp = await Notifications.getExpoPushTokenAsync({ projectId });
+              console.log('Successfully got token with projectId');
+            } catch (err2) {
+              console.error('Failed with projectId:', err2);
+              console.log('Firebase not configured. Please set up FCM credentials.');
+              return;
+            }
+          }
+          
+          const pushToken = tokenResp.data;
+          console.log('Push token:', pushToken);
+          
+          if (pushToken) {
+            await registerPushToken(pushToken);
+            console.log('Push token registered successfully');
+          } else {
+            console.log('No push token received');
+          }
+        } else {
+          console.log('Notification permission not granted:', finalStatus);
+        }
+      } catch (e) {
+        console.error('Error in post-login push token registration:', e);
+      }
+
       // Fetch user details
       try {
         const userResponse = await fetch(`${API_URL}/api/users/${data.user.id}`, {
@@ -580,7 +650,7 @@ export default function ProfileScreen() {
           </View>
 
           {/* Quick Actions */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: 18 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginHorizontal: 18 }}>
             <TouchableOpacity activeOpacity={0.9} style={styles.quickAction} onPress={handleEditProfile}>
               <Ionicons name="create-outline" size={22} color="#4CAF50" />
               <Text style={styles.quickActionText}>Edit</Text>
@@ -596,6 +666,121 @@ export default function ProfileScreen() {
             <TouchableOpacity activeOpacity={0.9} style={styles.quickAction} onPress={() => router.push('/settings')}>
               <Ionicons name="settings-outline" size={22} color="#4CAF50" />
               <Text style={styles.quickActionText}>Settings</Text>
+            </TouchableOpacity>
+            {/* Debug action: Register Push Token */}
+            <TouchableOpacity
+              activeOpacity={0.9}
+              style={[styles.quickAction, { backgroundColor:'#e8f5e9' }]}
+              onPress={async () => {
+                try {
+                  console.log('=== Push Token Registration Debug ===');
+                  
+                  const Notifications = await import('expo-notifications');
+                  const Device = await import('expo-device');
+                  const isDevice = (Device as any).default?.isDevice ?? Device?.isDevice;
+                  
+                  console.log('Is physical device:', isDevice);
+                  if (!isDevice) {
+                    Alert.alert('Device required', 'Push notifications require a physical device.');
+                    return;
+                  }
+                  
+                  // Check current permissions
+                  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+                  console.log('Current permission status:', existingStatus);
+                  
+                  let finalStatus = existingStatus;
+                  if (existingStatus !== 'granted') {
+                    console.log('Requesting notification permissions...');
+                    const { status } = await Notifications.requestPermissionsAsync();
+                    finalStatus = status;
+                    console.log('Permission request result:', status);
+                  }
+                  
+                  if (finalStatus !== 'granted') {
+                    Alert.alert('Permission needed', `Notification permission was not granted. Status: ${finalStatus}`);
+                    return;
+                  }
+                  
+                  console.log('Permission granted, fetching push token...');
+                  
+                  // Get projectId
+                  const projectId = (Constants?.expoConfig?.extra as any)?.eas?.projectId || (Constants as any)?.easConfig?.projectId;
+                  console.log('Using projectId:', projectId);
+                  
+                  let tokenResp: any;
+                  let pushToken: string;
+                  
+                  try {
+                    console.log('Attempting to get Expo push token without projectId (avoiding Firebase)...');
+                    tokenResp = await Notifications.getExpoPushTokenAsync();
+                    pushToken = tokenResp.data;
+                    console.log('Successfully got token without projectId:', pushToken);
+                  } catch (err) {
+                    console.error('Failed without projectId:', err);
+                    console.log('Retrying with projectId...');
+                    try {
+                      tokenResp = await Notifications.getExpoPushTokenAsync({ projectId });
+                      pushToken = tokenResp.data;
+                      console.log('Successfully got token with projectId:', pushToken);
+                    } catch (err2) {
+                      console.error('Failed with projectId:', err2);
+                      Alert.alert('Token error', `Failed to get Expo push token:\n${err2.message || err2}\n\nFirebase not configured. Please set up FCM credentials.`);
+                      return;
+                    }
+                  }
+                  
+                  if (!pushToken) {
+                    Alert.alert('Token error', 'No push token received');
+                    return;
+                  }
+                  
+                  console.log('Final push token:', pushToken);
+                  
+                  // Register with backend
+                  try {
+                    const auth = await AsyncStorage.getItem('token');
+                    if (!auth) {
+                      Alert.alert('Auth error', 'No authentication token found');
+                      return;
+                    }
+                    
+                    console.log('Registering token with backend...');
+                    const res = await fetch(`${API_URL}/api/alerts/register-token`, {
+                      method: 'POST',
+                      headers: {
+                        Authorization: `Bearer ${auth}`,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({ expoPushToken: String(pushToken) })
+                    });
+                    
+                    const text = await res.text();
+                    console.log('Backend response:', res.status, text);
+                    
+                    // Verify what was saved
+                    const verify = await fetch(`${API_URL}/api/alerts/me/token`, { 
+                      headers: { Authorization: `Bearer ${auth}` } 
+                    });
+                    const verifyJson = await verify.json();
+                    console.log('Verification response:', verifyJson);
+                    
+                    Alert.alert(
+                      res.ok ? '✅ Registered push token' : `❌ Register failed (${res.status})`,
+                      `Token: ${String(pushToken)}\n\nServer Response: ${text}\n\nSaved Token: ${JSON.stringify(verifyJson)}`
+                    );
+                  } catch (regErr) {
+                    console.error('Registration error:', regErr);
+                    Alert.alert('Register error', `Failed to POST token to server:\n${regErr.message || regErr}`);
+                    return;
+                  }
+                } catch (e) {
+                  console.error('General error:', e);
+                  Alert.alert('Error', `Failed to register push token:\n${e.message || e}`);
+                }
+              }}
+            >
+              <Text style={[styles.quickActionText, { color:'#2e7d32' }]}>🔔 Register Push Token</Text>
             </TouchableOpacity>
           </View>
 

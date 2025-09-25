@@ -78,25 +78,74 @@ export default function RootLayout() {
   useEffect(() => {
     (async () => {
       try {
-        if (!Device.isDevice) return;
+        if (!Device.isDevice) {
+          console.log('Push notifications require a physical device');
+          return;
+        }
+        
         // Avoid calling remote push APIs on Android Expo Go (SDK 53+) — requires dev build
         if (Platform.OS === 'android' && Constants.appOwnership === 'expo') {
           console.log('Skipping push token on Android Expo Go. Use a dev build.');
           return;
         }
+        
         const Notifications = await import('expo-notifications');
+        
+        // Check current permission status
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        console.log('Current notification permission status:', existingStatus);
+        
         let finalStatus = existingStatus;
         if (existingStatus !== 'granted') {
+          console.log('Requesting notification permissions...');
           const { status } = await Notifications.requestPermissionsAsync();
           finalStatus = status;
+          console.log('Permission request result:', status);
         }
-        if (finalStatus !== 'granted') return;
+        
+        if (finalStatus !== 'granted') {
+          console.log('Notification permission not granted:', finalStatus);
+          return;
+        }
+        
+        console.log('Notification permission granted, fetching push token...');
+        
+        // Get projectId from app config
         const projectId = (Constants?.expoConfig?.extra as any)?.eas?.projectId || (Constants as any)?.easConfig?.projectId;
-        const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+        console.log('Using projectId:', projectId);
+        
+        // Fetch Expo push token
+        let token;
+        try {
+          // Try without projectId first to avoid Firebase issues
+          const tokenResponse = await Notifications.getExpoPushTokenAsync();
+          token = tokenResponse.data;
+          console.log('Successfully fetched Expo push token (no projectId):', token);
+        } catch (tokenError) {
+          console.error('Failed to get Expo push token without projectId:', tokenError);
+          // Try with projectId as fallback
+          try {
+            const tokenResponse = await Notifications.getExpoPushTokenAsync({ projectId });
+            token = tokenResponse.data;
+            console.log('Successfully fetched Expo push token (with projectId):', token);
+          } catch (fallbackError) {
+            console.error('Failed to get Expo push token (with projectId):', fallbackError);
+            console.log('Firebase not configured. Please set up FCM credentials.');
+            return;
+          }
+        }
+        
+        if (!token) {
+          console.log('No push token received');
+          return;
+        }
+        
+        console.log('Registering push token with backend...');
         await registerPushToken(token);
+        console.log('Push token registered successfully');
+        
       } catch (e) {
-        // ignore
+        console.error('Error in push notification setup:', e);
       }
     })();
   }, []);

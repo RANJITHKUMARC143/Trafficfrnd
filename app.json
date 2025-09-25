@@ -25,6 +25,7 @@
     },
     "android": {
       "package": "com.trafficfriend.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#ffffff"
@@ -48,6 +49,14 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Traffic Frnd to use your location to find nearby delivery buddies and improve delivery accuracy."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#4CAF50",
+          "defaultChannel": "default"
         }
       ],
       "expo-router"
