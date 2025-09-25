@@ -25,6 +25,7 @@
     },
     "android": {
       "package": "com.trafficfriend.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#ffffff"
