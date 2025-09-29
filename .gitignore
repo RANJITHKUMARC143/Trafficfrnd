@@ -105,3 +105,7 @@ Delivery_app/service-account.json
 Delivery_app/*firebase-adminsdk*.json
 **/service-account.json
 **/*firebase-adminsdk*.json
+
+# APK artifacts
+Delivery_app/*.apk
+**/*.apk
