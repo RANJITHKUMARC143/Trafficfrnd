@@ -7,7 +7,7 @@ import { Order } from '@/types/order';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import { COLORS, FONTS } from '@/constants/theme';
-import { MapPin, Clock, DollarSign, Package } from 'lucide-react-native';
+import { MapPin, Clock, Package } from 'lucide-react-native';
 
 interface MakeOrderProps {
   onOrderPlaced: (order: Order) => void;
@@ -117,10 +117,7 @@ const MakeOrder = ({ onOrderPlaced }: MakeOrderProps) => {
           <Clock size={16} color={COLORS.gray} />
           <Text style={styles.infoText}>Instant updates</Text>
         </View>
-        <View style={styles.infoItem}>
-          <DollarSign size={16} color={COLORS.gray} />
-          <Text style={styles.infoText}>Secure payment</Text>
-        </View>
+        
       </View>
     </Card>
   );

@@ -113,7 +113,7 @@ export default function EditProfileScreen() {
   if (isLoading) {
     return (
       <ThemedView style={styles.container}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color="#3d7a00" />
       </ThemedView>
     );
   }
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     width: 110,
     height: 110,
     borderRadius: 55,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   saveButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     borderRadius: 12,
     height: 50,
     alignItems: 'center',

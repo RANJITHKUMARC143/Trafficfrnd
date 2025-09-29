@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, ScrollView, Text } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ScrollView, Text, Image } from 'react-native';
 import { ThemedText } from '@cmp/ThemedText';
 import { ThemedView } from '@cmp/ThemedView';
 // Icons replaced with emoji for compatibility
@@ -71,8 +71,16 @@ export default function OrderConfirmationScreen() {
               }}
               pointerEvents="none"
             >
-              <Marker coordinate={currentLocation} title="Your Location" pinColor="#4CAF50" />
-              <Marker coordinate={deliveryPoint} title={deliveryPoint.name || 'Delivery Point'} pinColor="#D32F2F" />
+              <Marker coordinate={currentLocation} title="Your Location" pinColor="#3d7a00" />
+              <Marker coordinate={deliveryPoint} title={deliveryPoint.name || 'Delivery Point'}>
+                <View style={styles.deliveryPointMarker}>
+                  <Image 
+                    source={require('../assets/images/logo.png')} 
+                    style={styles.deliveryPointLogo}
+                    resizeMode="contain"
+                  />
+                </View>
+              </Marker>
             </MapView>
           </View>
         )}
@@ -127,7 +135,7 @@ const styles = StyleSheet.create({
   },
   successHeader: {
     width: '100%',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     borderRadius: 16,
     padding: 20,
     alignItems: 'center',
@@ -211,7 +219,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   statusValue: {
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: '800',
     fontSize: 14,
   },
@@ -228,7 +236,7 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     flex: 1,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
@@ -272,5 +280,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center'
+  },
+  deliveryPointMarker: {
+    backgroundColor: '#34C759',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#fff',
+  },
+  deliveryPointLogo: {
+    width: 24,
+    height: 24,
   },
 }); 

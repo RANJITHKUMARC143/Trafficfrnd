@@ -34,11 +34,14 @@ const TOKEN_KEY = '@traffic_friend_token';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadUser();
+    // Delay loading user to prevent blocking app startup
+    setTimeout(() => {
+      loadUser();
+    }, 2000);
   }, []);
 
   const loadUser = async () => {
@@ -82,20 +85,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
         body: JSON.stringify({ email, password }),
       });
-
-      const data = await response.json();
-      console.log('Login response data:', data);
+      // Robust parsing: handle non-JSON responses (e.g., rate limit plain text)
+      let data: any = null;
+      let text: string | null = null;
+      try {
+        data = await response.clone().json();
+      } catch {
+        try {
+          text = await response.clone().text();
+        } catch {}
+      }
+      console.log('Login response status:', response.status, 'data:', data, 'text:', text);
 
       if (!response.ok) {
-        let message = data?.message || 'Login failed';
+        let message = (data && (data.message || data.error)) || (text || 'Login failed');
         const lower = String(message).toLowerCase();
         if (response.status === 400 || response.status === 401 || lower.includes('invalid') || lower.includes('not found')) {
           message = 'User not found. Please sign up in the user app.';
+        } else if (response.status === 429 || lower.startsWith('too many requests')) {
+          message = 'Too many attempts. Please try again after a few minutes.';
         }
         throw new Error(message);
       }
 
-      console.log('Token from backend:', data.token);
+      console.log('Token from backend:', data?.token);
       await AsyncStorage.setItem(TOKEN_KEY, data.token);
       const checkToken = await AsyncStorage.getItem(TOKEN_KEY);
       console.log('Token after set (login):', checkToken);

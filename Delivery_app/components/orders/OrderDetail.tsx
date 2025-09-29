@@ -5,7 +5,7 @@ import { COLORS, FONTS, IS_WEB } from '@/constants/theme';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import StatusBadge from '../common/StatusBadge';
-import { MapPin, Clock, DollarSign, Phone, Navigation, Package } from 'lucide-react-native';
+import { MapPin, Clock, Phone, Navigation, Package } from 'lucide-react-native';
 import Constants from 'expo-constants';
 import { Order } from '@/types/order';
 import { useRouter } from 'expo-router';
@@ -338,7 +338,6 @@ const OrderDetail = ({ order, onStatusUpdate }: OrderDetailProps) => {
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>Earnings</Text>
             <View style={styles.detailValueContainer}>
-              <DollarSign size={16} color={COLORS.success} />
               <Text style={[styles.detailValue, styles.earnings]}>
                 ₹{estimatedEarnings.toFixed(2)}
               </Text>

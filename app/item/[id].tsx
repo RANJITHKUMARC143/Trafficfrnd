@@ -109,7 +109,7 @@ export default function ItemDetailScreen() {
           loop
           style={{ width: 200, height: 200 }}
         />
-        <ThemedText style={{ marginTop: 16, fontSize: 16, color: '#4CAF50' }}>Loading item...</ThemedText>
+        <ThemedText style={{ marginTop: 16, fontSize: 16, color: '#3d7a00' }}>Loading item...</ThemedText>
       </View>
     );
   }
@@ -164,7 +164,7 @@ export default function ItemDetailScreen() {
             <View style={styles.discountPill}><ThemedText style={styles.discountText}>{item.mrp && item.mrp > item.price ? `${Math.round(((item.mrp - item.price)/item.mrp)*100)}% OFF` : '15% OFF'}</ThemedText></View>
           </View>
           <ThemedText style={styles.description}>{item.description}</ThemedText>
-          <View style={styles.trafficTip}><Ionicons name="car" size={16} color="#4CAF50" /><ThemedText style={styles.trafficTipText}>Perfect snack for your jam</ThemedText></View>
+          <View style={styles.trafficTip}><Ionicons name="car" size={16} color="#3d7a00" /><ThemedText style={styles.trafficTipText}>Perfect snack for your jam</ThemedText></View>
           {item.preparationTime && (
             <View style={styles.prepTimeRow}>
               <Ionicons name="time-outline" size={18} color="#666" />
@@ -207,9 +207,9 @@ export default function ItemDetailScreen() {
         {/* Sticky Bottom Bar */}
         <View style={styles.stickyBar}>
           <View style={styles.qtyPill}>
-            <TouchableOpacity style={styles.qtyBtn} onPress={handleAddToCart}><Ionicons name="remove" size={18} color="#4CAF50" /></TouchableOpacity>
+            <TouchableOpacity style={styles.qtyBtn} onPress={handleAddToCart}><Ionicons name="remove" size={18} color="#3d7a00" /></TouchableOpacity>
             <ThemedText style={styles.qtyText}>1</ThemedText>
-            <TouchableOpacity style={styles.qtyBtn} onPress={handleAddToCart}><Ionicons name="add" size={18} color="#4CAF50" /></TouchableOpacity>
+            <TouchableOpacity style={styles.qtyBtn} onPress={handleAddToCart}><Ionicons name="add" size={18} color="#3d7a00" /></TouchableOpacity>
           </View>
           <TouchableOpacity style={[styles.buyNowButton, !item.isAvailable && { opacity: 0.5 }]} onPress={handleBuyNow} disabled={!item.isAvailable}>
             <ThemedText style={styles.buyNowButtonText}>Buy Now</ThemedText>
@@ -248,19 +248,19 @@ const styles = StyleSheet.create({
   heroGradient: { padding: 16, alignItems: 'center' },
   image: { width: 300, height: 220, borderRadius: 16, backgroundColor: '#eee' },
   badgesRow: { flexDirection: 'row', gap: 8, position: 'absolute', top: 12, left: 12 },
-  badgePrimary: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#4CAF50', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14 },
+  badgePrimary: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#3d7a00', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14 },
   badgePrimaryText: { color: '#fff', marginLeft: 4, fontWeight: '700', fontSize: 12 },
   badgeGhost: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 12, borderWidth: 1, borderColor: '#eee' },
   badgeGhostText: { color: '#222', marginLeft: 4, fontWeight: '600', fontSize: 12 },
   name: { fontSize: 24, fontWeight: 'bold', color: '#333', marginBottom: 8, textAlign: 'center' },
   priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 8 },
-  price: { fontSize: 24, color: '#4CAF50', fontWeight: 'bold' },
-  discountPill: { backgroundColor: '#e8f5e8', borderColor: '#4CAF50', borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  price: { fontSize: 24, color: '#3d7a00', fontWeight: 'bold' },
+  discountPill: { backgroundColor: '#e8f5e8', borderColor: '#3d7a00', borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   discountText: { color: '#2e7d32', fontWeight: '700', fontSize: 12 },
   mrpText: { textDecorationLine: 'line-through', color: '#9CA3AF', fontSize: 14 },
   description: { fontSize: 16, color: '#666', marginBottom: 12, textAlign: 'center' },
   trafficTip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 16 },
-  trafficTipText: { color: '#4CAF50', fontWeight: '600' },
+  trafficTipText: { color: '#3d7a00', fontWeight: '600' },
   prepTimeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   prepTime: { fontSize: 14, color: '#666', marginLeft: 6 },
   unavailableText: { fontSize: 16, color: '#FF3B30', fontWeight: '500', marginBottom: 10 },
@@ -271,16 +271,16 @@ const styles = StyleSheet.create({
   comboImage: { width: 180, height: 110 },
   comboInfo: { padding: 10 },
   comboTitle: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 4 },
-  comboPrice: { fontSize: 16, fontWeight: '700', color: '#4CAF50' },
+  comboPrice: { fontSize: 16, fontWeight: '700', color: '#3d7a00' },
   recoCard: { width: 120, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#f0f0f0', marginRight: 12, padding: 8 },
   recoImage: { width: 104, height: 80, borderRadius: 8, marginBottom: 6, backgroundColor: '#eee' },
   recoName: { fontSize: 12, fontWeight: '600', color: '#333' },
-  recoPrice: { fontSize: 12, fontWeight: '700', color: '#4CAF50' },
+  recoPrice: { fontSize: 12, fontWeight: '700', color: '#3d7a00' },
   stickyBar: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 12, backgroundColor: '#ffffff', borderTopWidth: 1, borderTopColor: '#eee', flexDirection: 'row', alignItems: 'center', gap: 10 },
   qtyPill: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 6 },
   qtyBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f6fef6' },
   qtyText: { width: 20, textAlign: 'center', fontWeight: '700', color: '#2e7d32' },
-  addToCartButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#4CAF50', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24 },
+  addToCartButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#3d7a00', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24 },
   addToCartButtonText: { color: '#fff', fontSize: 14, fontWeight: '700', marginLeft: 6 },
   buyNowButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF9800', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24 },
   buyNowButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },

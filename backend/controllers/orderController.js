@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Vendor = require('../models/Vendor');
 const Earnings = require('../models/Earnings');
 const DeliveryBoy = require('../models/DeliveryBoy');
+const DeliveryAlert = require('../models/DeliveryAlert');
 const Alert = require('../models/Alert');
 const MenuItem = require('../models/MenuItem');
 const haversine = require('haversine-distance');
@@ -236,6 +237,30 @@ const updateOrderStatus = async (req, res) => {
       order.status = 'confirmed';
       order.updatedAt = Date.now();
       await order.save();
+      // Create a delivery alert for the driver who accepted
+      try {
+        const shortId = String(order._id).slice(-8);
+        const driverAlert = await DeliveryAlert.create({
+          title: 'Order Assigned',
+          message: `You accepted order #${shortId}.`,
+          type: 'order-update',
+          deliveryBoyId: order.deliveryBoyId,
+        });
+        // Emit realtime notification specifically to this driver
+        try {
+          const io = req.app.get('io');
+          if (io) {
+            io.to(`deliveryBoy:${String(order.deliveryBoyId)}`).emit('deliveryNotification', {
+              type: 'order-update',
+              title: 'Order Assigned',
+              message: `You accepted order #${shortId}.`,
+              deliveryAlertId: String(driverAlert._id)
+            });
+          }
+        } catch {}
+      } catch (e) {
+        console.warn('Failed to create delivery alert on accept:', e?.message || e);
+      }
       // Alert user: delivery partner assigned
       try {
         let driverName = 'Delivery partner';
@@ -339,6 +364,28 @@ const updateOrderStatus = async (req, res) => {
       });
     } catch (e) {
       console.warn('Failed to create alert for status update:', e?.message || e);
+    }
+    // Also create a delivery alert for assigned driver
+    try {
+      if (order.deliveryBoyId) {
+        const statusTextMapDriver = {
+          pending: 'Pending',
+          confirmed: 'Confirmed',
+          preparing: 'Preparing',
+          enroute: 'On the way',
+          ready: 'Ready for pickup',
+          completed: 'Delivered',
+          cancelled: 'Cancelled'
+        };
+        await DeliveryAlert.create({
+          title: 'Order Update',
+          message: `Order #${String(order._id).slice(-8)}: ${statusTextMapDriver[order.status] || order.status}`,
+          type: 'order-update',
+          deliveryBoyId: order.deliveryBoyId,
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to create delivery alert for driver status update:', e?.message || e);
     }
     // Return freshly loaded order to ensure client sees persisted changes
     const fresh = await Order.findById(orderId);
@@ -595,6 +642,17 @@ const createOrder = async (req, res) => {
           if (io) {
             console.log('[SOCKET] Emitting orderCreated to deliveryBoy room:', String(top.candidate._id));
             io.to(`deliveryBoy:${String(top.candidate._id)}`).emit('orderCreated', order);
+          }
+          // Also create a delivery alert so it appears in the driver's Alerts list
+          try {
+            await DeliveryAlert.create({
+              title: 'New Order Available',
+              message: `A new order is available near you (#${String(order._id).slice(-8)})`,
+              type: 'order-update',
+              deliveryBoyId: top.candidate._id,
+            });
+          } catch (e) {
+            console.warn('Failed to create delivery alert for available order:', e?.message || e);
           }
         } else {
           console.log('[ASSIGNMENT] No nearby drivers <1km. Not broadcasting to pool. Order remains pending and unassigned.');

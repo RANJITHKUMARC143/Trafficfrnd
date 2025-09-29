@@ -51,7 +51,7 @@ const EarningsChart = ({ data, timeframe }: EarningsChartProps) => {
     barPercentage: 0.5,
     useShadowColorFromDataset: false,
     decimalPlaces: 2,
-    formatYLabel: (value: string) => `₹${value}`,
+    formatYLabel: (value: string) => `${value}`,
   };
   
   return (
@@ -69,7 +69,7 @@ const EarningsChart = ({ data, timeframe }: EarningsChartProps) => {
           data={chartData}
           width={chartWidth}
           height={220}
-          yAxisLabel="₹"
+          yAxisLabel={''}
           chartConfig={chartConfig}
           verticalLabelRotation={0}
           showValuesOnTopOfBars

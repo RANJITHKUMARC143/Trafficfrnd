@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { StyleSheet, FlatList, View, TouchableOpacity, RefreshControl, Alert as RNAlert, Text, Modal } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@cmp/ThemedText';
 import { ThemedView } from '@cmp/ThemedView';
 import BottomNavigationBar from '@cmp/_components/BottomNavigationBar';
@@ -7,6 +8,7 @@ import { fetchAlerts, deleteAlert, clearAllAlerts, markAlertRead } from '../../s
 import { Audio } from 'expo-av';
 import { Swipeable } from 'react-native-gesture-handler';
 import { router } from 'expo-router';
+import LoadingAnimation from '../../components/LoadingAnimation';
 
 const alertTypeIcon = (type: string) => {
   const style = { marginRight: 12, fontSize: 24 } as const;
@@ -243,8 +245,9 @@ export default function AlertsScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <View style={styles.headerRow}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+      <ThemedView style={styles.container}>
+        <View style={styles.headerRow}>
         <ThemedText style={styles.title}>Alerts</ThemedText>
         {alerts.length > 0 && (
           <TouchableOpacity onPress={handleClearAll} style={styles.clearAllBtn}>
@@ -255,7 +258,11 @@ export default function AlertsScreen() {
       </View>
       {loading ? (
         <View style={styles.loadingState}>
-          <Text style={{ fontSize: 40, marginBottom: 10 }}>⏳</Text>
+          <LoadingAnimation 
+            visible={true} 
+            size="large" 
+            overlay={false}
+          />
           <ThemedText style={styles.loadingText}>Loading alerts...</ThemedText>
         </View>
       ) : alerts.length === 0 ? (
@@ -329,7 +336,8 @@ export default function AlertsScreen() {
           </View>
         </View>
       </Modal>
-    </ThemedView>
+      </ThemedView>
+    </SafeAreaView>
   );
 }
 
@@ -416,7 +424,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#4CAF50',
+    color: '#3d7a00',
     textAlign: 'center',
     fontWeight: '500',
   },
@@ -433,7 +441,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   loginButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 25,

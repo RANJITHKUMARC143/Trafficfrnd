@@ -375,7 +375,7 @@ export default function EnhancedPaymentModal({
                 disabled={loading}
               >
                 <LinearGradient
-                  colors={['#4CAF50', '#45a049']}
+                  colors={['#3d7a00', '#3d7a00']}
                   style={styles.upiAppsButtonGradient}
                 >
                   <Ionicons name="phone-portrait" size={24} color="#fff" />
@@ -426,7 +426,7 @@ export default function EnhancedPaymentModal({
                 disabled={loading || !upiId.trim()}
               >
                 <LinearGradient
-                  colors={['#4CAF50', '#45a049']}
+                  colors={['#3d7a00', '#3d7a00']}
                   style={styles.payButtonGradient}
                 >
                   <Ionicons name="card" size={20} color="#fff" />
@@ -440,7 +440,7 @@ export default function EnhancedPaymentModal({
 
           {/* Security Info */}
           <View style={styles.securityInfo}>
-            <Ionicons name="shield-checkmark" size={16} color="#4CAF50" />
+            <Ionicons name="shield-checkmark" size={16} color="#3d7a00" />
             <Text style={styles.securityText}>
               Your payment is secured with 256-bit SSL encryption
             </Text>
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
     borderRadius: 12, // Increased border radius
   },
   methodButtonActive: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
   },
   methodButtonText: {
     fontSize: 18, // Increased font size

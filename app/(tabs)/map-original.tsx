@@ -652,7 +652,7 @@ export default function MapScreen() {
       case 'traffic': return '#FF9800';
       case 'busstop': return '#2196F3';
       case 'signal': return '#F44336';
-      default: return '#4CAF50';
+      default: return '#3d7a00';
     }
   };
 
@@ -670,7 +670,7 @@ export default function MapScreen() {
           <View style={styles.destinationBanner}>
             <View style={styles.destinationInfo}>
               <View style={styles.destinationIconContainer}>
-                <Ionicons name="navigate" size={20} color="#4CAF50" />
+                <Ionicons name="navigate" size={20} color="#3d7a00" />
               </View>
               <View style={styles.destinationTextContainer}>
                 <ThemedText style={styles.destinationLabel}>Destination</ThemedText>
@@ -696,7 +696,7 @@ export default function MapScreen() {
               <ThemedText style={styles.searchInputText}>Where do you want to go?</ThemedText>
             </View>
             <View style={styles.searchInputIcon}>
-              <Ionicons name="navigate-outline" size={20} color="#4CAF50" />
+              <Ionicons name="navigate-outline" size={20} color="#3d7a00" />
             </View>
           </TouchableOpacity>
         )}
@@ -745,7 +745,7 @@ export default function MapScreen() {
                   </View>
                 </View>
                 <View style={{ alignItems: 'flex-end', justifyContent: 'space-between' }}>
-                  <View style={[styles.trafficBadge, { backgroundColor: route.trafficDensity === 'low' ? '#4CAF50' : route.trafficDensity === 'medium' ? '#FFA000' : '#F44336' }] }>
+                  <View style={[styles.trafficBadge, { backgroundColor: route.trafficDensity === 'low' ? '#3d7a00' : route.trafficDensity === 'medium' ? '#FFA000' : '#F44336' }] }>
                     <Text style={styles.trafficText}>{route.trafficDensity.toUpperCase()}</Text>
                   </View>
                   <TouchableOpacity 
@@ -1315,10 +1315,10 @@ export default function MapScreen() {
 
   const getRouteColor = (density: DeliveryRoute['trafficDensity']) => {
     switch (density) {
-      case 'low': return '#4CAF50';
+      case 'low': return '#3d7a00';
       case 'medium': return '#FFA000';
       case 'high': return '#D32F2F';
-      default: return '#4CAF50';
+      default: return '#3d7a00';
     }
   };
 
@@ -1654,7 +1654,7 @@ export default function MapScreen() {
         <>
           <View style={styles.destinationBanner}>
             <View style={styles.destinationInfo}>
-              <Ionicons name="navigate" size={20} color="#4CAF50" />
+              <Ionicons name="navigate" size={20} color="#3d7a00" />
               <ThemedText style={styles.destinationText} numberOfLines={1}>
                 Destination: {destination.address}
               </ThemedText>
@@ -1686,7 +1686,7 @@ export default function MapScreen() {
                   title="Your Location"
                 >
                   <View style={styles.originMarker}>
-                    <Ionicons name="location" size={24} color="#4CAF50" />
+                    <Ionicons name="location" size={24} color="#3d7a00" />
                   </View>
                 </Marker>
 
@@ -1729,7 +1729,7 @@ export default function MapScreen() {
                   >
                     <View style={[styles.locationMarker, { 
                       backgroundColor: getMarkerColor(selectedDeliveryPoint.type),
-                      borderColor: '#4CAF50',
+                      borderColor: '#3d7a00',
                       borderWidth: 2,
                       transform: [{ scale: 1.2 }]
                     }]}> 
@@ -1810,7 +1810,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   changeDestinationText: {
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontSize: 14,
   },
   mapContainer: {
@@ -1825,7 +1825,7 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#4CAF50',
+    borderColor: '#3d7a00',
   },
   destinationMarker: {
     backgroundColor: 'white',
@@ -2012,7 +2012,7 @@ const styles = StyleSheet.create({
     bottom: 30,
     left: 20,
     right: 20,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -2032,7 +2032,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   selectableTrafficMarker: {
-    borderColor: '#4CAF50',
+    borderColor: '#3d7a00',
     borderWidth: 3,
     transform: [{ scale: 1.1 }],
   },
@@ -2040,7 +2040,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -5,
     right: -5,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     borderRadius: 10,
     width: 20,
     height: 20,
@@ -2273,7 +2273,7 @@ const styles = StyleSheet.create({
   },
   selectedRoute: {
     backgroundColor: '#e8f5e9',
-    borderColor: '#4CAF50',
+    borderColor: '#3d7a00',
     borderWidth: 1,
   },
   routeNameContainer: {
@@ -2419,7 +2419,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   selectButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 18,

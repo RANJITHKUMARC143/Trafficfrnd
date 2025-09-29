@@ -524,11 +524,11 @@ export default function CartScreen() {
           </View>
           <View style={styles.qtyRow}>
             <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item.id, -1)}>
-              <Ionicons name="remove" size={18} color="#4CAF50" />
+              <Ionicons name="remove" size={18} color="#3d7a00" />
             </TouchableOpacity>
             <ThemedText style={styles.qtyText}>{item.quantity}</ThemedText>
             <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item.id, 1)}>
-              <Ionicons name="add" size={18} color="#4CAF50" />
+              <Ionicons name="add" size={18} color="#3d7a00" />
             </TouchableOpacity>
           </View>
         </View>
@@ -582,7 +582,7 @@ export default function CartScreen() {
             ListFooterComponent={() => (
               <View style={{ paddingBottom: 8 }}>
                 <View style={styles.couponRow}>
-                  <Ionicons name="pricetags" size={18} color="#4CAF50" />
+                  <Ionicons name="pricetags" size={18} color="#3d7a00" />
                   <TextInput placeholder="Apply coupon code" style={styles.couponInput} placeholderTextColor="#9CA3AF" />
                   <TouchableOpacity style={styles.couponBtn}><ThemedText style={styles.couponBtnText}>Apply</ThemedText></TouchableOpacity>
                 </View>
@@ -604,7 +604,7 @@ export default function CartScreen() {
                               justifyContent: 'space-between',
                               padding: 10,
                               borderWidth: 2,
-                              borderColor: isSelected ? '#4CAF50' : '#e5e7eb',
+                              borderColor: isSelected ? '#3d7a00' : '#e5e7eb',
                               borderRadius: 10,
                               marginBottom: 8,
                               backgroundColor: isSelected ? '#e8f5e8' : '#fafafa'
@@ -629,8 +629,8 @@ export default function CartScreen() {
                               <ThemedText style={{ color: '#2e7d32', fontWeight: '700' }}>{p.distance.toFixed(1)} km</ThemedText>
                               {isSelected ? (
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                                  <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                                  <ThemedText style={{ color: '#4CAF50', fontSize: 12, marginLeft: 4 }}>Selected</ThemedText>
+                                  <Ionicons name="checkmark-circle" size={16} color="#3d7a00" />
+                                  <ThemedText style={{ color: '#3d7a00', fontSize: 12, marginLeft: 4 }}>Selected</ThemedText>
                                 </View>
                               ) : null}
                             </View>
@@ -639,7 +639,7 @@ export default function CartScreen() {
                       })}
                       {!selectedDeliveryPoint && suggestedDeliveryPoints.length > 0 && (
                         <TouchableOpacity
-                          style={{ backgroundColor: '#4CAF50', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+                          style={{ backgroundColor: '#3d7a00', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
                           onPress={async () => {
                             const nearest = suggestedDeliveryPoints[0];
                             if (!nearest) return;
@@ -693,7 +693,7 @@ export default function CartScreen() {
                         paddingHorizontal: 12, 
                         borderRadius: 10, 
                         borderWidth: 1, 
-                        borderColor: paymentMethod==='cod' ? '#4CAF50' : '#e5e7eb', 
+                        borderColor: paymentMethod==='cod' ? '#3d7a00' : '#e5e7eb', 
                         backgroundColor: paymentMethod==='cod' ? '#e8f5e8' : '#fff' 
                       }}
                     >
@@ -712,7 +712,7 @@ export default function CartScreen() {
                         paddingHorizontal: 12, 
                         borderRadius: 10, 
                         borderWidth: 1, 
-                        borderColor: paymentMethod==='razorpay' ? '#4CAF50' : '#e5e7eb', 
+                        borderColor: paymentMethod==='razorpay' ? '#3d7a00' : '#e5e7eb', 
                         backgroundColor: paymentMethod==='razorpay' ? '#e8f5e8' : (!razorpayKeyId ? '#f9fafb' : '#fff'), 
                         opacity: !razorpayKeyId ? 0.6 : 1 
                       }}
@@ -793,7 +793,7 @@ export default function CartScreen() {
                       justifyContent: 'space-between',
                       padding: 10,
                       borderWidth: 2,
-                      borderColor: isSelected ? '#4CAF50' : '#e5e7eb',
+                      borderColor: isSelected ? '#3d7a00' : '#e5e7eb',
                       borderRadius: 10,
                       marginBottom: 8,
                       backgroundColor: isSelected ? '#e8f5e8' : '#fafafa'
@@ -818,8 +818,8 @@ export default function CartScreen() {
                       <ThemedText style={{ color: '#2e7d32', fontWeight: '700' }}>{p.distance.toFixed(1)} km</ThemedText>
                       {isSelected ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                          <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                          <ThemedText style={{ color: '#4CAF50', fontSize: 12, marginLeft: 4 }}>Selected</ThemedText>
+                          <Ionicons name="checkmark-circle" size={16} color="#3d7a00" />
+                          <ThemedText style={{ color: '#3d7a00', fontSize: 12, marginLeft: 4 }}>Selected</ThemedText>
                         </View>
                       ) : null}
                     </View>
@@ -827,7 +827,7 @@ export default function CartScreen() {
                 );})}
                 {!selectedDeliveryPoint && suggestedDeliveryPoints.length > 0 && (
                   <TouchableOpacity
-                    style={{ backgroundColor: '#4CAF50', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+                    style={{ backgroundColor: '#3d7a00', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
                     onPress={async () => {
                       const nearest = suggestedDeliveryPoints[0];
                       if (!nearest) return;
@@ -926,11 +926,11 @@ const styles = StyleSheet.create({
   },
   itemPrice: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#3d7a00',
     marginBottom: 4,
   },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  freeBadge: { backgroundColor: '#e8f5e8', borderColor: '#4CAF50', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
+  freeBadge: { backgroundColor: '#e8f5e8', borderColor: '#3d7a00', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
   freeBadgeText: { color: '#2e7d32', fontSize: 11, fontWeight: '700' },
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   qtyBtn: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
@@ -941,7 +941,7 @@ const styles = StyleSheet.create({
   },
   couponRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingTop: 6 },
   couponInput: { flex: 1, height: 42, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 12, backgroundColor: '#fff', color: '#111' },
-  couponBtn: { backgroundColor: '#4CAF50', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
+  couponBtn: { backgroundColor: '#3d7a00', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
   couponBtnText: { color: '#fff', fontWeight: '700' },
   footer: {
     padding: 20,
@@ -967,10 +967,10 @@ const styles = StyleSheet.create({
   totalAmount: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#3d7a00',
   },
   placeOrderButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     borderRadius: 12,
     paddingVertical: 15,
     alignItems: 'center',
@@ -993,7 +993,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   continueShopping: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     borderRadius: 12,
     paddingVertical: 15,
     paddingHorizontal: 30,
@@ -1032,7 +1032,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   confirmButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 24,

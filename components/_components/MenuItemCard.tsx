@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#4CAF50',
+    color: '#3d7a00',
   },
   description: {
     fontSize: 14,

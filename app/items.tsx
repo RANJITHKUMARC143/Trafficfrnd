@@ -136,7 +136,7 @@ export default function ItemsScreen() {
           <Ionicons
             name={sortOrder === 'asc' ? 'arrow-up' : 'arrow-down'}
             size={20}
-            color="#4CAF50"
+            color="#3d7a00"
           />
         </TouchableOpacity>
       </View>
@@ -146,7 +146,7 @@ export default function ItemsScreen() {
   if (loading && !refreshing) {
     return (
       <ThemedView style={styles.centered}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color="#3d7a00" />
       </ThemedView>
     );
   }
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   sortButtonTextActive: {
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: '600',
   },
   sortOrderButton: {
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,

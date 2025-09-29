@@ -29,7 +29,7 @@ const Header = ({
         {showBack && (
           <TouchableOpacity 
             style={styles.backButton} 
-            onPress={() => router.back()}
+            onPress={() => router.replace('/')}
             activeOpacity={0.7}
           >
             <ArrowLeft color={COLORS.darkGray} size={24} />

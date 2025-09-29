@@ -196,7 +196,7 @@ export default function LocationPicker({ onLocationSelected, initialLocation }: 
   if (isLoading) {
     return (
       <ThemedView style={styles.container}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color="#3d7a00" />
       </ThemedView>
     );
   }

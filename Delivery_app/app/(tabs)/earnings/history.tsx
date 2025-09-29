@@ -162,7 +162,7 @@ export default function EarningsHistoryScreen() {
       <View style={styles.summaryCard}>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryLabel}>Total Earnings</Text>
-          <Text style={styles.summaryValue}>${summary.totalEarnings.toFixed(2)}</Text>
+          <Text style={styles.summaryValue}>₹{summary.totalEarnings.toFixed(2)}</Text>
         </View>
         
         <View style={styles.divider} />

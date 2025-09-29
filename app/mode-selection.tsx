@@ -45,7 +45,7 @@ export default function ModeSelectionScreen() {
             style={styles.optionCard}
             onPress={() => handleModeSelection('travel')}
           >
-            <View style={[styles.iconContainer, { backgroundColor: '#4CAF50' }]}>
+            <View style={[styles.iconContainer, { backgroundColor: '#3d7a00' }]}>
               <Ionicons name="airplane" size={40} color="white" />
             </View>
             <ThemedText style={styles.optionTitle}>Travel Mode</ThemedText>

@@ -14,8 +14,9 @@ export const connectSocket = (user?: { id: string; role?: string; token?: string
       transports: ['websocket'],
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 500,
+      timeout: 8000,
     auth: {
       role: user?.role || 'delivery',
       token: user?.token || undefined,

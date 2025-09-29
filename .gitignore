@@ -99,3 +99,9 @@ coverage/
 
 # Visual Studio Code
 .vscode/
+
+# Secrets (do not commit)
+Delivery_app/service-account.json
+Delivery_app/*firebase-adminsdk*.json
+**/service-account.json
+**/*firebase-adminsdk*.json

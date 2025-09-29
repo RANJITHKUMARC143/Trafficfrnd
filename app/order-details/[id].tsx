@@ -439,8 +439,8 @@ export default function OrderDetailsScreen() {
       case 'confirmed': return '#2196F3';
       case 'preparing': return '#9C27B0';
       case 'enroute': return '#FF5722';
-      case 'ready': return '#4CAF50';
-      case 'completed': return '#4CAF50';
+      case 'ready': return '#3d7a00';
+      case 'completed': return '#3d7a00';
       case 'cancelled': return '#F44336';
       default: return '#666';
     }
@@ -558,7 +558,7 @@ export default function OrderDetailsScreen() {
                 <Marker
                   coordinate={currentLocation}
                   title="Your Location"
-                  pinColor="#4CAF50"
+                  pinColor="#3d7a00"
                 />
               )}
               {deliveryBoyLocation && typeof deliveryBoyLocation.latitude === 'number' && typeof deliveryBoyLocation.longitude === 'number' && (
@@ -730,7 +730,7 @@ export default function OrderDetailsScreen() {
           )}
           {order.vehicleNumber && (
             <View style={styles.deliveryDetailRow}>
-              <ThemedText style={{ color: '#4CAF50', fontSize: 18 }}>🚗</ThemedText>
+              <ThemedText style={{ color: '#3d7a00', fontSize: 18 }}>🚗</ThemedText>
               <View style={styles.deliveryDetailInfo}>
                 <ThemedText style={styles.deliveryDetailTitle}>Vehicle Number</ThemedText>
                 <ThemedText style={styles.deliveryDetailText}>{order.vehicleNumber}</ThemedText>
@@ -756,7 +756,7 @@ export default function OrderDetailsScreen() {
               <View style={styles.connectionStatus}>
                 <View style={[
                   styles.statusDot, 
-                  { backgroundColor: isChatConnected ? '#4CAF50' : '#F44336' }
+                  { backgroundColor: isChatConnected ? '#3d7a00' : '#F44336' }
                 ]} />
                 <ThemedText style={styles.connectionStatusText}>
                   {isChatConnected ? 'Connected' : 'Disconnected'}
@@ -958,7 +958,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 12,
     right: 12,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 12,
@@ -1035,7 +1035,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#3d7a00',
   },
   itemRow: {
     flexDirection: 'row',
@@ -1061,7 +1061,7 @@ const styles = StyleSheet.create({
   itemPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#3d7a00',
   },
   deliveryPartnerCard: {
     flexDirection: 'row',
@@ -1106,7 +1106,7 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   callButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     width: 50,
     height: 50,
     borderRadius: 25,

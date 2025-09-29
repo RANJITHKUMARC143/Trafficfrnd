@@ -68,8 +68,7 @@ const EarningsSummary = ({
       </View>
       
       <View style={styles.amountContainer}>
-        <Text style={styles.dollarSign}>₹</Text>
-        <Text style={styles.amount}>{currentEarnings.toFixed(2)}</Text>
+        <Text style={styles.amount}>₹{currentEarnings.toFixed(2)}</Text>
       </View>
       
       <Text style={styles.comparisonText}>
@@ -129,11 +128,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 8,
   },
-  dollarSign: {
-    ...FONTS.h3,
-    color: COLORS.darkGray,
-    marginTop: 6,
-  },
+  
   amount: {
     ...FONTS.largeTitle,
     color: COLORS.darkGray,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import Screen from '@/components/common/Screen';
 import Header from '@/components/common/Header';
 import OrderCard from '@/components/orders/OrderCard';
@@ -11,6 +12,7 @@ import { COLORS, FONTS } from '@/constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { connectSocket, getSocket } from '@/utils/socket';
 import { useOrders } from '@/context/OrderContext';
+import LoadingOverlay from '@/components/LoadingOverlay';
 
 // Use the same token key as AuthContext and auth utility
 const TOKEN_KEY = '@traffic_friend_token';
@@ -18,14 +20,22 @@ const TOKEN_KEY = '@traffic_friend_token';
 export default function OrdersScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { orders } = useOrders();
+  const { orders, refreshOrders } = useOrders();
   const [activeTab, setActiveTab] = useState('available');
   const [refreshing, setRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const onRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 500);
+    refreshOrders().finally(() => setRefreshing(false));
   };
+  // Always refresh when screen gains focus
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshOrders();
+      return () => {};
+    }, [refreshOrders])
+  );
 
   const handleRetry = () => {
     // Optionally, you could trigger a refetch in OrderContext
@@ -121,6 +131,7 @@ export default function OrdersScreen() {
         }
         ListEmptyComponent={renderEmptyState()}
       />
+      <LoadingOverlay visible={isLoading} size="medium" />
     </Screen>
   );
 }

@@ -173,6 +173,14 @@ const deliveryBoySchema = new mongoose.Schema({
     },
     details: mongoose.Schema.Types.Mixed
   }],
+  expoPushToken: {
+    type: String,
+    default: ''
+  },
+  fcmToken: {
+    type: String,
+    default: ''
+  },
   createdAt: {
     type: Date,
     default: Date.now

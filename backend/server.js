@@ -52,20 +52,31 @@ const io = socketIo(server, {
 server.timeout = 30000; // 30 seconds timeout
 server.keepAliveTimeout = 30000; // 30 seconds keep-alive timeout
 
-// Socket.io authentication middleware
+// Socket.io authentication middleware (supports delivery via handshake auth)
 io.use((socket, next) => {
   try {
-    const token = socket.handshake.auth.token;
-    if (!token) {
-      return next(new Error('Authentication error: Token not provided'));
+    const auth = socket.handshake?.auth || {};
+    const token = auth.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded && decoded.vendorId) {
+          socket.vendorId = decoded.vendorId;
+        }
+        if (decoded && (decoded.id || decoded.userId)) {
+          socket.deliveryBoyId = String(decoded.id || decoded.userId);
+        }
+      } catch (e) {
+        console.warn('Socket token verify failed, will use handshake id if provided');
+      }
     }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    socket.vendorId = decoded.vendorId;
-    next();
+    if (!socket.deliveryBoyId && auth && auth.id) {
+      socket.deliveryBoyId = String(auth.id);
+    }
+    return next();
   } catch (error) {
-    console.error('Socket authentication error:', error.message);
-    return next(new Error('Authentication error: Invalid token'));
+    console.error('Socket authentication error:', error?.message || error);
+    return next();
   }
 });
 
@@ -129,6 +140,8 @@ app.use('/api/delivery-points', require('./routes/deliveryPointRoutes'));
 
 // Register alert routes
 app.use('/api/alerts', require('./routes/alertRoutes'));
+// Delivery alerts (delivery boy-specific alerts)
+app.use('/api/delivery-alerts', require('./routes/deliveryAlertRoutes'));
 
 // Register settings routes
 app.use('/api/settings', require('./routes/settingsRoutes'));
@@ -263,9 +276,23 @@ io.on('connection', (socket) => {
     try {
       const { orderId, status } = data;
       // Update order status in database
+      const Order = require('./models/Order');
       await Order.findByIdAndUpdate(orderId, { status });
       // Broadcast to all clients
       io.emit('orderStatusUpdated', { orderId, status });
+      // Notify assigned delivery boy
+      try {
+        const ord = await Order.findById(orderId).select('deliveryBoyId');
+        const assigned = ord && ord.deliveryBoyId ? String(ord.deliveryBoyId) : '';
+        if (assigned) {
+          io.to(`deliveryBoy:${assigned}`).emit('deliveryNotification', {
+            type: 'order-update',
+            orderId: String(orderId),
+            title: 'Order Update',
+            message: `Order status changed to ${String(status)}`
+          });
+        }
+      } catch {}
     } catch (error) {
       console.error('Error updating order status:', error);
     }
@@ -277,6 +304,12 @@ io.on('connection', (socket) => {
       const assignedId = order && order.deliveryBoyId ? String(order.deliveryBoyId) : '';
       if (assignedId) {
         io.to(`deliveryBoy:${assignedId}`).emit('orderCreated', order);
+        io.to(`deliveryBoy:${assignedId}`).emit('deliveryNotification', { 
+          type: 'order-update',
+          orderId: String(order._id || order.id || ''),
+          title: 'New Order',
+          message: 'A new order has been assigned to you.'
+        });
       } else {
         io.to('deliveryBoys').emit('orderCreated', order);
       }

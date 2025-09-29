@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { COLORS, FONTS } from '@/constants/theme';
 import Screen from '@/components/common/Screen';
 import Header from '@/components/common/Header';
+import { fetchAlerts } from '@/services/alertService';
 import Card from '@/components/common/Card';
 import StatCard from '@/components/dashboard/StatCard';
 import OrderCard from '@/components/orders/OrderCard';
@@ -12,23 +13,28 @@ import {
   Clock, 
   Navigation, 
   MapPin,
-  TrendingUp,
-  DollarSign 
+  TrendingUp
 } from 'lucide-react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { connectSocket, getSocket } from '@/utils/socket';
-import { getBaseUrl, API_ENDPOINTS } from '@/config/api';
 import { useAuth } from '@/context/AuthContext';
-
-const TOKEN_KEY = '@traffic_friend_token';
+import { useOrders } from '@/context/OrderContext';
+import { DeviceEventEmitter } from 'react-native';
+import TestNotificationComponent from '@/components/TestNotificationComponent';
+import LoadingOverlay from '@/components/LoadingOverlay';
 
 export default function DashboardScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { orders } = useOrders();
   const [activeStatus, setActiveStatus] = useState('all');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [orders, setOrders] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Test loading animation
+  const testLoading = () => {
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 3000);
+  };
   
   // Filter orders based on active status
   const filteredOrders = activeStatus === 'all' 
@@ -51,90 +57,42 @@ export default function DashboardScreen() {
     onlineHours: '6.5 hrs'
   };
 
-  const fetchOrders = async () => {
-    try {
-      setError(null);
-      setLoading(true);
-      const token = await AsyncStorage.getItem(TOKEN_KEY);
-      console.log('HomeScreen - Token loaded:', token ? 'Token exists' : 'No token');
-      if (!token || token === 'null' || token === 'undefined') {
-        setError('No authentication token found. Please log in again.');
-        setLoading(false);
-        return;
-      }
-      if (token.split('.').length !== 3) {
-        setError('Invalid authentication token. Please log in again.');
-        setLoading(false);
-        return;
-      }
-      if (!user || !user.id) {
-        setError('User information not available. Please log in again.');
-        setLoading(false);
-        return;
-      }
-      const ordersEndpoint = API_ENDPOINTS.DELIVERY.ORDERS(user.id);
-      const url = `${getBaseUrl()}${ordersEndpoint}`;
-      console.log('HomeScreen - Fetching orders from:', url, 'with token:', token);
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      console.log('HomeScreen - Orders response status:', response.status);
-      let data = null;
-      try { data = await response.clone().json(); } catch (e) { data = null; }
-      console.log('HomeScreen - Orders response data:', data);
-      if (!response.ok) {
-        const errorData = data || {};
-        throw new Error(errorData.message || `HTTP ${response.status}: Failed to fetch orders`);
-      }
-      setOrders(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('HomeScreen - Error fetching orders:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch orders');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    if (user && user.id) {
-    fetchOrders();
-    }
-
-    // Real-time updates via Socket.IO
-    connectSocket();
-
-    const handleOrderCreated = () => {
-      fetchOrders();
-    };
-    const handleOrderUpdated = () => {
-      fetchOrders();
-    };
-    getSocket().on('orderCreated', handleOrderCreated);
-    getSocket().on('orderStatusUpdate', handleOrderUpdated);
+    // Remove the duplicate socket listeners since OrderContext handles them
+    const sub = DeviceEventEmitter.addListener('alertsUpdated', async () => {
+      try {
+        const alerts = await fetchAlerts();
+        const count = Array.isArray(alerts) ? alerts.filter((a: any) => !a.read).length : 0;
+        setUnreadCount(count);
+      } catch {}
+    });
 
     return () => {
-      getSocket().off('orderCreated', handleOrderCreated);
-      getSocket().off('orderStatusUpdate', handleOrderUpdated);
+      sub?.remove?.();
     };
   }, [user]);
+
+  const [unreadCount, setUnreadCount] = React.useState(0);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const alerts = await fetchAlerts();
+        const count = Array.isArray(alerts) ? alerts.filter((a: any) => !a.read).length : 0;
+        setUnreadCount(count);
+      } catch {}
+    })();
+  }, []);
 
   return (
     <Screen scroll>
       <Header 
         title="Dashboard" 
         showNotification 
-        notificationCount={3} 
+        notificationCount={unreadCount} 
+        onNotificationPress={() => router.push('/(tabs)/alerts')}
       />
-      
-      {/* Error display */}
-      {error && (
-        <Card style={styles.errorCard}>
-          <Text style={styles.errorText}>{error}</Text>
-        </Card>
-      )}
       
       <Text style={styles.date}>{currentDate}</Text>
       <Text style={styles.welcomeText}>
@@ -151,7 +109,6 @@ export default function DashboardScreen() {
         <StatCard 
           title="Earnings" 
           value={todayStats.earnings} 
-          icon={<DollarSign size={20} color={COLORS.primary} />}
           isUp={true}
           changePercent={12}
         />
@@ -252,11 +209,7 @@ export default function DashboardScreen() {
         </TouchableOpacity>
       </View>
       
-      {loading ? (
-        <Card style={styles.loadingCard}>
-          <Text style={styles.loadingText}>Loading orders...</Text>
-        </Card>
-      ) : filteredOrders.length > 0 ? (
+      {filteredOrders.length > 0 ? (
         filteredOrders.map(order => (
           <OrderCard 
             key={order._id || order.id} 
@@ -303,6 +256,23 @@ export default function DashboardScreen() {
           </View>
         </View>
       </Card>
+
+      {/* Firebase Notification Test */}
+      <View style={styles.ordersSectionHeader}>
+        <Text style={styles.sectionTitle}>Firebase Notifications</Text>
+      </View>
+      
+      <TestNotificationComponent />
+      
+      {/* Test Loading Animation */}
+      <View style={styles.ordersSectionHeader}>
+        <Text style={styles.sectionTitle}>Test Loading Animation</Text>
+      </View>
+      <TouchableOpacity style={styles.testButton} onPress={testLoading}>
+        <Text style={styles.testButtonText}>Test Loading (3 seconds)</Text>
+      </TouchableOpacity>
+      
+      <LoadingOverlay visible={isLoading} size="medium" />
     </Screen>
   );
 }
@@ -398,18 +368,17 @@ const styles = StyleSheet.create({
     ...FONTS.body4,
     color: COLORS.gray,
   },
-  errorCard: {
-    marginBottom: 24,
+  testButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginBottom: 16,
   },
-  errorText: {
-    ...FONTS.body3,
-    color: COLORS.error,
-  },
-  loadingCard: {
-    marginBottom: 24,
-  },
-  loadingText: {
-    ...FONTS.body3,
-    color: COLORS.gray,
+  testButtonText: {
+    ...FONTS.body3Medium,
+    color: COLORS.white,
   },
 });

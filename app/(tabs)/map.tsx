@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, TouchableOpacity, Alert, Text, ScrollView, Platform } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Alert, Text, ScrollView, Platform, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE, PROVIDER_DEFAULT, Polyline } from 'react-native-maps';
@@ -331,9 +332,9 @@ export default function MapScreen() {
           ${deliveryPoints.map(point => `
             L.circle([${point.latitude}, ${point.longitude}], {
               radius: 300,
-              color: '#4CAF50',
+              color: '#3d7a00',
               weight: 2,
-              fillColor: '#4CAF50',
+              fillColor: '#3d7a00',
               fillOpacity: 0.15
             }).addTo(map);
 
@@ -458,7 +459,8 @@ export default function MapScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+      <View style={styles.container}>
       
 
 
@@ -571,7 +573,11 @@ export default function MapScreen() {
                 title={deliveryPoint.name || 'Delivery Point'}
               >
                 <View style={styles.deliveryPointMarker}>
-                  <Ionicons name="flag" size={18} color="#fff" />
+                  <Image 
+                    source={require('../../assets/images/logo.png')} 
+                    style={styles.deliveryPointLogo}
+                    resizeMode="contain"
+                  />
                 </View>
               </Marker>
             )}
@@ -596,7 +602,7 @@ export default function MapScreen() {
                     key={`${point._id}-zone`}
                     center={{ latitude: point.latitude, longitude: point.longitude }}
                     radius={300}
-                    strokeColor={'#4CAF50'}
+                    strokeColor={'#3d7a00'}
                     strokeWidth={2}
                     fillColor={'rgba(76, 175, 80, 0.15)'}
                   />
@@ -614,7 +620,11 @@ export default function MapScreen() {
                       styles.deliveryPointMarker,
                       selectedDeliveryPoint?._id === point._id && styles.selectedDeliveryPointMarker
                     ]}>
-                      <Ionicons name="location" size={20} color="#fff" />
+                      <Image 
+                        source={require('../../assets/images/logo.png')} 
+                        style={styles.deliveryPointLogo}
+                        resizeMode="contain"
+                      />
                     </View>
                   </Marker>
                 </React.Fragment>
@@ -759,7 +769,8 @@ export default function MapScreen() {
 
       {/* Enhanced Navigation Bar */}
       <BottomNavigationBar />
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -833,6 +844,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF9500',
     transform: [{ scale: 1.2 }],
   },
+  deliveryPointLogo: {
+    width: 24,
+    height: 24,
+  },
   overlay: {
     position: 'absolute',
     bottom: 100,
@@ -872,7 +887,7 @@ const styles = StyleSheet.create({
   },
   nearestDeliveryPointItem: {
     backgroundColor: '#E8F5E8',
-    borderColor: '#4CAF50',
+    borderColor: '#3d7a00',
     borderWidth: 1,
   },
   deliveryPointHeader: {
@@ -881,7 +896,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   nearestBadge: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
@@ -893,7 +908,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   nearestDistance: {
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: 'bold',
   },
   deliveryPointInfo: {

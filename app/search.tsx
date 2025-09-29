@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, ScrollView, Image, TouchableOpacity, ActivityIndicator, TextInput, Animated, Dimensions, StatusBar, Platform, Modal, Alert, Easing, FlatList } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@cmp/ThemedText';
 import { ThemedView } from '@cmp/ThemedView';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -7,6 +8,7 @@ import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { menuService } from '@lib/services/menuService';
 import { MenuItem } from '@lib/types/menu';
 import LottieView from '@cmp/LottieFallback';
+import LoadingAnimation from '../components/LoadingAnimation';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,6 +25,7 @@ export default function SearchScreen() {
   const [results, setResults] = useState<MenuItem[]>([]);
   const [allItems, setAllItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState((q || '').toString());
   const [inputValue, setInputValue] = useState((q || '').toString());
   const [searchFocused, setSearchFocused] = useState(false);
@@ -51,7 +54,7 @@ export default function SearchScreen() {
   const nameIndex = useRef<{ original: string; lower: string; image?: string }[]>([]);
 
   const categories = [
-    { id: '', name: 'All', icon: 'grid-outline', color: '#4CAF50' },
+    { id: '', name: 'All', icon: 'grid-outline', color: '#3d7a00' },
     { id: 'Main Course', name: 'Main Course', icon: 'restaurant-outline', color: '#FF6B6B' },
     { id: 'Appetizer', name: 'Appetizer', icon: 'wine-outline', color: '#4ECDC4' },
     { id: 'Fast Food', name: 'Fast Food', icon: 'fast-food-outline', color: '#45B7D1' },
@@ -106,30 +109,40 @@ export default function SearchScreen() {
 
   useEffect(() => {
     const query = searchQuery.toLowerCase();
-    let filtered = allItems.filter(item =>
-      item.name.toLowerCase().includes(query) ||
-      (item.description && item.description.toLowerCase().includes(query))
-    );
-    if (selectedCategory) {
-      filtered = filtered.filter(item => item.category === selectedCategory);
+    
+    // Show loading for search operations (only if there's a query)
+    if (query.trim()) {
+      setSearchLoading(true);
     }
-    switch (sortBy) {
-      case 'price-low':
-        filtered.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-high':
-        filtered.sort((a, b) => b.price - a.price);
-        break;
-      case 'rating':
-        filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-        break;
-      case 'name':
-        filtered.sort((a, b) => a.name.localeCompare(b.name));
-        break;
-      default:
-        break;
-    }
-    setResults(filtered);
+    
+    // Simulate a small delay for better UX
+    setTimeout(() => {
+      let filtered = allItems.filter(item =>
+        item.name.toLowerCase().includes(query) ||
+        (item.description && item.description.toLowerCase().includes(query))
+      );
+      if (selectedCategory) {
+        filtered = filtered.filter(item => item.category === selectedCategory);
+      }
+      switch (sortBy) {
+        case 'price-low':
+          filtered.sort((a, b) => a.price - b.price);
+          break;
+        case 'price-high':
+          filtered.sort((a, b) => b.price - a.price);
+          break;
+        case 'rating':
+          filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+          break;
+        case 'name':
+          filtered.sort((a, b) => a.name.localeCompare(b.name));
+          break;
+        default:
+          break;
+      }
+      setResults(filtered);
+      setSearchLoading(false);
+    }, 150); // Small delay for better UX
 
     if (!query) {
       setSuggestions([]);
@@ -353,17 +366,23 @@ export default function SearchScreen() {
   if (loading) {
     return (
       <ThemedView style={styles.loadingContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+        <StatusBar barStyle="light-content" backgroundColor="#3d7a00" />
         <View style={[styles.loadingGradient, { backgroundColor: '#ffffff' }]}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+          <LoadingAnimation 
+            visible={true} 
+            size="large" 
+            overlay={false}
+          />
+          <ThemedText style={styles.loadingText}>Loading menu items...</ThemedText>
         </View>
       </ThemedView>
     );
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+      <ThemedView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#3d7a00" />
       
       {/* Header moved into list header to make it scrollable with content */}
 
@@ -375,7 +394,7 @@ export default function SearchScreen() {
           <BlurView intensity={20} tint="light" style={styles.suggestionsBlur}>
             <View style={styles.suggestionsContainer}>
               <View style={styles.suggestionsHeader}>
-                <Ionicons name="search" size={16} color="#4CAF50" />
+                <Ionicons name="search" size={16} color="#3d7a00" />
                 <ThemedText style={styles.suggestionsTitle}>Search Suggestions</ThemedText>
               </View>
               {computedSuggestions.map((suggestion, index) => (
@@ -410,23 +429,20 @@ export default function SearchScreen() {
         ]}
       >
         {!searchQuery && results.length === 0 ? (
-          // Enhanced Empty State
+          // Enhanced Empty State with Loading Animation
           <View style={styles.emptyState}>
-            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <LottieView
-                source={require('../assets/animations/location.json')}
-                autoPlay
-                loop
-                style={styles.emptyAnimation}
-              />
-            </Animated.View>
+            <LoadingAnimation 
+              visible={true} 
+              size="large" 
+              overlay={false}
+            />
             <ThemedText style={styles.emptyTitle}>Ready to Explore?</ThemedText>
             <ThemedText style={styles.emptySubtitle}>Tap. Grab. Go</ThemedText>
             
             {/* Enhanced Popular Searches */}
             <View style={styles.popularContainer}>
               <View style={styles.popularHeader}>
-                <Ionicons name="trending-up" size={20} color="#4CAF50" />
+                <Ionicons name="trending-up" size={20} color="#3d7a00" />
                 <ThemedText style={styles.popularTitle}>Trending Now</ThemedText>
               </View>
               <View style={styles.popularTags}>
@@ -459,7 +475,7 @@ export default function SearchScreen() {
             {recentSearches.length > 0 && (
               <View style={styles.recentContainer}>
                 <View style={styles.recentHeader}>
-                  <Ionicons name="time" size={20} color="#4CAF50" />
+                  <Ionicons name="time" size={20} color="#3d7a00" />
                   <ThemedText style={styles.recentTitle}>Recent Searches</ThemedText>
                 </View>
                 {recentSearches.map((search, index) => (
@@ -481,7 +497,7 @@ export default function SearchScreen() {
                       activeOpacity={0.8}
                     >
                       <View style={styles.recentIconContainer}>
-                        <Ionicons name="time-outline" size={16} color="#4CAF50" />
+                        <Ionicons name="time-outline" size={16} color="#3d7a00" />
                       </View>
                       <ThemedText style={styles.recentText}>{search}</ThemedText>
                       <Ionicons name="arrow-up" size={16} color="#9CA3AF" />
@@ -490,6 +506,16 @@ export default function SearchScreen() {
                 ))}
               </View>
             )}
+          </View>
+        ) : searchLoading ? (
+          // Search Loading State
+          <View style={styles.searchLoadingContainer}>
+            <LoadingAnimation 
+              visible={true} 
+              size="medium" 
+              overlay={false}
+            />
+            <ThemedText style={styles.searchLoadingText}>Searching...</ThemedText>
           </View>
         ) : results.length === 0 ? (
           // Enhanced No Results
@@ -551,7 +577,7 @@ export default function SearchScreen() {
                     }
                   ]}
                 >
-                  <View style={[styles.headerGradient, { backgroundColor: '#4CAF50' }]}>
+                  <View style={[styles.headerGradient, { backgroundColor: '#3d7a00' }]}>
                     <View style={{
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -588,7 +614,7 @@ export default function SearchScreen() {
                       
                       <Animated.View style={[styles.searchContainer, { transform: [{ scale: headerAnim.interpolate({ inputRange: [0,1], outputRange: [0.95, 1] }) }]} ]}>
                         <View style={styles.searchIconContainer}>
-                          <Ionicons name="search" size={20} color="#4CAF50" />
+                          <Ionicons name="search" size={20} color="#3d7a00" />
                         </View>
                         <TextInput
                           style={styles.searchInput}
@@ -701,7 +727,7 @@ export default function SearchScreen() {
                 {/* Results header */}
                 <View style={styles.resultsHeader}>
                   <View style={styles.resultsCountContainer}>
-                    <Ionicons name="list" size={16} color="#4CAF50" />
+                    <Ionicons name="list" size={16} color="#3d7a00" />
                     <ThemedText style={styles.resultsCount}>
                       {results.length} {results.length === 1 ? 'item' : 'items'} found
                     </ThemedText>
@@ -711,7 +737,7 @@ export default function SearchScreen() {
                     onPress={() => setShowFilters(!showFilters)}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="swap-vertical-outline" size={16} color="#4CAF50" />
+                    <Ionicons name="swap-vertical-outline" size={16} color="#3d7a00" />
                     <ThemedText style={styles.sortText}>Sort</ThemedText>
                   </TouchableOpacity>
                 </View>
@@ -732,7 +758,7 @@ export default function SearchScreen() {
           <View style={styles.filterContent}>
             <View style={styles.filterHeader}>
               <View style={styles.filterTitleContainer}>
-                <Ionicons name="options" size={24} color="#4CAF50" />
+                <Ionicons name="options" size={24} color="#3d7a00" />
                 <ThemedText style={styles.filterTitle}>Sort & Filter</ThemedText>
               </View>
               <TouchableOpacity 
@@ -761,7 +787,7 @@ export default function SearchScreen() {
                       <Ionicons 
                         name={option.icon as any} 
                         size={20} 
-                        color={sortBy === option.id ? '#4CAF50' : '#666'} 
+                        color={sortBy === option.id ? '#3d7a00' : '#666'} 
                       />
                     </View>
                     <ThemedText style={[
@@ -773,7 +799,7 @@ export default function SearchScreen() {
                   </View>
                   {sortBy === option.id && (
                     <View style={styles.checkmarkContainer}>
-                      <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                      <Ionicons name="checkmark-circle" size={24} color="#3d7a00" />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -782,7 +808,8 @@ export default function SearchScreen() {
     </View>
         </BlurView>
       </Modal>
-    </ThemedView>
+      </ThemedView>
+    </SafeAreaView>
   );
 }
 
@@ -812,6 +839,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  searchLoadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  searchLoadingText: {
+    marginTop: 12,
+    color: '#3d7a00',
+    fontSize: 16,
+    fontWeight: '500',
+  },
   loadingDots: {
     flexDirection: 'row',
     marginTop: 20,
@@ -828,7 +866,7 @@ const styles = StyleSheet.create({
   header: {
     paddingTop: Platform.OS === 'ios' ? 44 : 8,
     paddingBottom: 12,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
   },
   headerGradient: {
     paddingHorizontal: 16,
@@ -913,7 +951,7 @@ const styles = StyleSheet.create({
   },
   categoryChipActive: {
     backgroundColor: '#e8f5e8',
-    borderColor: '#4CAF50',
+    borderColor: '#3d7a00',
   },
   categoryIconContainer: {
     width: 32,
@@ -1038,7 +1076,7 @@ const styles = StyleSheet.create({
   sortText: {
     marginLeft: 6,
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: '600',
   },
 
@@ -1149,10 +1187,10 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#4CAF50',
+    shadowColor: '#3d7a00',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -1216,8 +1254,8 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     backgroundColor: '#fff',
     borderWidth: 2,
-    borderColor: '#4CAF50',
-    shadowColor: '#4CAF50',
+    borderColor: '#3d7a00',
+    shadowColor: '#3d7a00',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -1225,7 +1263,7 @@ const styles = StyleSheet.create({
   },
   popularTagText: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: '600',
   },
   recentContainer: {
@@ -1307,8 +1345,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 25,
-    backgroundColor: '#4CAF50',
-    shadowColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
+    shadowColor: '#3d7a00',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1390,7 +1428,7 @@ const styles = StyleSheet.create({
   },
   filterOptionActive: {
     backgroundColor: '#e8f5e8',
-    borderColor: '#4CAF50',
+    borderColor: '#3d7a00',
   },
   filterOptionContent: {
     flexDirection: 'row',
@@ -1412,7 +1450,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   filterOptionTextActive: {
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: '700',
   },
   checkmarkContainer: {

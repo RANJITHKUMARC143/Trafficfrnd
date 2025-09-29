@@ -35,7 +35,7 @@ export default function PaymentsScreen() {
           <TouchableOpacity style={styles.row} activeOpacity={0.9} onPress={item.onPress}>
             <View style={styles.rowLeft}>
               <View style={styles.iconWrap}>
-                <Ionicons name={item.icon} size={20} color="#4CAF50" />
+                <Ionicons name={item.icon} size={20} color="#3d7a00" />
               </View>
               <View>
                 <ThemedText style={styles.rowTitle}>{item.title}</ThemedText>

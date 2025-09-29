@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "ec706359-dc4c-417e-83a5-bc992dad546f"
+      }
+    },
+    "android": {
+      "package": "com.ranjith0705.delivery_app"
+    }
+  }
+}

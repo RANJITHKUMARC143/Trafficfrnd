@@ -73,7 +73,7 @@ export default function BottomNavigationBar({ keyboardOpen = false }: BottomNavi
                   <Ionicons 
                     name={tab.icon} 
                     size={24} 
-                    color={isActive ? '#4CAF50' : '#666'} 
+                    color={isActive ? '#3d7a00' : '#666'} 
                   />
                   {tab.name === 'alerts' && unreadAlerts > 0 && (
                     <View style={styles.alertBadge}>
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
   },
   alertBadge: {
     position: 'absolute',
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   activeTabLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#4CAF50',
+    color: '#3d7a00',
     marginTop: 4,
     textAlign: 'center',
   },

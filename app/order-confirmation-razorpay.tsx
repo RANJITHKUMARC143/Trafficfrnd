@@ -182,11 +182,11 @@ export default function OrderConfirmationRazorpayScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+      <StatusBar barStyle="light-content" backgroundColor="#3d7a00" />
       
       {/* Header */}
       <LinearGradient
-        colors={['#4CAF50', '#45a049']}
+        colors={['#3d7a00', '#3d7a00']}
         style={styles.header}
       >
         <TouchableOpacity
@@ -206,7 +206,7 @@ export default function OrderConfirmationRazorpayScreen() {
             <Ionicons 
               name={paymentCompleted ? "checkmark-circle" : "time"} 
               size={24} 
-              color={paymentCompleted ? "#4CAF50" : "#FF9800"} 
+              color={paymentCompleted ? "#3d7a00" : "#FF9800"} 
             />
             <ThemedText style={styles.statusTitle}>
               {paymentCompleted ? 'Order Confirmed' : 'Payment Pending'}
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     paddingVertical: 15,
     paddingHorizontal: 30,
     borderRadius: 12,
@@ -541,8 +541,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   modalButtonPrimary: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
+    borderColor: '#3d7a00',
   },
   modalButtonText: {
     textAlign: 'center',

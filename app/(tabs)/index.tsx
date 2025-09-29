@@ -1,5 +1,6 @@
 import 'react-native-get-random-values';
 import { StyleSheet, TextInput, ScrollView, TouchableOpacity, View, Image, Alert, Platform, Linking, Dimensions, Animated, KeyboardAvoidingView, Text, Modal, FlatList, Keyboard } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@cmp/ThemedText';
 import { ThemedView } from '@cmp/ThemedView';
 import BottomNavigationBar from '@cmp/_components/BottomNavigationBar';
@@ -17,6 +18,7 @@ import { menuService } from '@lib/services/menuService';
 import { sendClickToCall } from '@lib/services/callService';
 import { MenuItem } from '@lib/types/menu';
 import LottieView from '@cmp/LottieFallback';
+import LoadingAnimation from '../../components/LoadingAnimation';
 import { useFocusEffect } from '@react-navigation/native';
 import { useMemo } from 'react';
 import { fetchUserOrders } from '@lib/services/orderService';
@@ -99,6 +101,7 @@ export default function HomeScreen() {
   const [location, setLocation] = useState<string>("Detecting your location...");
   const [locationCoords, setLocationCoords] = useState<{latitude: number; longitude: number} | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [nearestBuddy, setNearestBuddy] = useState<DeliveryBuddy>({
     id: 'DB1',
@@ -211,8 +214,6 @@ export default function HomeScreen() {
     sortBy: 'relevance'
   });
   const [showFilters, setShowFilters] = useState(false);
-  const [searchBarFloating, setSearchBarFloating] = useState(false);
-  const [searchBarAnimation] = useState(new Animated.Value(0));
   const [searchDebounceTimeout, setSearchDebounceTimeout] = useState<NodeJS.Timeout | null>(null);
 
   // Fallback menu items for when API is down
@@ -294,19 +295,23 @@ export default function HomeScreen() {
   const [filteredMenuItems, setFilteredMenuItems] = useState<MenuItem[]>([]);
   const [recentlyViewedIds, setRecentlyViewedIds] = useState<string[]>([]);
   const [recentlyViewedItems, setRecentlyViewedItems] = useState<MenuItem[]>([]);
+  const [loadingMenuItems, setLoadingMenuItems] = useState(true);
 
   // Load all menu items once for searching/filtering and set initial filtered list
   useEffect(() => {
     let isActive = true;
+    setLoadingMenuItems(true);
     menuService.getAllMenuItems().then((items) => {
       if (!isActive) return;
       const list = items && items.length > 0 ? items : fallbackMenuItems;
       setMenuItems(list);
       setFilteredMenuItems(list);
+      setLoadingMenuItems(false);
     }).catch(() => {
       if (!isActive) return;
       setMenuItems(fallbackMenuItems);
       setFilteredMenuItems(fallbackMenuItems);
+      setLoadingMenuItems(false);
     });
     return () => { isActive = false; };
   }, []);
@@ -684,90 +689,7 @@ export default function HomeScreen() {
     }
   }, [searchQuery]);
 
-  // Debounced search handler for floating search bar
-  const handleFloatingSearchInputChange = useCallback((text: string) => {
-    setSearchQuery(text);
-    
-    // Clear existing timeout
-    if (searchDebounceTimeout) {
-      clearTimeout(searchDebounceTimeout);
-    }
-    
-    // Set new timeout for debounced search
-    const timeout = setTimeout(() => {
-      if (text.trim()) {
-        const filtered = menuItems.filter(item =>
-          item.name.toLowerCase().includes(text.toLowerCase()) ||
-          item.description.toLowerCase().includes(text.toLowerCase()) ||
-          item.category.toLowerCase().includes(text.toLowerCase())
-        );
-        setFilteredMenuItems(filtered);
-      } else {
-        setFilteredMenuItems(menuItems);
-      }
-    }, 300); // 300ms debounce
-    
-    setSearchDebounceTimeout(timeout);
-  }, [menuItems, searchDebounceTimeout]);
 
-  // Memoized Floating Search Bar Component
-  const FloatingSearchBar = memo(({ 
-    searchQuery, 
-    onSearchInputChange, 
-    onSearch, 
-    onClearSearch,
-    searchBarAnimation 
-  }: {
-    searchQuery: string;
-    onSearchInputChange: (text: string) => void;
-    onSearch: () => void;
-    onClearSearch: () => void;
-    searchBarAnimation: Animated.Value;
-  }) => (
-    <Animated.View 
-      style={[
-        styles.floatingSearchContainer,
-        {
-          opacity: searchBarAnimation,
-          transform: [{
-            translateY: searchBarAnimation.interpolate({
-              inputRange: [0, 1],
-              outputRange: [100, 0],
-            })
-          }]
-        }
-      ]}
-    >
-      <View style={styles.floatingSearchBar}>
-        <Ionicons name="search" size={20} color="#4CAF50" />
-        <TextInput
-          style={styles.floatingSearchInput}
-          placeholder="Search..."
-          value={searchQuery}
-          onChangeText={onSearchInputChange}
-          onSubmitEditing={onSearch}
-          placeholderTextColor="#9CA3AF"
-          returnKeyType="search"
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity
-            onPress={onClearSearch}
-            style={styles.floatingClearButton}
-          >
-            <Ionicons name="close" size={18} color="#9CA3AF" />
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity 
-          style={styles.floatingSearchActionButton}
-          onPress={onSearch}
-        >
-          <Ionicons name="search" size={16} color="#fff" />
-        </TouchableOpacity>
-      </View>
-    </Animated.View>
-  ));
 
   const handleSearchFocus = () => {
     setSearchFocused(true);
@@ -874,10 +796,10 @@ export default function HomeScreen() {
 
   const getRouteColor = (density: DeliveryRoute['trafficDensity']) => {
     switch (density) {
-      case 'low': return '#4CAF50';
+      case 'low': return '#3d7a00';
       case 'medium': return '#FFA000';
       case 'high': return '#D32F2F';
-      default: return '#4CAF50';
+      default: return '#3d7a00';
     }
   };
 
@@ -1213,16 +1135,6 @@ export default function HomeScreen() {
     requestAnimationFrame(() => {
       const scrollY = capturedY;
 
-      // Show floating search bar when scrolled down - optimized with throttling
-      const shouldShowFloating = scrollY > 100;
-      if (shouldShowFloating !== searchBarFloating) {
-        setSearchBarFloating(shouldShowFloating);
-        Animated.timing(searchBarAnimation, {
-          toValue: shouldShowFloating ? 1 : 0,
-          duration: 200, // Reduced duration for snappier response
-          useNativeDriver: true,
-        }).start();
-      }
 
       if (!isScrolling) {
         setIsScrolling(true);
@@ -1368,8 +1280,9 @@ export default function HomeScreen() {
   }, [keyboardOpen]);
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <StatusBar style="auto" />
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+      <ThemedView style={{ flex: 1 }}>
+        <StatusBar style="auto" />
       
       {/* Touch handler to close suggestions */}
       {(searchSuggestions.length > 0 || searchFocused) && (
@@ -1432,10 +1345,21 @@ export default function HomeScreen() {
                   }
                 ]}
               >
-                <View style={styles.heroTextContainer}>
-                  <ThemedText style={styles.heroTitle}>Welcome to Traffic Frnd</ThemedText>
-                  <ThemedText style={styles.heroSubtitle}>Your delivery companion through traffic</ThemedText>
-                </View>
+                <Animated.View 
+                  style={[
+                    styles.heroAppNameLogoContainer,
+                    {
+                      transform: [{
+                        scale: heroAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.5, 1],
+                        })
+                      }]
+                    }
+                  ]}
+                >
+                  <Image source={require('../../assets/images/appnamelogo.png')} style={styles.heroAppNameLogo} resizeMode="contain" />
+                </Animated.View>
                 <Animated.View 
                   style={[
                     styles.heroLogoContainer,
@@ -1498,7 +1422,7 @@ export default function HomeScreen() {
                       <Ionicons 
                         name="search" 
                         size={24} 
-                        color={searchFocused ? "#4CAF50" : "#6B7280"} 
+                        color={searchFocused ? "#3d7a00" : "#6B7280"} 
                       />
                     </View>
             <TextInput
@@ -1535,21 +1459,21 @@ export default function HomeScreen() {
                       style={styles.quickActionChip}
                       onPress={() => handlePopularSearchPress('Pizza')}
                     >
-                      <Ionicons name="pizza" size={16} color="#4CAF50" />
+                      <Ionicons name="pizza" size={16} color="#3d7a00" />
                       <Text style={styles.quickActionText}>Pizza</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={styles.quickActionChip}
                       onPress={() => handlePopularSearchPress('Coffee')}
                     >
-                      <Ionicons name="cafe" size={16} color="#4CAF50" />
+                      <Ionicons name="cafe" size={16} color="#3d7a00" />
                       <Text style={styles.quickActionText}>Coffee</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={styles.quickActionChip}
                       onPress={() => handlePopularSearchPress('Burger')}
                     >
-                      <Ionicons name="restaurant" size={16} color="#4CAF50" />
+                      <Ionicons name="restaurant" size={16} color="#3d7a00" />
                       <Text style={styles.quickActionText}>Burger</Text>
                     </TouchableOpacity>
           </View>
@@ -1563,7 +1487,7 @@ export default function HomeScreen() {
         {(searchSuggestions.length > 0 || searchFocused) && (
           <Animated.View 
             style={[
-              searchBarFloating ? styles.floatingSuggestionsDropdown : styles.enhancedSuggestionsDropdown,
+              styles.enhancedSuggestionsDropdown,
               {
                 opacity: searchAnimation,
                 transform: [{
@@ -1577,10 +1501,19 @@ export default function HomeScreen() {
           >
             <BlurView intensity={20} tint="light" style={styles.suggestionsBlurContainer}>
               {/* Search Suggestions */}
-          {searchSuggestions.length > 0 && (
+          {isSearching ? (
+            <View style={styles.searchLoadingContainer}>
+              <LoadingAnimation 
+                visible={true} 
+                size="small" 
+                overlay={false}
+              />
+              <Text style={styles.searchLoadingText}>Searching...</Text>
+            </View>
+          ) : searchSuggestions.length > 0 && (
                 <View style={styles.suggestionsSection}>
                   <View style={styles.suggestionsHeader}>
-                    <Ionicons name="search" size={16} color="#4CAF50" />
+                    <Ionicons name="search" size={16} color="#3d7a00" />
                     <Text style={styles.suggestionsSectionTitle}>Search Results</Text>
                   </View>
               {searchSuggestions.map((item, idx) => {
@@ -1615,7 +1548,7 @@ export default function HomeScreen() {
                             <Text style={styles.modernSuggestionPrice}>₹{item.price}</Text>
                     </View>
                         </View>
-                        <Ionicons name="arrow-forward" size={18} color="#4CAF50" />
+                        <Ionicons name="arrow-forward" size={18} color="#3d7a00" />
                   </TouchableOpacity>
                 );
               })}
@@ -1651,10 +1584,10 @@ export default function HomeScreen() {
               {searchQuery.length > 0 && (
                 <View style={styles.suggestionsSection}>
                   <View style={styles.suggestionsHeader}>
-                    <Ionicons name="filter" size={16} color="#4CAF50" />
+                    <Ionicons name="filter" size={16} color="#3d7a00" />
                     <Text style={styles.suggestionsSectionTitle}>Quick Filters</Text>
                     <TouchableOpacity onPress={() => setShowFilters(!showFilters)}>
-                      <Ionicons name={showFilters ? "chevron-up" : "chevron-down"} size={16} color="#4CAF50" />
+                      <Ionicons name={showFilters ? "chevron-up" : "chevron-down"} size={16} color="#3d7a00" />
                     </TouchableOpacity>
                   </View>
                   <View style={styles.filtersContainer}>
@@ -1662,28 +1595,28 @@ export default function HomeScreen() {
                       style={[styles.filterChip, searchFilters.category === 'snacks' && styles.activeFilterChip]}
                       onPress={() => setSearchFilters(prev => ({ ...prev, category: prev.category === 'snacks' ? '' : 'snacks' }))}
                     >
-                      <Ionicons name="cafe" size={14} color={searchFilters.category === 'snacks' ? '#fff' : '#4CAF50'} />
+                      <Ionicons name="cafe" size={14} color={searchFilters.category === 'snacks' ? '#fff' : '#3d7a00'} />
                       <Text style={[styles.filterChipText, searchFilters.category === 'snacks' && styles.activeFilterChipText]}>Snacks</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.filterChip, searchFilters.category === 'drinks' && styles.activeFilterChip]}
                       onPress={() => setSearchFilters(prev => ({ ...prev, category: prev.category === 'drinks' ? '' : 'drinks' }))}
                     >
-                      <Ionicons name="beer" size={14} color={searchFilters.category === 'drinks' ? '#fff' : '#4CAF50'} />
+                      <Ionicons name="beer" size={14} color={searchFilters.category === 'drinks' ? '#fff' : '#3d7a00'} />
                       <Text style={[styles.filterChipText, searchFilters.category === 'drinks' && styles.activeFilterChipText]}>Drinks</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.filterChip, searchFilters.priceRange === 'under-100' && styles.activeFilterChip]}
                       onPress={() => setSearchFilters(prev => ({ ...prev, priceRange: prev.priceRange === 'under-100' ? '' : 'under-100' }))}
                     >
-                      <Ionicons name="pricetag" size={14} color={searchFilters.priceRange === 'under-100' ? '#fff' : '#4CAF50'} />
+                      <Ionicons name="pricetag" size={14} color={searchFilters.priceRange === 'under-100' ? '#fff' : '#3d7a00'} />
                       <Text style={[styles.filterChipText, searchFilters.priceRange === 'under-100' && styles.activeFilterChipText]}>Under ₹100</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.filterChip, searchFilters.rating === '4+' && styles.activeFilterChip]}
                       onPress={() => setSearchFilters(prev => ({ ...prev, rating: prev.rating === '4+' ? '' : '4+' }))}
                     >
-                      <Ionicons name="star" size={14} color={searchFilters.rating === '4+' ? '#fff' : '#4CAF50'} />
+                      <Ionicons name="star" size={14} color={searchFilters.rating === '4+' ? '#fff' : '#3d7a00'} />
                       <Text style={[styles.filterChipText, searchFilters.rating === '4+' && styles.activeFilterChipText]}>4+ Rating</Text>
                     </TouchableOpacity>
                   </View>
@@ -1694,7 +1627,7 @@ export default function HomeScreen() {
               {searchQuery.length === 0 && (
                 <View style={styles.suggestionsSection}>
                   <View style={styles.suggestionsHeader}>
-                    <Ionicons name="trending-up" size={16} color="#4CAF50" />
+                    <Ionicons name="trending-up" size={16} color="#3d7a00" />
                     <Text style={styles.suggestionsSectionTitle}>Popular Searches</Text>
                   </View>
                   <View style={styles.popularSearchesContainer}>
@@ -1765,7 +1698,7 @@ export default function HomeScreen() {
                   activeOpacity={0.8}
             >
                   <View style={styles.modernCategoryIconContainer}>
-                    <Ionicons name={category.icon} size={26} color="#4CAF50" />
+                    <Ionicons name={category.icon} size={26} color="#3d7a00" />
               </View>
                   <ThemedText style={styles.modernCategoryName}>{category.name}</ThemedText>
                   <View style={styles.categoryIndicator} />
@@ -1800,7 +1733,7 @@ export default function HomeScreen() {
                 </ThemedText>
                 <View style={styles.promotionCta}>
                   <ThemedText style={styles.promotionCtaText}>Explore Offers</ThemedText>
-                  <Ionicons name="arrow-forward" size={16} color="#4CAF50" />
+                  <Ionicons name="arrow-forward" size={16} color="#3d7a00" />
                 </View>
               </View>
             </View>
@@ -1817,11 +1750,10 @@ export default function HomeScreen() {
           </View>
           {loadingRecommended ? (
             <View style={styles.loadingContainer}>
-              <LottieView
-                source={require('../../assets/animations/car-delivery.json')}
-                autoPlay
-                loop
-                style={styles.loadingAnimation}
+              <LoadingAnimation 
+                visible={true} 
+                size="medium" 
+                overlay={false}
               />
               <ThemedText style={styles.loadingText}>Loading recommended...</ThemedText>
             </View>
@@ -1972,13 +1904,23 @@ export default function HomeScreen() {
               <ThemedText style={styles.viewAllText}>Explore</ThemedText>
             </TouchableOpacity>
           </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.modernScrollView}
-            contentContainerStyle={styles.modernScrollContent}
-          >
-            {(menuItems.filter((m) => (m.price || 0) <= 100).slice(0, 12)).map((item: MenuItem) => (
+          {loadingMenuItems ? (
+            <View style={styles.loadingContainer}>
+              <LoadingAnimation 
+                visible={true} 
+                size="medium" 
+                overlay={false}
+              />
+              <ThemedText style={styles.loadingText}>Loading budget picks...</ThemedText>
+            </View>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.modernScrollView}
+              contentContainerStyle={styles.modernScrollContent}
+            >
+              {(menuItems.filter((m) => (m.price || 0) <= 100).slice(0, 12)).map((item: MenuItem) => (
               <TouchableOpacity
                 key={`bp-${item._id}`}
                 style={styles.modernRecommendedCard}
@@ -2024,7 +1966,8 @@ export default function HomeScreen() {
                 </View>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+            </ScrollView>
+          )}
         </View>
 
         {/* Modern Top Rated Section */}
@@ -2037,11 +1980,10 @@ export default function HomeScreen() {
           </View>
           {loadingTopRated ? (
             <View style={styles.loadingContainer}>
-              <LottieView
-                source={require('../../assets/animations/car-delivery.json')}
-                autoPlay
-                loop
-                style={styles.loadingAnimation}
+              <LoadingAnimation 
+                visible={true} 
+                size="medium" 
+                overlay={false}
               />
               <ThemedText style={styles.loadingText}>Loading top rated...</ThemedText>
             </View>
@@ -2128,7 +2070,7 @@ export default function HomeScreen() {
           <View style={styles.modernDeliveryContent}>
             <View style={styles.modernDeliveryHeader}>
               <View style={styles.deliveryTitleContainer}>
-                <Ionicons name="bicycle" size={24} color="#4CAF50" />
+                <Ionicons name="bicycle" size={24} color="#3d7a00" />
                 <ThemedText style={styles.modernDeliveryTitle}>Nearest Delivery Buddy</ThemedText>
               </View>
               <TouchableOpacity 
@@ -2136,7 +2078,7 @@ export default function HomeScreen() {
                 onPress={() => router.push('/delivery-status' as any)}
               >
                 <ThemedText style={styles.modernViewDetailsText}>View Details</ThemedText>
-                <Ionicons name="chevron-forward" size={18} color="#4CAF50" />
+                <Ionicons name="chevron-forward" size={18} color="#3d7a00" />
               </TouchableOpacity>
             </View>
 
@@ -2162,7 +2104,7 @@ export default function HomeScreen() {
                     description={`Estimated arrival: ${deliveryRoute?.duration || 'Calculating...'}`}
                   >
                     <View style={styles.modernDeliveryMarker}>
-                      <Ionicons name="bicycle" size={24} color="#4CAF50" />
+                      <Ionicons name="bicycle" size={24} color="#3d7a00" />
                     </View>
                   </Marker>
 
@@ -2182,13 +2124,13 @@ export default function HomeScreen() {
                   <View style={styles.modernTrafficInfo}>
                     <View style={styles.modernTrafficCard}>
                       <View style={styles.modernTrafficDetail}>
-                        <Ionicons name="time-outline" size={18} color="#4CAF50" />
+                        <Ionicons name="time-outline" size={18} color="#3d7a00" />
                         <ThemedText style={styles.modernTrafficText}>
                         {deliveryRoute.duration}
                       </ThemedText>
                     </View>
                       <View style={styles.modernTrafficDetail}>
-                        <Ionicons name="map-outline" size={18} color="#4CAF50" />
+                        <Ionicons name="map-outline" size={18} color="#3d7a00" />
                         <ThemedText style={styles.modernTrafficText}>
                         {deliveryRoute.distance}
                       </ThemedText>
@@ -2213,7 +2155,7 @@ export default function HomeScreen() {
                   <View style={styles.buddyInfoContainer}>
                     <ThemedText style={styles.modernBuddyName}>{nearestBuddy.name}</ThemedText>
                     <View style={styles.modernBuddyStatus}>
-                      <View style={[styles.modernStatusDot, { backgroundColor: nearestBuddy.status === 'available' ? '#4CAF50' : '#6B7280' }]} />
+                      <View style={[styles.modernStatusDot, { backgroundColor: nearestBuddy.status === 'available' ? '#3d7a00' : '#6B7280' }]} />
                       <ThemedText style={styles.modernStatusText}>{nearestBuddy.status === 'available' ? 'Available' : 'Busy'}</ThemedText>
                     </View>
                   </View>
@@ -2252,7 +2194,7 @@ export default function HomeScreen() {
                     : 'stop-circle-outline'
                 }
                 size={24}
-                color="#4CAF50"
+                color="#3d7a00"
               />
             </View>
             <View style={styles.locationTextContainer}>
@@ -2288,7 +2230,7 @@ export default function HomeScreen() {
                 <Ionicons
                   name={category.icon}
                   size={24}
-                  color="#4CAF50"
+                  color="#3d7a00"
                 />
               </View>
               <View style={styles.categoryInfo}>
@@ -2347,16 +2289,6 @@ export default function HomeScreen() {
         </Modal>
       )}
 
-      {/* Floating Search Bar (hidden when fixed bar is focused/visible) */}
-      {searchBarFloating && !searchFocused && (
-        <FloatingSearchBar
-          searchQuery={searchQuery}
-          onSearchInputChange={handleFloatingSearchInputChange}
-          onSearch={handleSearch}
-          onClearSearch={handleClearSearch}
-          searchBarAnimation={searchBarAnimation}
-        />
-      )}
 
       {/* Floating Action Buttons */}
       <View style={styles.floatingActionContainer}>
@@ -2468,7 +2400,8 @@ export default function HomeScreen() {
           </Animated.View>
         )}
       </View>
-    </ThemedView>
+      </ThemedView>
+    </SafeAreaView>
   );
 }
 
@@ -2596,7 +2529,7 @@ const styles = StyleSheet.create({
   },
   recommendedPrice: {
     fontSize: 15,
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: 'bold',
     marginBottom: 4,
   },
@@ -2620,7 +2553,7 @@ const styles = StyleSheet.create({
   recommendedAddButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -2658,7 +2591,7 @@ const styles = StyleSheet.create({
   },
   viewDetailsText: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: '500',
   },
   mapContainer: {
@@ -2941,7 +2874,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -3064,19 +2997,19 @@ const styles = StyleSheet.create({
   
   // Modern Hero Section Styles
   heroSection: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
     marginBottom: 20,
     overflow: 'hidden',
-    shadowColor: '#4CAF50',
+    shadowColor: '#3d7a00',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 12,
   },
   heroGradient: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     paddingTop: 60,
     paddingBottom: 40,
     paddingHorizontal: 20,
@@ -3091,20 +3024,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
     marginBottom: 25,
-  },
-  heroTextContainer: {
-    flex: 1,
-  },
-  heroTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  heroSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
+    marginTop: -40,
   },
   heroLogoContainer: {
     width: 60,
@@ -3117,6 +3037,16 @@ const styles = StyleSheet.create({
   heroLogo: {
     width: 40,
     height: 40,
+  },
+  heroAppNameLogoContainer: {
+    width: 220,
+    height: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroAppNameLogo: {
+    width: 200,
+    height: 100,
   },
   
   // Hero Decorative Elements
@@ -3200,7 +3130,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     backgroundColor: '#fff',
     borderRadius: 24,
-    shadowColor: '#4CAF50',
+    shadowColor: '#3d7a00',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
@@ -3217,7 +3147,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
-    shadowColor: '#4CAF50',
+    shadowColor: '#3d7a00',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -3233,7 +3163,7 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     marginTop: 8,
   },
   
@@ -3276,7 +3206,7 @@ const styles = StyleSheet.create({
   },
   modernPromotionSubtitle: {
     fontSize: 16,
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: '600',
     marginBottom: 12,
   },
@@ -3286,7 +3216,7 @@ const styles = StyleSheet.create({
   },
   promotionCtaText: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: '600',
     marginRight: 4,
   },
@@ -3313,7 +3243,7 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: '600',
   },
   
@@ -3329,8 +3259,19 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontSize: 16,
+    fontWeight: '500',
+  },
+  searchLoadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  searchLoadingText: {
+    marginTop: 8,
+    color: '#3d7a00',
+    fontSize: 14,
     fontWeight: '500',
   },
   emptyStateContainer: {
@@ -3360,7 +3301,7 @@ const styles = StyleSheet.create({
     marginRight: 20,
     backgroundColor: '#fff',
     borderRadius: 20,
-    shadowColor: '#4CAF50',
+    shadowColor: '#3d7a00',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
@@ -3444,7 +3385,7 @@ const styles = StyleSheet.create({
   },
   modernItemPrice: {
     fontSize: 16,
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: 'bold',
     marginBottom: 6,
   },
@@ -3471,10 +3412,10 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#4CAF50',
+    shadowColor: '#3d7a00',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -3488,7 +3429,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     marginHorizontal: 20,
     borderRadius: 24,
-    shadowColor: '#4CAF50',
+    shadowColor: '#3d7a00',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 20,
@@ -3526,7 +3467,7 @@ const styles = StyleSheet.create({
   },
   modernViewDetailsText: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: '600',
     marginRight: 4,
   },
@@ -3598,7 +3539,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: 'rgba(76, 175, 80, 0.1)',
-    shadowColor: '#4CAF50',
+    shadowColor: '#3d7a00',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -3613,7 +3554,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -3674,7 +3615,7 @@ const styles = StyleSheet.create({
   enhancedSearchContainer: {
     width: '100%',
     paddingHorizontal: 0,
-    marginTop: 20,
+    marginTop: -25,
   },
   searchBarWrapper: {
     width: '100%',
@@ -3715,8 +3656,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 25,
-    backgroundColor: '#4CAF50',
-    shadowColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
+    shadowColor: '#3d7a00',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -3761,7 +3702,7 @@ const styles = StyleSheet.create({
     maxHeight: 450,
     borderRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#4CAF50',
+    shadowColor: '#3d7a00',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.2,
     shadowRadius: 24,
@@ -3776,7 +3717,7 @@ const styles = StyleSheet.create({
     maxHeight: 400,
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#4CAF50',
+    shadowColor: '#3d7a00',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 20,
@@ -3864,7 +3805,7 @@ const styles = StyleSheet.create({
   modernSuggestionPrice: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#3d7a00',
   },
   modernHistoryItem: {
     flexDirection: 'row',
@@ -3895,7 +3836,7 @@ const styles = StyleSheet.create({
   },
   popularSearchText: {
     fontSize: 13,
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: '500',
   },
   emptySearchContainer: {
@@ -3935,69 +3876,18 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   activeFilterChip: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
+    borderColor: '#3d7a00',
   },
   filterChipText: {
     fontSize: 13,
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: '500',
   },
   activeFilterChipText: {
     color: '#fff',
   },
   
-  // Floating Search Bar Styles
-  floatingSearchContainer: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    right: 20,
-    zIndex: 2000,
-    elevation: 30,
-  },
-  floatingSearchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 25,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 12,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-  },
-  floatingSearchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#333',
-    marginLeft: 12,
-    marginRight: 8,
-    // Performance optimizations
-    includeFontPadding: false,
-    textAlignVertical: 'center',
-  },
-  floatingClearButton: {
-    padding: 4,
-  },
-  floatingSearchActionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#4CAF50',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 6,
-  },
   
   // Suggestions Overlay
   suggestionsOverlay: {
@@ -4065,8 +3955,8 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#4CAF50',
-    shadowColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
+    shadowColor: '#3d7a00',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

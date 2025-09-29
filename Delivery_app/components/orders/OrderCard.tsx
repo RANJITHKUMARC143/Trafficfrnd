@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Image } from 'react-native';
 import { COLORS, FONTS } from '@/constants/theme';
 import Card from '../common/Card';
 import StatusBadge from '../common/StatusBadge';
-import { MapPin, Clock, DollarSign } from 'lucide-react-native';
+import { MapPin, Clock } from 'lucide-react-native';
 import { Order } from '@/types/order';
 
 interface OrderCardProps {
@@ -65,7 +65,7 @@ const OrderCard = ({ order, onPress }: OrderCardProps) => {
           <Text style={styles.orderDetailText}>30 min</Text>
         </View>
         <View style={styles.orderDetailItem}>
-          <DollarSign size={16} color={COLORS.success} />
+        
           <Text style={[styles.orderDetailText, styles.earnings]}>
             ₹{estimatedEarnings.toFixed(2)}
           </Text>

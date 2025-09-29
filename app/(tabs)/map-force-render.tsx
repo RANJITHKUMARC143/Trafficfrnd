@@ -656,7 +656,7 @@ const styles = StyleSheet.create({
     borderColor: '#e0e0e0',
   },
   selectedDeliveryPointCard: {
-    borderColor: '#4CAF50',
+    borderColor: '#3d7a00',
     borderWidth: 2,
   },
   deliveryPointName: {
@@ -672,11 +672,11 @@ const styles = StyleSheet.create({
   },
   deliveryPointDistance: {
     fontSize: 12,
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: '600',
   },
   nearestBadge: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,

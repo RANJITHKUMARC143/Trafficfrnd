@@ -4,12 +4,12 @@
     "slug": "traffic-frnd-new",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/images/logo.png",
     "userInterfaceStyle": "light",
     "scheme": "trafficfriend",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/icon.png",
+      "image": "./assets/images/logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -54,8 +54,8 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
-          "color": "#4CAF50",
+          "icon": "./assets/images/logo.png",
+          "color": "#3d7a00",
           "defaultChannel": "default"
         }
       ],

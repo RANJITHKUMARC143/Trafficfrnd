@@ -87,11 +87,11 @@ export default function RazorpayPayment({ orderId, amount, userEmail, userPhone,
           .amount {
             font-size: 24px;
             font-weight: bold;
-            color: #4CAF50;
+            color: #3d7a00;
             margin: 10px 0;
           }
           .button {
-            background-color: #4CAF50;
+            background-color: #3d7a00;
             color: white;
             padding: 15px 30px;
             border: none;
@@ -102,7 +102,7 @@ export default function RazorpayPayment({ orderId, amount, userEmail, userPhone,
             margin-top: 20px;
           }
           .button:hover {
-            background-color: #45a049;
+            background-color: #3d7a00;
           }
           .button:disabled {
             background-color: #ccc;
@@ -170,7 +170,7 @@ export default function RazorpayPayment({ orderId, amount, userEmail, userPhone,
               }
             },
             theme: {
-              color: '#4CAF50'
+              color: '#3d7a00'
             },
             handler: function (response) {
               console.log('Payment success:', response);
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   paymentButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     paddingVertical: 15,
     paddingHorizontal: 30,
     borderRadius: 10,

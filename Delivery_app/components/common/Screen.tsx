@@ -1,6 +1,5 @@
 import React from 'react';
 import { 
-  SafeAreaView, 
   View, 
   StyleSheet, 
   ScrollView, 
@@ -9,6 +8,7 @@ import {
   StatusBar,
   KeyboardAvoidingView
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/constants/theme';
 
 interface ScreenProps {
@@ -26,8 +26,6 @@ const Screen = ({
   backgroundColor = COLORS.background,
   safeArea = true
 }: ScreenProps) => {
-  const Container = safeArea ? SafeAreaView : View;
-  
   const content = (
     <View style={[
       styles.container, 
@@ -48,16 +46,29 @@ const Screen = ({
         backgroundColor={backgroundColor} 
         barStyle="dark-content" 
       />
-      <Container style={[styles.screen, { backgroundColor }]}>
-        {scroll ? (
-          <ScrollView 
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-          >
-            {content}
-          </ScrollView>
-        ) : content}
-      </Container>
+      {safeArea ? (
+        <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={[styles.screen, { backgroundColor }]}>
+          {scroll ? (
+            <ScrollView 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.scrollContent}
+            >
+              {content}
+            </ScrollView>
+          ) : content}
+        </SafeAreaView>
+      ) : (
+        <View style={[styles.screen, { backgroundColor, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0 }]}>
+          {scroll ? (
+            <ScrollView 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.scrollContent}
+            >
+              {content}
+            </ScrollView>
+          ) : content}
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 };

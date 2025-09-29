@@ -1,22 +1,40 @@
 import { Tabs } from 'expo-router';
 import { Platform, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, FONTS } from '@/constants/theme';
 import { FontAwesome } from '@expo/vector-icons';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+  const barHeightBase = Platform.OS === 'ios' ? 85 : 65;
+  const barPaddingBottomBase = Platform.OS === 'ios' ? 25 : 10;
   return (
       <Tabs
+        initialRouteName="index"
         screenOptions={{
           tabBarActiveTintColor: '#007AFF',
           tabBarInactiveTintColor: COLORS.gray,
           tabBarLabelStyle: styles.tabBarLabel,
-          tabBarStyle: styles.tabBar,
+          tabBarStyle: [
+            styles.tabBar,
+            {
+              height: barHeightBase + Math.max(0, insets.bottom),
+              paddingBottom: Math.max(barPaddingBottomBase, insets.bottom),
+            }
+          ],
           headerShown: false,
           tabBarHideOnKeyboard: true,
           tabBarShowLabel: true,
           tabBarIconStyle: styles.tabBarIcon,
         }}
       >
+        {/* Hidden alerts screen: accessible via navigation, not shown in tab bar */}
+        <Tabs.Screen
+          name="alerts"
+          options={{
+            href: null,
+          }}
+        />
         <Tabs.Screen
           name="index"
           options={{

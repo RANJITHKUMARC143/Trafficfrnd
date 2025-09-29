@@ -3,7 +3,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
@@ -11,6 +11,8 @@ import { registerPushToken } from '@lib/services/alertService';
 import { useColorScheme } from 'react-native';
 import { socketService } from '@lib/services/socketService';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import LoadingAnimation from '../components/LoadingAnimation';
 
 export {
   ErrorBoundary,
@@ -28,6 +30,7 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
   });
+  const [isAppLoading, setIsAppLoading] = useState(true);
 
   useEffect(() => {
     if (error) throw error;
@@ -53,6 +56,10 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync();
+      // Add a small delay to show the loading animation
+      setTimeout(() => {
+        setIsAppLoading(false);
+      }, 1000);
     }
   }, [loaded]);
 
@@ -161,9 +168,12 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <RootLayoutNav />
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <RootLayoutNav />
+        <LoadingAnimation visible={isAppLoading} size="large" />
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }
 

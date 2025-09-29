@@ -9,6 +9,7 @@ const User = require('../models/User');
 const Vendor = require('../models/Vendor');
 const DeliveryBoy = require('../models/DeliveryBoy');
 const Alert = require('../models/Alert');
+const DeliveryAlert = require('../models/DeliveryAlert');
 
 // --- ADMIN ORDER MANAGEMENT ENDPOINTS ---
 // List all orders (admin)
@@ -76,6 +77,15 @@ router.patch('/admin/:orderId/status', auth, async (req, res) => {
           at: new Date().toISOString(),
           by: 'admin'
         });
+        // Notify assigned delivery boy via socket
+        if (order.deliveryBoyId) {
+          io.to(`deliveryBoy:${String(order.deliveryBoyId)}`).emit('deliveryNotification', {
+            type: 'order-update',
+            orderId: String(order._id),
+            title: 'Order Status Updated',
+            message: `Order #${String(order._id).slice(-8)} is now ${order.status}`
+          });
+        }
       }
     } catch (e) {
       console.warn('Admin status emit failed:', e?.message || e);
@@ -101,6 +111,28 @@ router.patch('/admin/:orderId/status', auth, async (req, res) => {
     } catch (e) {
       console.warn('Admin status alert failed:', e?.message || e);
     }
+    // Create delivery alert for assigned driver
+    try {
+      if (order.deliveryBoyId) {
+        const statusTextMapDriver = {
+          pending: 'Pending',
+          confirmed: 'Confirmed',
+          preparing: 'Preparing',
+          enroute: 'On the way',
+          ready: 'Ready for pickup',
+          completed: 'Delivered',
+          cancelled: 'Cancelled'
+        };
+        await DeliveryAlert.create({
+          title: 'Order Update',
+          message: `Order #${String(order._id).slice(-8)}: ${statusTextMapDriver[order.status] || order.status}`,
+          type: 'order-update',
+          deliveryBoyId: order.deliveryBoyId,
+        });
+      }
+    } catch (e) {
+      console.warn('Admin driver alert (status) failed:', e?.message || e);
+    }
     res.json(order);
   } catch (error) {
     res.status(500).json({ message: 'Error updating order status', error: error.message });
@@ -114,6 +146,111 @@ router.delete('/admin/:orderId', auth, async (req, res) => {
     res.json({ message: 'Order deleted successfully', id: req.params.orderId });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting order', error: error.message });
+  }
+});
+
+// Assign order to a delivery boy (admin)
+router.post('/admin/:orderId/assign', auth, async (req, res) => {
+  try {
+    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'super_admin')) {
+      return res.status(403).json({ message: 'Forbidden: Only admins can assign' });
+    }
+    const { deliveryBoyId } = req.body || {};
+    if (!deliveryBoyId) return res.status(400).json({ message: 'deliveryBoyId is required' });
+    const order = await Order.findById(req.params.orderId);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    order.deliveryBoyId = deliveryBoyId;
+    if (!order.status || order.status === 'pending') order.status = 'confirmed';
+    order.updatedAt = Date.now();
+    await order.save();
+    // Alert new driver
+    try {
+      await DeliveryAlert.create({
+        title: 'Order Assigned',
+        message: `You have been assigned order #${String(order._id).slice(-8)}`,
+        type: 'order-update',
+        deliveryBoyId: order.deliveryBoyId,
+      });
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`deliveryBoy:${String(order.deliveryBoyId)}`).emit('deliveryNotification', {
+          type: 'order-update',
+          orderId: String(order._id),
+          title: 'Order Assigned',
+          message: `You have been assigned order #${String(order._id).slice(-8)}`
+        });
+      }
+    } catch (e) { console.warn('Assign alert failed:', e?.message || e); }
+    res.json({ success: true, order });
+  } catch (error) {
+    res.status(500).json({ message: 'Error assigning order', error: error.message });
+  }
+});
+
+// Reassign order to a different delivery boy (admin)
+router.post('/admin/:orderId/reassign', auth, async (req, res) => {
+  try {
+    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'super_admin')) {
+      return res.status(403).json({ message: 'Forbidden: Only admins can reassign' });
+    }
+    const { deliveryBoyId } = req.body || {};
+    if (!deliveryBoyId) return res.status(400).json({ message: 'deliveryBoyId is required' });
+    const order = await Order.findById(req.params.orderId);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    const oldDriverId = order.deliveryBoyId ? String(order.deliveryBoyId) : null;
+    order.deliveryBoyId = deliveryBoyId;
+    order.updatedAt = Date.now();
+    await order.save();
+    const io = req.app.get('io');
+    // Alert old driver
+    try {
+      if (oldDriverId) {
+        await DeliveryAlert.create({
+          title: 'Order Reassigned',
+          message: `Order #${String(order._id).slice(-8)} has been reassigned`,
+          type: 'info',
+          deliveryBoyId: oldDriverId,
+        });
+        if (io) io.to(`deliveryBoy:${oldDriverId}`).emit('deliveryNotification', { type: 'info', orderId: String(order._id), title: 'Order Reassigned', message: 'This order has been reassigned.' });
+      }
+    } catch (e) { console.warn('Old driver alert failed:', e?.message || e); }
+    // Alert new driver
+    try {
+      await DeliveryAlert.create({
+        title: 'New Order Assigned',
+        message: `You have been assigned order #${String(order._id).slice(-8)}`,
+        type: 'order-update',
+        deliveryBoyId: order.deliveryBoyId,
+      });
+      if (io) io.to(`deliveryBoy:${String(order.deliveryBoyId)}`).emit('deliveryNotification', { type: 'order-update', orderId: String(order._id), title: 'New Order Assigned', message: `You have been assigned order #${String(order._id).slice(-8)}` });
+    } catch (e) { console.warn('New driver alert failed:', e?.message || e); }
+    res.json({ success: true, order });
+  } catch (error) {
+    res.status(500).json({ message: 'Error reassigning order', error: error.message });
+  }
+});
+
+// Add admin note/message to assigned driver
+router.post('/admin/:orderId/note', auth, async (req, res) => {
+  try {
+    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'super_admin')) {
+      return res.status(403).json({ message: 'Forbidden: Only admins can add notes' });
+    }
+    const { title, message, type } = req.body || {};
+    const order = await Order.findById(req.params.orderId);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    if (!order.deliveryBoyId) return res.status(400).json({ message: 'No delivery boy assigned' });
+    const alert = await DeliveryAlert.create({
+      title: title || 'Admin Message',
+      message: message || 'You have a message regarding this order',
+      type: type || 'info',
+      deliveryBoyId: order.deliveryBoyId,
+    });
+    const io = req.app.get('io');
+    if (io) io.to(`deliveryBoy:${String(order.deliveryBoyId)}`).emit('deliveryNotification', { type: alert.type, orderId: String(order._id), title: alert.title, message: alert.message });
+    res.json({ success: true, alert });
+  } catch (error) {
+    res.status(500).json({ message: 'Error adding note', error: error.message });
   }
 });
 

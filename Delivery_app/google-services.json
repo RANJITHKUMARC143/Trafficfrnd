@@ -1,0 +1,69 @@
+{
+  "project_info": {
+    "project_number": "638529861871",
+    "firebase_url": "https://traffic-frnd-default-rtdb.firebaseio.com",
+    "project_id": "traffic-frnd",
+    "storage_bucket": "traffic-frnd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:638529861871:android:79e086db2aebeb49c0031a",
+        "android_client_info": {
+          "package_name": "com.nanu01.delivery"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "638529861871-j64o9o2ulgu15u2climn00hp5apcis75.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDx9y8Rn9iKhgR7SXQXAShnC4kGElfnImA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "638529861871-j64o9o2ulgu15u2climn00hp5apcis75.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:638529861871:android:4c252244189f2a52c0031a",
+        "android_client_info": {
+          "package_name": "com.trafficfriend.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "638529861871-j64o9o2ulgu15u2climn00hp5apcis75.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDx9y8Rn9iKhgR7SXQXAShnC4kGElfnImA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "638529861871-j64o9o2ulgu15u2climn00hp5apcis75.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

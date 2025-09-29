@@ -1,5 +1,5 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, SafeAreaView, Modal, Pressable, Text, Dimensions, Animated } from 'react-native';
+import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, SafeAreaView, Modal, Pressable, Text, Dimensions, Animated, StatusBar } from 'react-native';
 import { ThemedText } from '@cmp/ThemedText';
 import { ThemedView } from '@cmp/ThemedView';
 import BottomNavigationBar from '@cmp/_components/BottomNavigationBar';
@@ -8,7 +8,6 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { API_URL } from '@src/config';
-import { registerPushToken } from '@lib/services/alertService';
 import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
@@ -17,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchUserOrders } from '@lib/services/orderService';
+import LoadingAnimation from '../../components/LoadingAnimation';
 
 type User = {
   id: string;
@@ -293,73 +293,6 @@ export default function ProfileScreen() {
       const storedUser = await AsyncStorage.getItem('user');
       console.log('After login: stored token:', storedToken);
       console.log('After login: stored user:', storedUser);
-      // Register push token after login (dev/production builds)
-      try {
-        console.log('=== Post-login Push Token Registration ===');
-        const Notifications = await import('expo-notifications');
-        const Device = await import('expo-device');
-        const { Platform } = await import('react-native');
-        const isDevice = (Device as any).default?.isDevice ?? Device?.isDevice;
-        
-        console.log('Is physical device:', isDevice);
-        if (!isDevice) {
-          console.log('Skipping push token registration - not a physical device');
-          return;
-        }
-        
-        // Skip on Android Expo Go
-        if (Platform.OS === 'android' && Constants.appOwnership === 'expo') {
-          console.log('Skipping push token on Android Expo Go');
-          return;
-        }
-        
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        console.log('Current permission status:', existingStatus);
-        
-        let finalStatus = existingStatus;
-        if (existingStatus !== 'granted') {
-          console.log('Requesting notification permissions...');
-          const { status } = await Notifications.requestPermissionsAsync();
-          finalStatus = status;
-          console.log('Permission request result:', status);
-        }
-        
-        if (finalStatus === 'granted') {
-          console.log('Permission granted, fetching push token...');
-          const projectId = (Constants?.expoConfig?.extra as any)?.eas?.projectId || (Constants as any)?.easConfig?.projectId;
-          console.log('Using projectId:', projectId);
-          
-          let tokenResp: any;
-          try {
-            tokenResp = await Notifications.getExpoPushTokenAsync();
-            console.log('Successfully got token without projectId');
-          } catch (err) {
-            console.error('Failed without projectId, trying with projectId:', err);
-            try {
-              tokenResp = await Notifications.getExpoPushTokenAsync({ projectId });
-              console.log('Successfully got token with projectId');
-            } catch (err2) {
-              console.error('Failed with projectId:', err2);
-              console.log('Firebase not configured. Please set up FCM credentials.');
-              return;
-            }
-          }
-          
-          const pushToken = tokenResp.data;
-          console.log('Push token:', pushToken);
-          
-          if (pushToken) {
-            await registerPushToken(pushToken);
-            console.log('Push token registered successfully');
-          } else {
-            console.log('No push token received');
-          }
-        } else {
-          console.log('Notification permission not granted:', finalStatus);
-        }
-      } catch (e) {
-        console.error('Error in post-login push token registration:', e);
-      }
 
       // Fetch user details
       try {
@@ -566,7 +499,12 @@ export default function ProfileScreen() {
   if (authState.isLoading) {
     return (
       <ThemedView style={{ flex: 1, backgroundColor: '#f7f8fa', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <LoadingAnimation 
+          visible={true} 
+          size="large" 
+          overlay={false}
+        />
+        <ThemedText style={styles.loadingText}>Loading profile...</ThemedText>
       </ThemedView>
     );
   }
@@ -575,7 +513,7 @@ export default function ProfileScreen() {
     return (
       <ThemedView style={{ flex: 1, backgroundColor: '#f7f8fa' }}>
         <Animated.ScrollView 
-          contentContainerStyle={{ paddingBottom: 40 }} 
+          contentContainerStyle={{ paddingBottom: 100 }} 
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
           onScroll={Animated.event(
@@ -605,7 +543,7 @@ export default function ProfileScreen() {
             }}
           >
             <LinearGradient
-              colors={["#4CAF50", "#43e97b"]}
+              colors={["#3d7a00", "#43e97b"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={[styles.hero, { paddingTop: insets.top + 40 }]}
@@ -633,7 +571,7 @@ export default function ProfileScreen() {
           {/* Stats Row */}
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <Ionicons name="cart-outline" size={28} color="#4CAF50" />
+              <Ionicons name="cart-outline" size={28} color="#3d7a00" />
               <Text style={styles.statNumber}>{stats.total}</Text>
               <Text style={styles.statLabel}>Orders</Text>
             </View>
@@ -652,135 +590,20 @@ export default function ProfileScreen() {
           {/* Quick Actions */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginHorizontal: 18 }}>
             <TouchableOpacity activeOpacity={0.9} style={styles.quickAction} onPress={handleEditProfile}>
-              <Ionicons name="create-outline" size={22} color="#4CAF50" />
+              <Ionicons name="create-outline" size={22} color="#3d7a00" />
               <Text style={styles.quickActionText}>Edit</Text>
             </TouchableOpacity>
             <TouchableOpacity activeOpacity={0.9} style={styles.quickAction} onPress={() => router.push('/orders')}>
-              <Ionicons name="receipt-outline" size={22} color="#4CAF50" />
+              <Ionicons name="receipt-outline" size={22} color="#3d7a00" />
               <Text style={styles.quickActionText}>Orders</Text>
             </TouchableOpacity>
             <TouchableOpacity activeOpacity={0.9} style={styles.quickAction} onPress={() => router.push('/payments')}>
-              <Ionicons name="wallet-outline" size={22} color="#4CAF50" />
+              <Ionicons name="wallet-outline" size={22} color="#3d7a00" />
               <Text style={styles.quickActionText}>Payments</Text>
             </TouchableOpacity>
             <TouchableOpacity activeOpacity={0.9} style={styles.quickAction} onPress={() => router.push('/settings')}>
-              <Ionicons name="settings-outline" size={22} color="#4CAF50" />
+              <Ionicons name="settings-outline" size={22} color="#3d7a00" />
               <Text style={styles.quickActionText}>Settings</Text>
-            </TouchableOpacity>
-            {/* Debug action: Register Push Token */}
-            <TouchableOpacity
-              activeOpacity={0.9}
-              style={[styles.quickAction, { backgroundColor:'#e8f5e9' }]}
-              onPress={async () => {
-                try {
-                  console.log('=== Push Token Registration Debug ===');
-                  
-                  const Notifications = await import('expo-notifications');
-                  const Device = await import('expo-device');
-                  const isDevice = (Device as any).default?.isDevice ?? Device?.isDevice;
-                  
-                  console.log('Is physical device:', isDevice);
-                  if (!isDevice) {
-                    Alert.alert('Device required', 'Push notifications require a physical device.');
-                    return;
-                  }
-                  
-                  // Check current permissions
-                  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-                  console.log('Current permission status:', existingStatus);
-                  
-                  let finalStatus = existingStatus;
-                  if (existingStatus !== 'granted') {
-                    console.log('Requesting notification permissions...');
-                    const { status } = await Notifications.requestPermissionsAsync();
-                    finalStatus = status;
-                    console.log('Permission request result:', status);
-                  }
-                  
-                  if (finalStatus !== 'granted') {
-                    Alert.alert('Permission needed', `Notification permission was not granted. Status: ${finalStatus}`);
-                    return;
-                  }
-                  
-                  console.log('Permission granted, fetching push token...');
-                  
-                  // Get projectId
-                  const projectId = (Constants?.expoConfig?.extra as any)?.eas?.projectId || (Constants as any)?.easConfig?.projectId;
-                  console.log('Using projectId:', projectId);
-                  
-                  let tokenResp: any;
-                  let pushToken: string;
-                  
-                  try {
-                    console.log('Attempting to get Expo push token without projectId (avoiding Firebase)...');
-                    tokenResp = await Notifications.getExpoPushTokenAsync();
-                    pushToken = tokenResp.data;
-                    console.log('Successfully got token without projectId:', pushToken);
-                  } catch (err) {
-                    console.error('Failed without projectId:', err);
-                    console.log('Retrying with projectId...');
-                    try {
-                      tokenResp = await Notifications.getExpoPushTokenAsync({ projectId });
-                      pushToken = tokenResp.data;
-                      console.log('Successfully got token with projectId:', pushToken);
-                    } catch (err2) {
-                      console.error('Failed with projectId:', err2);
-                      Alert.alert('Token error', `Failed to get Expo push token:\n${err2.message || err2}\n\nFirebase not configured. Please set up FCM credentials.`);
-                      return;
-                    }
-                  }
-                  
-                  if (!pushToken) {
-                    Alert.alert('Token error', 'No push token received');
-                    return;
-                  }
-                  
-                  console.log('Final push token:', pushToken);
-                  
-                  // Register with backend
-                  try {
-                    const auth = await AsyncStorage.getItem('token');
-                    if (!auth) {
-                      Alert.alert('Auth error', 'No authentication token found');
-                      return;
-                    }
-                    
-                    console.log('Registering token with backend...');
-                    const res = await fetch(`${API_URL}/api/alerts/register-token`, {
-                      method: 'POST',
-                      headers: {
-                        Authorization: `Bearer ${auth}`,
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({ expoPushToken: String(pushToken) })
-                    });
-                    
-                    const text = await res.text();
-                    console.log('Backend response:', res.status, text);
-                    
-                    // Verify what was saved
-                    const verify = await fetch(`${API_URL}/api/alerts/me/token`, { 
-                      headers: { Authorization: `Bearer ${auth}` } 
-                    });
-                    const verifyJson = await verify.json();
-                    console.log('Verification response:', verifyJson);
-                    
-                    Alert.alert(
-                      res.ok ? '✅ Registered push token' : `❌ Register failed (${res.status})`,
-                      `Token: ${String(pushToken)}\n\nServer Response: ${text}\n\nSaved Token: ${JSON.stringify(verifyJson)}`
-                    );
-                  } catch (regErr) {
-                    console.error('Registration error:', regErr);
-                    Alert.alert('Register error', `Failed to POST token to server:\n${regErr.message || regErr}`);
-                    return;
-                  }
-                } catch (e) {
-                  console.error('General error:', e);
-                  Alert.alert('Error', `Failed to register push token:\n${e.message || e}`);
-                }
-              }}
-            >
-              <Text style={[styles.quickActionText, { color:'#2e7d32' }]}>🔔 Register Push Token</Text>
             </TouchableOpacity>
           </View>
 
@@ -791,7 +614,7 @@ export default function ProfileScreen() {
               <View style={styles.infoCardContent}>
                 <Text style={styles.infoTitle}>Personal Information</Text>
                 <TouchableOpacity activeOpacity={0.85} style={styles.infoRowGlass}>
-                  <Ionicons name="person-circle" size={28} color="#4CAF50" style={styles.infoIconGlass} />
+                  <Ionicons name="person-circle" size={28} color="#3d7a00" style={styles.infoIconGlass} />
                   <View style={styles.infoTextBlock}>
                     <Text style={styles.infoLabelGlass}>Username</Text>
                     <Text style={styles.infoValueGlass}>{authState.user.username}</Text>
@@ -812,7 +635,7 @@ export default function ProfileScreen() {
                   </View>
                 </TouchableOpacity>
                 <TouchableOpacity activeOpacity={0.85} style={styles.infoRowGlass}>
-                  <Ionicons name="mail" size={28} color="#4CAF50" style={styles.infoIconGlass} />
+                  <Ionicons name="mail" size={28} color="#3d7a00" style={styles.infoIconGlass} />
                   <View style={styles.infoTextBlock}>
                     <Text style={styles.infoLabelGlass}>Email</Text>
                     <Text style={styles.infoValueGlass}>{authState.user.email}</Text>
@@ -830,12 +653,19 @@ export default function ProfileScreen() {
                 <View style={{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom: 12 }}>
                   <Text style={styles.infoTitle}>Recent Orders</Text>
                   <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/orders')} style={{ flexDirection:'row', alignItems:'center' }}>
-                    <Text style={{ color:'#4CAF50', fontWeight:'600' }}>View All</Text>
-                    <Ionicons name="chevron-forward" size={18} color="#4CAF50" />
+                    <Text style={{ color:'#3d7a00', fontWeight:'600' }}>View All</Text>
+                    <Ionicons name="chevron-forward" size={18} color="#3d7a00" />
                   </TouchableOpacity>
                 </View>
                 {ordersLoading ? (
-                  <ActivityIndicator color="#4CAF50" />
+                  <View style={styles.ordersLoadingContainer}>
+                    <LoadingAnimation 
+                      visible={true} 
+                      size="small" 
+                      overlay={false}
+                    />
+                    <Text style={styles.ordersLoadingText}>Loading orders...</Text>
+                  </View>
                 ) : recentOrders.length === 0 ? (
                   <Text style={{ color:'#555' }}>No recent orders</Text>
                 ) : (
@@ -848,7 +678,7 @@ export default function ProfileScreen() {
                     return (
                       <View key={order._id || index} style={styles.orderRow}>
                         <View style={styles.orderIconWrapper}>
-                          <Ionicons name="receipt-outline" size={20} color="#4CAF50" />
+                          <Ionicons name="receipt-outline" size={20} color="#3d7a00" />
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.orderTitle}>{title}</Text>
@@ -883,7 +713,7 @@ export default function ProfileScreen() {
             <View style={{ backgroundColor:'#fff', borderRadius:16, padding:18, width:'80%' }}>
               <Text style={{ fontSize:16, fontWeight:'700', marginBottom:10 }}>Update Profile Photo</Text>
               <TouchableOpacity style={styles.quickAction} onPress={pickAndUploadPhoto}>
-                <Ionicons name="image-outline" size={22} color="#4CAF50" />
+                <Ionicons name="image-outline" size={22} color="#3d7a00" />
                 <Text style={styles.quickActionText}>Choose from Gallery</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.quickAction, { backgroundColor:'#fef2f2' }]} onPress={() => setShowPhotoMenu(false)}>
@@ -902,10 +732,14 @@ export default function ProfileScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#3d7a00" />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.headerSafeArea}>
           <View style={styles.authHeader}>
             <View style={styles.welcomeContainer}>
+              <View style={styles.logoContainer}>
+                <Image source={require('../../assets/images/appnamelogo.png')} style={styles.appNameLogo} resizeMode="contain" />
+              </View>
               <ThemedText style={styles.welcomeTitle}>
                 {isLogin ? 'Welcome Back' : 'Create Account'}
               </ThemedText>
@@ -1058,7 +892,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f7f8fa',
   },
   headerSafeArea: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     paddingTop: 20,
   },
   scrollView: {
@@ -1070,7 +904,7 @@ const styles = StyleSheet.create({
   },
   coverPhoto: {
     height: 150,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     justifyContent: 'flex-end',
     alignItems: 'center',
   },
@@ -1157,7 +991,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   editButtonText: {
-    color: '#4CAF50',
+    color: '#3d7a00',
     marginLeft: 5,
     fontSize: 16,
   },
@@ -1179,7 +1013,7 @@ const styles = StyleSheet.create({
   },
   infoAccentBar: {
     width: 7,
-    backgroundColor: 'linear-gradient(180deg, #4CAF50 0%, #43e97b 100%)',
+    backgroundColor: 'linear-gradient(180deg, #3d7a00 0%, #43e97b 100%)',
     borderTopLeftRadius: 24,
     borderBottomLeftRadius: 24,
   },
@@ -1195,7 +1029,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingVertical: 12,
     paddingHorizontal: 10,
-    shadowColor: '#4CAF50',
+    shadowColor: '#3d7a00',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 2,
@@ -1208,7 +1042,7 @@ const styles = StyleSheet.create({
   },
   infoLabelGlass: {
     fontSize: 13,
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontWeight: 'bold',
     marginBottom: 2,
   },
@@ -1233,7 +1067,7 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   authHeader: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     paddingTop: 40,
     paddingBottom: 40,
     borderBottomLeftRadius: 30,
@@ -1241,6 +1075,14 @@ const styles = StyleSheet.create({
   },
   welcomeContainer: {
     paddingHorizontal: 25,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  appNameLogo: {
+    width: 180,
+    height: 90,
   },
   welcomeTitle: {
     fontSize: 32,
@@ -1284,7 +1126,7 @@ const styles = StyleSheet.create({
     padding: 5,
   },
   submitButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     borderRadius: 12,
     height: 50,
     alignItems: 'center',
@@ -1301,7 +1143,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   switchButtonText: {
-    color: '#4CAF50',
+    color: '#3d7a00',
     fontSize: 14,
   },
   defaultProfileImage: {
@@ -1330,7 +1172,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   retryButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
@@ -1347,6 +1189,17 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     color: '#666',
+  },
+  ordersLoadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  ordersLoadingText: {
+    marginTop: 8,
+    color: '#3d7a00',
+    fontSize: 14,
+    fontWeight: '500',
   },
   locationPlaceholder: {
     height: 100,
@@ -1408,7 +1261,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 3,
@@ -1469,13 +1322,13 @@ const styles = StyleSheet.create({
   editBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     borderRadius: 24,
     marginHorizontal: 40,
     marginTop: 28,
     paddingVertical: 14,
     justifyContent: 'center',
-    shadowColor: '#4CAF50',
+    shadowColor: '#3d7a00',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
     shadowRadius: 4,
@@ -1494,6 +1347,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     marginHorizontal: 40,
     marginTop: 16,
+    marginBottom: 20,
     paddingVertical: 14,
     justifyContent: 'center',
     shadowColor: '#ff6b6b',

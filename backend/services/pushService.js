@@ -1,5 +1,7 @@
 const { Expo } = require('expo-server-sdk');
+const firebaseService = require('./firebaseService');
 const User = require('../models/User');
+const DeliveryBoy = require('../models/DeliveryBoy');
 
 // Singleton Expo client
 let expo = null;
@@ -28,22 +30,27 @@ async function sendPushMessages(messages) {
 async function sendToUser(userId, title, body, data = {}) {
   try {
     if (!userId) return;
-    const user = await User.findById(userId).select('expoPushToken');
-    const token = user && user.expoPushToken ? user.expoPushToken : '';
-    if (!isValidExpoToken(token)) {
-      console.log('[PUSH] No valid Expo token for user', String(userId));
-      return;
+    const user = await User.findById(userId).select('expoPushToken fcmToken');
+    const expoToken = user && user.expoPushToken ? user.expoPushToken : '';
+    const fcmToken = user && user.fcmToken ? user.fcmToken : '';
+    
+    // Try Firebase first, then Expo as fallback
+    if (firebaseService.isValidFCMToken(fcmToken)) {
+      await firebaseService.sendToUser(userId, title, body, data);
+    } else if (isValidExpoToken(expoToken)) {
+      const message = {
+        to: expoToken,
+        sound: 'default',
+        title: String(title || 'Notification'),
+        body: String(body || ''),
+        data: data || {},
+        priority: 'high'
+      };
+      await sendPushMessages([message]);
+      console.log('[PUSH] Sent to user via Expo', String(userId));
+    } else {
+      console.log('[PUSH] No valid token for user', String(userId));
     }
-    const message = {
-      to: token,
-      sound: 'default',
-      title: String(title || 'Notification'),
-      body: String(body || ''),
-      data: data || {},
-      priority: 'high'
-    };
-    await sendPushMessages([message]);
-    console.log('[PUSH] Sent to user', String(userId));
   } catch (e) {
     console.warn('sendToUser error:', e?.message || e);
   }
@@ -51,6 +58,34 @@ async function sendToUser(userId, title, body, data = {}) {
 
 module.exports = {
   sendToUser,
+  async sendToDeliveryBoy(deliveryBoyId, title, body, data = {}) {
+    try {
+      if (!deliveryBoyId) return;
+      const driver = await DeliveryBoy.findById(deliveryBoyId).select('expoPushToken fcmToken');
+      const expoToken = driver && driver.expoPushToken ? driver.expoPushToken : '';
+      const fcmToken = driver && driver.fcmToken ? driver.fcmToken : '';
+      
+      // Try Firebase first, then Expo as fallback
+      if (firebaseService.isValidFCMToken(fcmToken)) {
+        await firebaseService.sendToDeliveryBoy(deliveryBoyId, title, body, data);
+      } else if (isValidExpoToken(expoToken)) {
+        const message = {
+          to: expoToken,
+          sound: 'default',
+          title: String(title || 'Notification'),
+          body: String(body || ''),
+          data: data || {},
+          priority: 'high'
+        };
+        await sendPushMessages([message]);
+        console.log('[PUSH] Sent to delivery via Expo', String(deliveryBoyId));
+      } else {
+        console.log('[PUSH] No valid token for delivery', String(deliveryBoyId));
+      }
+    } catch (e) {
+      console.warn('sendToDeliveryBoy error:', e?.message || e);
+    }
+  }
 };
 
 

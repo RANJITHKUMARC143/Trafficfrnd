@@ -146,7 +146,7 @@ export default function CategoryScreen() {
           loop
           style={{ width: 200, height: 200 }}
         />
-        <ThemedText style={{ marginTop: 16, fontSize: 16, color: '#4CAF50' }}>Loading items...</ThemedText>
+        <ThemedText style={{ marginTop: 16, fontSize: 16, color: '#3d7a00' }}>Loading items...</ThemedText>
       </View>
     );
   }
@@ -178,7 +178,7 @@ export default function CategoryScreen() {
           <Ionicons
             name={locationType === 'traffic' ? 'alert-circle' : locationType === 'busstop' ? 'bus-outline' : 'stop-circle-outline'}
             size={24}
-            color="#4CAF50"
+            color="#3d7a00"
           />
           <ThemedText style={styles.locationName}>{locationName}</ThemedText>
         </View>
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
   locationName: {
     marginLeft: 8,
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#3d7a00',
   },
   content: {
     flex: 1,
@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
   itemPrice: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#4CAF50',
+    color: '#3d7a00',
   },
   unavailableText: {
     fontSize: 12,
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     borderRadius: 8,
   },
   addToCartButtonText: {
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     borderRadius: 8,
   },
   buyNowButtonText: {
@@ -535,7 +535,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#3d7a00',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
