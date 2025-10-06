@@ -148,24 +148,7 @@ export default function TestNotificationComponent() {
     }
   };
 
-  const sendTestNotification = async () => {
-    try {
-      setIsLoading(true);
-      
-      // This would typically be called from the backend
-      // For now, we'll just show a success message
-      Alert.alert(
-        'Test Notification',
-        'Firebase notification service is ready! Check backend logs for actual notification sending.',
-        [{ text: 'OK' }]
-      );
-    } catch (error) {
-      console.error('Send test notification error:', error);
-      Alert.alert('Error', 'Failed to send test notification');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // removed explicit test-notification sender to keep UI clean
 
   return (
     <ScrollView style={styles.container}>
@@ -234,15 +217,7 @@ export default function TestNotificationComponent() {
         </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.button, styles.secondaryButton, isLoading && styles.buttonDisabled]}
-        onPress={sendTestNotification}
-        disabled={isLoading}
-      >
-        <Text style={[styles.buttonText, styles.secondaryButtonText]}>
-          {isLoading ? 'Sending...' : 'Send Test Notification'}
-        </Text>
-      </TouchableOpacity>
+      {/* Removed explicit "Send Test Notification" button */}
 
       <Text style={styles.info}>
         Make sure you are running a development build (not Expo Go) and the backend is running.
