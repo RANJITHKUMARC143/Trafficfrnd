@@ -19,6 +19,21 @@ class MenuService {
     return MenuService.instance;
   }
 
+  private normalizeItem(item: MenuItem): MenuItem {
+    try {
+      const needsPrefix = typeof item.image === 'string' && item.image.startsWith('/');
+      const base = needsPrefix ? `${API_URL}${item.image}` : item.image;
+      const cacheBust = (item as any).updatedAt ? `?t=${new Date((item as any).updatedAt).getTime()}` : '';
+      return { ...(item as any), image: `${base}${cacheBust}` } as MenuItem;
+    } catch {
+      return item;
+    }
+  }
+
+  private normalizeList(items: MenuItem[]): MenuItem[] {
+    return (items || []).map((it) => this.normalizeItem(it));
+  }
+
   private initialize() {
     if (this.isInitialized) return;
 
@@ -130,7 +145,8 @@ class MenuService {
         throw new Error(`Failed to fetch menu items: ${response.status} ${response.statusText}`);
       }
 
-      const items = await this.parseJsonResponse(response);
+      const raw = await this.parseJsonResponse(response);
+      const items = this.normalizeList(raw);
       console.log('Fetched menu items:', items);
       
       this.menuCache.set(vendorId, items);
@@ -151,7 +167,8 @@ class MenuService {
         throw new Error(`Failed to fetch all menu items: ${response.status} ${response.statusText}`);
       }
 
-      const items = await this.parseJsonResponse(response);
+      const raw = await this.parseJsonResponse(response);
+      const items = this.normalizeList(raw);
       
       // Update cache for each vendor
       items.forEach((item: MenuItem) => {
@@ -174,14 +191,15 @@ class MenuService {
 
   private updateCache(item: MenuItem) {
     try {
-      const vendorId = item.vendorId;
+      const normalized = this.normalizeItem(item);
+      const vendorId = normalized.vendorId as any;
       const currentItems = this.menuCache.get(vendorId) || [];
-      const existingItemIndex = currentItems.findIndex(i => i._id === item._id);
+      const existingItemIndex = currentItems.findIndex(i => i._id === normalized._id);
 
       if (existingItemIndex >= 0) {
-        currentItems[existingItemIndex] = item;
+        (currentItems as any)[existingItemIndex] = normalized as any;
       } else {
-        currentItems.push(item);
+        (currentItems as any).push(normalized as any);
       }
 
       this.menuCache.set(vendorId, currentItems);
