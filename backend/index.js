@@ -937,6 +937,15 @@ app.use('/api/call', require('./routes/callRoutes'));
 // Delivery alerts
 app.use('/api/delivery-alerts', require('./routes/deliveryAlertRoutes'));
 
+// Users and Alerts (mount routers so push token registration and inspection work)
+try {
+  app.use('/api/users', require('./routes/userAuth'));
+  app.use('/api/alerts', require('./routes/alertRoutes'));
+  console.log('Mounted /api/users and /api/alerts routes');
+} catch (e) {
+  console.warn('Warning: failed to mount /api/users or /api/alerts routes:', e?.message);
+}
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT} and listening on all interfaces`);
