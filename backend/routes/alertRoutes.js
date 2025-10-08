@@ -21,17 +21,19 @@ router.put('/:id/read', auth, alertController.markAlertRead);
 // Register/update push token (reuses userAuth.updatePushToken)
 router.post('/register-token', auth, userAuth.updatePushToken);
 
-// Inspect current user's token
+// Inspect current user's tokens (FCM and Expo)
 router.get('/me/token', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('expoPushToken');
-    const token = user?.expoPushToken || '';
-    let valid = false;
+    const user = await User.findById(req.user._id).select('expoPushToken fcmToken');
+    const expo = user?.expoPushToken || '';
+    const fcm = user?.fcmToken || '';
+    let expoValid = false;
     try {
       const { Expo } = require('expo-server-sdk');
-      valid = typeof token === 'string' && Expo.isExpoPushToken(token);
+      expoValid = typeof expo === 'string' && Expo.isExpoPushToken(expo);
     } catch {}
-    res.json({ token, valid });
+    const fcmValid = typeof fcm === 'string' && fcm.length > 0 && fcm.startsWith('f');
+    res.json({ expoPushToken: expo, expoValid, fcmToken: fcm, fcmValid });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }

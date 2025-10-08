@@ -181,7 +181,10 @@ exports.getProfile = async (req, res) => {
         address: user.address,
         profileImage: user.profileImage,
         role: user.role,
-        location: user.location
+        location: user.location,
+        // Include push tokens for easier debugging/verification
+        fcmToken: user.fcmToken || '',
+        expoPushToken: user.expoPushToken || ''
       }
     });
   } catch (error) {
@@ -291,23 +294,24 @@ exports.updateLocation = async (req, res) => {
   }
 };
 
-// Update Expo push token
+// Update push token (prefer FCM, fallback to Expo token for backward compatibility)
 exports.updatePushToken = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    const token = req.body.expoPushToken || '';
-    let valid = false;
-    try {
-      const { Expo } = require('expo-server-sdk');
-      valid = typeof token === 'string' && Expo.isExpoPushToken(token);
-    } catch {}
-    user.expoPushToken = token;
+    const fcmToken = req.body.fcmToken || '';
+    const expoToken = req.body.expoPushToken || '';
+    if (typeof fcmToken === 'string' && fcmToken.length > 0) {
+      user.fcmToken = fcmToken;
+    }
+    if (typeof expoToken === 'string') {
+      user.expoPushToken = expoToken;
+    }
     await user.save();
-    console.log('[PUSH] updatePushToken user', String(user._id), 'token', token ? token.substring(0, 12) + '...' : '(empty)', 'valid=', valid);
-    res.json({ message: 'Expo push token updated successfully', token, valid });
+    console.log('[PUSH] updatePushToken user', String(user._id), 'fcm=', fcmToken ? fcmToken.substring(0, 12) + '...' : '(empty)', 'expo=', expoToken ? expoToken.substring(0, 12) + '...' : '(empty)');
+    res.json({ message: 'Push token updated successfully', fcmToken, expoPushToken: expoToken });
   } catch (error) {
     res.status(500).json({ message: 'Error updating push token', error: error.message });
   }
