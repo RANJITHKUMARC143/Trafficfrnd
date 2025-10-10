@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { SOCKET_URL } from '../../config';
 import { Bell, Search, Menu, X, User, Settings, HelpCircle } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -48,7 +49,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     let socket: Socket | null = null;
     try {
       const token = localStorage.getItem('token') || '';
-      socket = io('http://localhost:3000', {
+      socket = io(SOCKET_URL, {
         transports: ['websocket'],
         auth: { token, role: 'admin' },
       });

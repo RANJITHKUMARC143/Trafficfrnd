@@ -7,6 +7,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { toast } from 'react-toastify';
 import { io, Socket } from 'socket.io-client';
+import { API_URL, SOCKET_URL } from '../config';
 
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
@@ -82,7 +83,7 @@ const Orders: React.FC = () => {
       setError('');
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`http://localhost:3000/api/vendors/orders/admin`, {
+        const res = await fetch(`${API_URL}/api/vendors/orders/admin`, {
           headers: { 'Authorization': token ? `Bearer ${token}` : '' }
         });
         const data = await res.json();
@@ -99,7 +100,7 @@ const Orders: React.FC = () => {
     let socket: Socket | null = null;
     try {
       const token = localStorage.getItem('token') || '';
-      socket = io('http://localhost:3000', {
+      socket = io(SOCKET_URL, {
         transports: ['websocket'],
         auth: { token, role: 'admin' },
       });
@@ -193,7 +194,7 @@ const Orders: React.FC = () => {
     if (!window.confirm(`Are you sure you want to delete order ${order._id}?`)) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/api/vendors/orders/admin/${order._id}`, {
+      const res = await fetch(`${API_URL}/api/vendors/orders/admin/${order._id}`, {
         method: 'DELETE',
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
@@ -233,7 +234,7 @@ const Orders: React.FC = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const apiUrl = `http://localhost:3000/api/vendors/orders/admin/${form._id}/status`;
+      const apiUrl = `${API_URL}/api/vendors/orders/admin/${form._id}/status`;
       
       console.log('Updating order status:', {
         orderId: form._id,
