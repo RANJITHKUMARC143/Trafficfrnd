@@ -29,7 +29,7 @@ export const DynamicIslandProvider = ({ children }) => {
     }, 300);
   }, []);
 
-  const connectSocket = useCallback((url = 'https://trafficfrnd-2.onrender.com') => {
+  const connectSocket = useCallback((url = 'http://192.168.31.107:3000') => {
     if (socket) {
       socket.disconnect();
     }

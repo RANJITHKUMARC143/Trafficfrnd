@@ -179,7 +179,7 @@ const handleWalkerAssigned = (walkerData) => {
 ```jsx
 // Socket.io listener
 useEffect(() => {
-  const socket = io('https://trafficfrnd-2.onrender.com');
+  const socket = io('http://192.168.31.107:3000');
   
   socket.on('ORDER_STATUS_UPDATE', (data) => {
     showNotification({

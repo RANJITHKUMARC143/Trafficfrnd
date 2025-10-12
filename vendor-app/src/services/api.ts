@@ -189,5 +189,5 @@ export const updateVendorPushToken = async (expoPushToken: string) => {
 export default api; 
 
 class SocketService {
-  private readonly SOCKET_URL = ((process as any).env?.EXPO_PUBLIC_API_URL || 'https://trafficfrnd-2.onrender.com'); // Updated backend socket URL
+  private readonly SOCKET_URL = ((process as any).env?.EXPO_PUBLIC_API_URL || 'http://192.168.31.107:3000'); // Updated backend socket URL
 } 

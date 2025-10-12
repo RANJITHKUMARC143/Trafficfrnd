@@ -171,7 +171,7 @@ module.exports = {
     const keyId = process.env.RAZORPAY_KEY_ID;
     const keySecret = process.env.RAZORPAY_KEY_SECRET;
     if (!keyId || !keySecret) {
-      const mockUrl = `https://trafficfrnd-2.onrender.com/mock-payment-link?orderId=${encodeURIComponent(orderId)}&amount=${encodeURIComponent(amount)}`;
+      const mockUrl = `http://192.168.31.107:3000/mock-payment-link?orderId=${encodeURIComponent(orderId)}&amount=${encodeURIComponent(amount)}`;
       return {
         success: true,
         id: `plink_${orderId}_${Date.now()}`,
