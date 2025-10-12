@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-export const API_URL = (process as any).env?.EXPO_PUBLIC_API_URL || 'https://trafficfrnd-2.onrender.com';
+export const API_URL = (process as any).env?.EXPO_PUBLIC_API_URL || 'http://192.168.31.107:3000';
 
 console.log('Using API URL:', API_URL);
 

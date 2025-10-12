@@ -23,14 +23,14 @@ export const API_CONFIG = {
   development: {
     baseUrl: (process as any).env?.EXPO_PUBLIC_API_URL
       ? `${(process as any).env.EXPO_PUBLIC_API_URL}/api`
-      : 'https://trafficfrnd-2.onrender.com/api',
+      : 'http://192.168.31.107:3000/api',
     timeout: 10000, // 10 seconds
   },
   // Production
   production: {
     baseUrl: (process as any).env?.EXPO_PUBLIC_API_URL
       ? `${(process as any).env.EXPO_PUBLIC_API_URL}/api`
-      : 'https://trafficfrnd-2.onrender.com/api',
+      : 'http://192.168.31.107:3000/api',
     timeout: 15000, // 15 seconds
   }
 };
@@ -54,8 +54,8 @@ export const getTimeout = () => {
   return getApiConfig().timeout;
 };
 
-const DEV_API_URL = 'https://trafficfrnd-2.onrender.com/api';
-const PROD_API_URL = 'https://trafficfrnd-2.onrender.com/api';
+const DEV_API_URL = 'http://192.168.31.107:3000/api';
+const PROD_API_URL = 'http://192.168.31.107:3000/api';
 
 export const API_ENDPOINTS = {
   AUTH: {

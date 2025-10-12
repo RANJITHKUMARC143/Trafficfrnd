@@ -156,7 +156,7 @@ export default function DeliveryBoyProfile() {
     try {
       const token = (authUser as any)?.token || (user as any)?.token;
       // Fallback to API_URL from config used elsewhere
-      const API_URL = (process as any).env?.EXPO_PUBLIC_API_URL || 'https://trafficfrnd-2.onrender.com';
+      const API_URL = (process as any).env?.EXPO_PUBLIC_API_URL || 'http://192.168.31.107:3000';
       await fetch(`${API_URL}/api/delivery/me/surge`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },

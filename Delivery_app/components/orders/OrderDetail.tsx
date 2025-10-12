@@ -56,7 +56,7 @@ const OrderDetail = ({ order, onStatusUpdate }: OrderDetailProps) => {
 
   const handleCall = async () => {
     try {
-      const baseUrl = (Constants?.expoConfig?.extra?.API_BASE_URL as string) || 'https://trafficfrnd-2.onrender.com/api';
+      const baseUrl = (Constants?.expoConfig?.extra?.API_BASE_URL as string) || 'http://192.168.31.107:3000/api';
       const storedToken = await AsyncStorage.getItem(TOKEN_KEY);
       const fallbackToken = (global as any).deliveryAuthToken || (Constants?.expoConfig?.extra?.DELIVERY_TOKEN as string) || '';
       const token = storedToken || fallbackToken;
