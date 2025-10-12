@@ -1,0 +1,22 @@
+# Ignore frontend dependencies and files for backend deployment
+node_modules/
+package-lock.json
+yarn.lock
+
+# Ignore frontend apps
+app/
+components/
+assets/
+android/
+ios/
+vendor-app/
+Delivery_app/
+Admin console/
+
+# Ignore development files
+*.log
+.env.local
+.env.development
+
+# Keep only backend files
+!backend/
