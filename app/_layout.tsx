@@ -14,8 +14,6 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import LoadingAnimation from '../components/LoadingAnimation';
-import { DynamicIslandProvider } from '../context/DynamicIslandContext';
-import TrafficFrndDynamicIsland from '../components/TrafficFrndDynamicIsland';
 
 export {
   ErrorBoundary,
@@ -162,23 +160,20 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <DynamicIslandProvider>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <StatusBar style="light" />
-          <View style={{ 
-            backgroundColor: '#3d7a00', 
-            height: Platform.OS === 'android' ? RNStatusBar.currentHeight || 24 : 44, 
-            position: 'absolute', 
-            top: 0, 
-            left: 0, 
-            right: 0, 
-            zIndex: 1000 
-          }} />
-          <RootLayoutNav />
-          <LoadingAnimation visible={isAppLoading} size="large" />
-          <TrafficFrndDynamicIsland />
-        </GestureHandlerRootView>
-      </DynamicIslandProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <StatusBar style="light" />
+        <View style={{
+          backgroundColor: '#3d7a00', 
+          height: Platform.OS === 'android' ? RNStatusBar.currentHeight || 24 : 44, 
+          position: 'absolute', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          zIndex: 1000 
+        }} />
+        <RootLayoutNav />
+        <LoadingAnimation visible={isAppLoading} size="large" />
+      </GestureHandlerRootView>
     </SafeAreaProvider>
   );
 }

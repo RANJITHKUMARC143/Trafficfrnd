@@ -939,12 +939,12 @@ app.get('/api/health', (req, res) => {
 // Menu endpoints for vendors
 app.get('/api/vendors/menu/public/explore/all', async (req, res) => {
   try {
-    // Get all items that are public/available
-    const items = await Item.find({ 
-      status: { $in: ['active', 'available'] },
-      isPublic: { $ne: false }
+    // Get all menu items that are available
+    const MenuItem = require('./models/MenuItem');
+    const items = await MenuItem.find({ 
+      isAvailable: true
     })
-    .populate('seller', 'username email name')
+    .populate('vendorId', 'businessName ownerName email')
     .sort({ createdAt: -1 });
     
     res.json({

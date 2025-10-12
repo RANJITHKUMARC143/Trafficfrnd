@@ -23,7 +23,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useMemo } from 'react';
 import { fetchUserOrders } from '@lib/services/orderService';
 import { BlurView } from 'expo-blur';
-import { useDynamicIsland } from '../../context/DynamicIslandContext';
 
 type Category = {
   id: number;
@@ -216,6 +215,7 @@ export default function HomeScreen() {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [searchDebounceTimeout, setSearchDebounceTimeout] = useState<NodeJS.Timeout | null>(null);
+
 
   // Fallback menu items for when API is down
   const fallbackMenuItems: MenuItem[] = [
@@ -1283,6 +1283,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
       <StatusBar style="light" />
+      
       <View style={{ 
         backgroundColor: '#3d7a00', 
         height: Platform.OS === 'android' ? RNStatusBar.currentHeight || 24 : 44, 

@@ -23,8 +23,9 @@
         "googleMapsApiKey": "AIzaSyAW74HcfPLqNz7kmr7EK4LM6TTmCnJ3pXM"
       },
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSSupportsLiveActivities": true
+      },
     },
     "android": {
       "package": "com.trafficfriend.app",
@@ -47,23 +48,23 @@
     "web": {
       "favicon": "./assets/images/logo.png"
     },
-    "plugins": [
-      [
-        "expo-location",
-        {
-          "locationAlwaysAndWhenInUsePermission": "Allow Traffic Frnd to use your location to find nearby delivery buddies and improve delivery accuracy."
-        }
+      "plugins": [
+        [
+          "expo-location",
+          {
+            "locationAlwaysAndWhenInUsePermission": "Allow Traffic Frnd to use your location to find nearby delivery buddies and improve delivery accuracy."
+          }
+        ],
+        [
+          "expo-notifications",
+          {
+            "icon": "./assets/images/logo.png",
+            "color": "#3d7a00",
+            "defaultChannel": "default"
+          }
+        ],
+        "expo-router"
       ],
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/images/logo.png",
-          "color": "#3d7a00",
-          "defaultChannel": "default"
-        }
-      ],
-      "expo-router"
-    ],
     "extra": {
       "router": {
         "origin": false
