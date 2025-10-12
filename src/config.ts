@@ -19,7 +19,7 @@ function deriveLanBaseURL(): string | undefined {
 }
 
 const LAN_BASE = deriveLanBaseURL();
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || LAN_BASE || 'http://localhost:3000';
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://trafficfrnd-2.onrender.com';
 
 // Socket Configuration
 export const SOCKET_CONFIG = {

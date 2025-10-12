@@ -27,7 +27,7 @@ const OrderCreate: React.FC = () => {
   const [paymentLink, setPaymentLink] = useState('');
   const [generatingPaymentLink, setGeneratingPaymentLink] = useState(false);
 
-  const API = 'http://localhost:3000';
+  const API = 'https://trafficfrnd-2.onrender.com';
 
   useEffect(() => {
     const token = localStorage.getItem('token');

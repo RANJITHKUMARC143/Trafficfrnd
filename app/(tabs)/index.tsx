@@ -1,5 +1,5 @@
 import 'react-native-get-random-values';
-import { StyleSheet, TextInput, ScrollView, TouchableOpacity, View, Image, Alert, Platform, Linking, Dimensions, Animated, KeyboardAvoidingView, Text, Modal, FlatList, Keyboard } from 'react-native';
+import { StyleSheet, TextInput, ScrollView, TouchableOpacity, View, Image, Alert, Platform, Linking, Dimensions, Animated, KeyboardAvoidingView, Text, Modal, FlatList, Keyboard, StatusBar as RNStatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@cmp/ThemedText';
 import { ThemedView } from '@cmp/ThemedView';
@@ -23,6 +23,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useMemo } from 'react';
 import { fetchUserOrders } from '@lib/services/orderService';
 import { BlurView } from 'expo-blur';
+import { useDynamicIsland } from '../../context/DynamicIslandContext';
 
 type Category = {
   id: number;
@@ -1280,9 +1281,18 @@ export default function HomeScreen() {
   }, [keyboardOpen]);
 
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+    <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+      <StatusBar style="light" />
+      <View style={{ 
+        backgroundColor: '#3d7a00', 
+        height: Platform.OS === 'android' ? RNStatusBar.currentHeight || 24 : 44, 
+        position: 'absolute', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        zIndex: 1000 
+      }} />
       <ThemedView style={{ flex: 1 }}>
-        <StatusBar style="auto" />
       
       {/* Touch handler to close suggestions */}
       {(searchSuggestions.length > 0 || searchFocused) && (

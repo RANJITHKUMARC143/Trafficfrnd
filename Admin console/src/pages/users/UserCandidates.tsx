@@ -88,7 +88,7 @@ const UserCandidates: React.FC = () => {
       setError('');
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`http://localhost:3000/api`, {
+        const res = await fetch(`https://trafficfrnd-2.onrender.com/api`, {
           headers: { 'Authorization': token ? `Bearer ${token}` : '' }
         });
         const data = await res.json();
@@ -259,7 +259,7 @@ const UserCandidates: React.FC = () => {
     if (!window.confirm(`Are you sure you want to delete user ${user.name}?`)) return;
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/api/${user.id}`, {
+      const res = await fetch(`https://trafficfrnd-2.onrender.com/api/${user.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
@@ -296,7 +296,7 @@ const UserCandidates: React.FC = () => {
     setFormError('');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/api/${form.id}`, {
+      const res = await fetch(`https://trafficfrnd-2.onrender.com/api/${form.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
         body: JSON.stringify(form)
@@ -318,7 +318,7 @@ const UserCandidates: React.FC = () => {
     setFormError('');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/api`, {
+      const res = await fetch(`https://trafficfrnd-2.onrender.com/api`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
         body: JSON.stringify(form)

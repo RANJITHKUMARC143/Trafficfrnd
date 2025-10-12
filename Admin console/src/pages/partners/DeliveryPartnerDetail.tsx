@@ -185,7 +185,7 @@ const DeliveryPartnerDetail: React.FC = () => {
       console.log('Fetching partner details for ID:', id);
       console.log('Using token:', token ? 'Token exists' : 'No token');
       
-      const url = `http://localhost:3000/api/delivery/${id}`;
+      const url = `https://trafficfrnd-2.onrender.com/api/delivery/${id}`;
       console.log('Request URL:', url);
       
       const res = await fetch(url, {
@@ -216,7 +216,7 @@ const DeliveryPartnerDetail: React.FC = () => {
   const fetchPartnerOrders = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/api/delivery/${id}/orders`, {
+      const res = await fetch(`https://trafficfrnd-2.onrender.com/api/delivery/${id}/orders`, {
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
       if (!res.ok) throw new Error('Failed to fetch partner orders');
@@ -232,7 +232,7 @@ const DeliveryPartnerDetail: React.FC = () => {
   const fetchPartnerVendors = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/api/delivery/${id}/vendors`, {
+      const res = await fetch(`https://trafficfrnd-2.onrender.com/api/delivery/${id}/vendors`, {
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
       if (!res.ok) throw new Error('Failed to fetch partner vendors');
@@ -248,7 +248,7 @@ const DeliveryPartnerDetail: React.FC = () => {
   const fetchActivityLog = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/api/delivery/${id}/activity`, {
+      const res = await fetch(`https://trafficfrnd-2.onrender.com/api/delivery/${id}/activity`, {
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
       if (!res.ok) throw new Error('Failed to fetch activity log');

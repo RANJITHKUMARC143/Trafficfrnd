@@ -23,7 +23,7 @@ const mapContainerStyle = { width: '100%', height: '100%', borderRadius: '8px' }
 const modalMapStyle = { width: '100%', height: 220 };
 // Google Maps API Key - Replace with your own key if needed
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAW74HcfPLqNz7kmr7EK4LM6TTmCnJ3pXM';
-const API_BASE = `http://localhost:3000/api/delivery-points`;
+const API_BASE = `https://trafficfrnd-2.onrender.com/api/delivery-points`;
 
 // Fix performance warning by keeping libraries array static
 const GOOGLE_MAPS_LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ['places'];

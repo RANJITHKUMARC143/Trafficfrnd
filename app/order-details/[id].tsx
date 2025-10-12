@@ -13,6 +13,7 @@ import {
   Dimensions,
   Platform
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@cmp/ThemedText';
 import { ThemedView } from '@cmp/ThemedView';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -481,7 +482,8 @@ export default function OrderDetailsScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+      <ThemedView style={styles.container}>
       {/* Compact banner when completed */}
       {String(order.status || '').toLowerCase() === 'completed' && (
         <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
@@ -830,6 +832,7 @@ export default function OrderDetailsScreen() {
         )}
       </ScrollView>
     </ThemedView>
+    </SafeAreaView>
   );
 }
 

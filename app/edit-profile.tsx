@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@cmp/ThemedText';
 import { ThemedView } from '@cmp/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
@@ -119,7 +120,8 @@ export default function EditProfileScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+      <ThemedView style={styles.container}>
       <Stack.Screen
         options={{
           title: 'Edit Profile',
@@ -195,6 +197,7 @@ export default function EditProfileScreen() {
         </View>
       </ScrollView>
     </ThemedView>
+    </SafeAreaView>
   );
 }
 

@@ -87,7 +87,7 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.trafficfriend.app'
+    namespace "com.trafficfriend.app"
     defaultConfig {
         applicationId 'com.trafficfriend.app'
         minSdkVersion rootProject.ext.minSdkVersion

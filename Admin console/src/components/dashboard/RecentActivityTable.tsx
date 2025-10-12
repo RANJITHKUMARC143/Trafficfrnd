@@ -55,7 +55,7 @@ const RecentActivityTable: React.FC = () => {
       try {
         setLoading(true);
         setError('');
-        const baseUrl = 'http://localhost:3000';
+        const baseUrl = 'https://trafficfrnd-2.onrender.com';
         const token = localStorage.getItem('token') || '';
 
         // Prefer recent call logs as a general activity feed for now

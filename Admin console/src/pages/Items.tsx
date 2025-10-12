@@ -32,7 +32,7 @@ const PREDEFINED_CATEGORIES = [
 ];
 
 const Items: React.FC = () => {
-  const API = 'http://localhost:3000';
+  const API = 'https://trafficfrnd-2.onrender.com';
   const [items, setItems] = useState<Item[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);

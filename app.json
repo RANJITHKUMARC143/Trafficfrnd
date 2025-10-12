@@ -21,6 +21,9 @@
       "bundleIdentifier": "com.trafficfriend.app",
       "config": {
         "googleMapsApiKey": "AIzaSyAW74HcfPLqNz7kmr7EK4LM6TTmCnJ3pXM"
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

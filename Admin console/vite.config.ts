@@ -9,6 +9,6 @@ export default defineConfig({
   },
   server: {
     historyApiFallback: true,
-    // '/api': 'http://localhost:3000',
+    // '/api': 'https://trafficfrnd-2.onrender.com',
   },
 });

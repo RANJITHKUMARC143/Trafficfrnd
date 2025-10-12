@@ -15,7 +15,7 @@ const Dashboard: React.FC = () => {
       try {
         setLoading(true);
         setError('');
-        const baseUrl = 'http://localhost:3000';
+        const baseUrl = 'https://trafficfrnd-2.onrender.com';
         const token = localStorage.getItem('token') || '';
 
         const [usersRes, vendorsRes, deliveryRes, ordersRes] = await Promise.all([

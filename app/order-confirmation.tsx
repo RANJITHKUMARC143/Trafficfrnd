@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, TouchableOpacity, ScrollView, Text, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@cmp/ThemedText';
 import { ThemedView } from '@cmp/ThemedView';
 // Icons replaced with emoji for compatibility
@@ -46,7 +47,8 @@ export default function OrderConfirmationScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+      <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         {/* Success Header */}
         <View style={styles.successHeader}>
@@ -120,6 +122,7 @@ export default function OrderConfirmationScreen() {
       </ScrollView>
       {/* Modal removed as per request */}
     </ThemedView>
+    </SafeAreaView>
   );
 }
 

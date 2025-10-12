@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, TouchableOpacity, FlatList } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@cmp/ThemedText';
 import { ThemedView } from '@cmp/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,7 +22,8 @@ export default function PaymentsScreen() {
   ];
 
   return (
-    <ThemedView style={styles.container}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+      <ThemedView style={styles.container}>
       <View style={styles.header}>
         <ThemedText style={styles.title}>Payments</ThemedText>
         <ThemedText style={styles.subtitle}>Manage methods and view history</ThemedText>
@@ -52,6 +54,7 @@ export default function PaymentsScreen() {
 
       <BottomNavigationBar />
     </ThemedView>
+    </SafeAreaView>
   );
 }
 

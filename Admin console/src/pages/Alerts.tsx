@@ -20,7 +20,7 @@ const RECIPIENT_TYPES = [
   { value: 'delivery', label: 'Delivery Boy' },
 ];
 
-const API_URL = 'http://localhost:3000';
+const API_URL = 'https://trafficfrnd-2.onrender.com';
 
 function getInitials(name) {
   if (!name) return '?';

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@cmp/ThemedText';
 import { ThemedView } from '@cmp/ThemedView';
 import { fetchUserOrders } from '@lib/services/orderService';
@@ -119,7 +120,8 @@ export default function OrdersScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+      <ThemedView style={styles.container}>
       <View style={styles.titleRow}>
         <ThemedText style={styles.title}>My Orders</ThemedText>
         <TouchableOpacity onPress={onRefresh} style={styles.refreshBtn} activeOpacity={0.8}>
@@ -155,6 +157,7 @@ export default function OrdersScreen() {
         }
       />
     </ThemedView>
+    </SafeAreaView>
   );
 }
 

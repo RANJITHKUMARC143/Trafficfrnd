@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Image, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Modal, Dimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { ThemedText } from '@cmp/ThemedText';
 import { menuService } from '@lib/services/menuService';
@@ -123,7 +124,7 @@ export default function ItemDetailScreen() {
   }
 
   return (
-    <>
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.container}>
         <View style={styles.headerContainer}>
@@ -237,7 +238,7 @@ export default function ItemDetailScreen() {
           </View>
         </Modal>
       </View>
-    </>
+    </SafeAreaView>
   );
 }
 

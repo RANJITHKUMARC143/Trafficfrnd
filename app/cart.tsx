@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, TouchableOpacity, FlatList, Alert, TextInput, Image } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@cmp/ThemedText';
 import { ThemedView } from '@cmp/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
@@ -550,7 +551,8 @@ export default function CartScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+      <ThemedView style={styles.container}>
       <Stack.Screen 
         options={{
           title: 'Your Cart',
@@ -887,6 +889,7 @@ export default function CartScreen() {
       )}
       {/* Removed legacy checkpoint overlays */}
     </ThemedView>
+    </SafeAreaView>
   );
 }
 

@@ -35,6 +35,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  fcmToken: {
+    type: String,
+    default: '',
+  },
   role: {
     type: String,
     default: 'user',

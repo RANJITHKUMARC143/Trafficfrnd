@@ -137,13 +137,14 @@ export async function registerPushToken(token: string) {
   try {
     const auth = await AsyncStorage.getItem('token');
     if (!auth) return;
+    // Prefer FCM token field; backend will accept either for backward compatibility
     await fetch(`${API_URL}/api/alerts/register-token`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${auth}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ expoPushToken: token })
+      body: JSON.stringify({ fcmToken: token, expoPushToken: '' })
     });
   } catch (e) {
     console.log('registerPushToken error:', e);

@@ -2,7 +2,7 @@ import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { API_URL } from '@src/config';
-const SOCKET_URL = API_URL;
+const SOCKET_URL = API_URL.replace('/api', '');
 
 class ChatService {
   private static instance: ChatService;

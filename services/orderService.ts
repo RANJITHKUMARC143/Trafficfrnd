@@ -6,6 +6,10 @@ const API_BASE_URL = `${API_URL}/api`;
 
 export async function createOrder(orderData) {
   const token = await AsyncStorage.getItem('token');
+  console.log('Creating order with data:', orderData);
+  console.log('Using token:', token ? 'Token exists' : 'No token');
+  console.log('API URL:', `${API_BASE_URL}/orders`);
+  
   const res = await fetch(`${API_BASE_URL}/orders`, {
     method: 'POST',
     headers: {
@@ -14,8 +18,19 @@ export async function createOrder(orderData) {
     },
     body: JSON.stringify(orderData),
   });
-  if (!res.ok) throw new Error('Failed to create order');
-  return res.json();
+  
+  console.log('Order creation response status:', res.status);
+  console.log('Order creation response headers:', res.headers);
+  
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
+    console.error('Order creation failed:', errorData);
+    throw new Error(errorData.message || `Failed to create order (${res.status})`);
+  }
+  
+  const result = await res.json();
+  console.log('Order created successfully:', result);
+  return result;
 }
 
 export async function fetchUserOrders() {

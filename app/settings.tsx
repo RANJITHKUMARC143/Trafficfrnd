@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Switch, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@cmp/ThemedText';
 import { ThemedView } from '@cmp/ThemedView';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,7 +12,8 @@ export default function SettingsScreen() {
   const [darkMode, setDarkMode] = useState(false);
 
   return (
-    <ThemedView style={styles.container}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+      <ThemedView style={styles.container}>
       <View style={styles.header}>
         <ThemedText style={styles.title}>Settings</ThemedText>
         <ThemedText style={styles.subtitle}>Personalize your experience</ThemedText>
@@ -62,6 +64,7 @@ export default function SettingsScreen() {
 
       <BottomNavigationBar />
     </ThemedView>
+    </SafeAreaView>
   );
 }
 

@@ -46,7 +46,7 @@ const Payments: React.FC = () => {
       try {
         setLoading(true);
         setError('');
-        const baseUrl = 'http://localhost:3000';
+        const baseUrl = 'https://trafficfrnd-2.onrender.com';
         const token = localStorage.getItem('token') || '';
 
         // Use vendor orders as transactions proxy for now

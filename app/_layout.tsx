@@ -6,13 +6,16 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { Platform, View, StatusBar as RNStatusBar } from 'react-native';
 import { registerPushToken } from '@lib/services/alertService';
 import { useColorScheme } from 'react-native';
 import { socketService } from '@lib/services/socketService';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import LoadingAnimation from '../components/LoadingAnimation';
+import { DynamicIslandProvider } from '../context/DynamicIslandContext';
+import TrafficFrndDynamicIsland from '../components/TrafficFrndDynamicIsland';
 
 export {
   ErrorBoundary,
@@ -121,27 +124,17 @@ export default function RootLayout() {
         const projectId = (Constants?.expoConfig?.extra as any)?.eas?.projectId || (Constants as any)?.easConfig?.projectId;
         console.log('Using projectId:', projectId);
         
-        // Fetch Expo push token
-        let token;
+        // Fetch native device push token (FCM on Android, APNs on iOS)
+        let token: string | undefined;
         try {
-          // Try without projectId first to avoid Firebase issues
-          const tokenResponse = await Notifications.getExpoPushTokenAsync();
-          token = tokenResponse.data;
-          console.log('Successfully fetched Expo push token (no projectId):', token);
+          const deviceToken = await Notifications.getDevicePushTokenAsync();
+          token = deviceToken?.data as unknown as string;
+          console.log('Successfully fetched device push token (FCM/APNs):', token?.slice(0, 12) + '...');
         } catch (tokenError) {
-          console.error('Failed to get Expo push token without projectId:', tokenError);
-          // Try with projectId as fallback
-          try {
-            const tokenResponse = await Notifications.getExpoPushTokenAsync({ projectId });
-            token = tokenResponse.data;
-            console.log('Successfully fetched Expo push token (with projectId):', token);
-          } catch (fallbackError) {
-            console.error('Failed to get Expo push token (with projectId):', fallbackError);
-            console.log('Firebase not configured. Please set up FCM credentials.');
-            return;
-          }
+          console.error('Failed to get device push token:', tokenError);
+          return;
         }
-        
+
         if (!token) {
           console.log('No push token received');
           return;
@@ -169,10 +162,23 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <RootLayoutNav />
-        <LoadingAnimation visible={isAppLoading} size="large" />
-      </GestureHandlerRootView>
+      <DynamicIslandProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <StatusBar style="light" />
+          <View style={{ 
+            backgroundColor: '#3d7a00', 
+            height: Platform.OS === 'android' ? RNStatusBar.currentHeight || 24 : 44, 
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            zIndex: 1000 
+          }} />
+          <RootLayoutNav />
+          <LoadingAnimation visible={isAppLoading} size="large" />
+          <TrafficFrndDynamicIsland />
+        </GestureHandlerRootView>
+      </DynamicIslandProvider>
     </SafeAreaProvider>
   );
 }

@@ -49,7 +49,7 @@ export default function App() {
   return (
     <AuthProvider>
       <SafeAreaProvider>
-        <StatusBar style="auto" />
+        <StatusBar style="light" backgroundColor="#3d7a00" />
         <AppNavigator />
       </SafeAreaProvider>
     </AuthProvider>
