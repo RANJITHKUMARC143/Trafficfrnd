@@ -927,6 +927,41 @@ app.get('/api/test', (req, res) => {
   res.json({ message: 'API is working!' });
 });
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+// Menu endpoints for vendors
+app.get('/api/vendors/menu/public/explore/all', async (req, res) => {
+  try {
+    // Get all items that are public/available
+    const items = await Item.find({ 
+      status: { $in: ['active', 'available'] },
+      isPublic: { $ne: false }
+    })
+    .populate('seller', 'username email name')
+    .sort({ createdAt: -1 });
+    
+    res.json({
+      success: true,
+      items,
+      total: items.length
+    });
+  } catch (error) {
+    console.error('Get all menu items error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error fetching menu items',
+      error: error.message 
+    });
+  }
+});
+
 app.use('/api/delivery-points', require('./routes/deliveryPointRoutes'));
 // Payments
 app.use('/api/payments', require('./routes/paymentRoutes'));
